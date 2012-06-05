@@ -1,0 +1,6 @@
+#generated files
+*.o
+egg
+
+#project files
+*.kdev4

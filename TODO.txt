@@ -1,3 +1,4 @@
 Build Parser Generator
 Make it Packrat
 Look at adding cut syntax
+Make sure you include an optional string literal description
