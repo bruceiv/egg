@@ -5,23 +5,27 @@
 
 namespace egg {
 
-	using std::string;
+	typedef std::string String;
 
 	/** Type of AST node  */
 	enum NodeType {
-		GRAMMAR,	/**< egg grammar  */
+		GRAMMAR,		/**< egg grammar  */
 		NONTERMINAL,	/**< nonterminal */
-		TERMINAL	/**< terminal */
+		TERMINAL		/**< terminal */
 	};
-
+	
 	/** Abstract syntax tree node */
 	struct Node {
 		
-		Node(NodeType type, string desc);
+		Node(NodeType type);
 
 		NodeType type;
-		string desc;
 	}; /* class Node */
+	
+	/** Gets the description corresponding to a given node type */
+	String NodeDesc(NodeType type);
+	/** Convenience for NodeDesc(node.type) */
+	String NodeDesc(Node const& node);
 
 } /* namespace egg */
 

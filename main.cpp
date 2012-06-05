@@ -5,9 +5,9 @@
 int main(int argc, char** argv) {
 	using namespace egg;
 	
-	Node root(GRAMMAR, "grammar");
+	Node root(GRAMMAR);
 
-	std::cout << root.desc << std::endl;
+	std::cout << NodeDesc(root) << std::endl;
 
 	return 0;
 } /* main() */
