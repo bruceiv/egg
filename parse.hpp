@@ -14,8 +14,7 @@
 
 namespace parse {
 	
-	typedef long			ind;	/**< index type */
-	typedef unsigned long	uind;	/**< unsigned index type */
+	typedef unsigned long	ind;	/**< unsigned index type */
 	
 	/** Error thrown when a parser is asked for state it has forgotten. */
 	struct forgotten_state_error : public std::range_error {
@@ -24,7 +23,7 @@ namespace parse {
 		 *  @param req		Requested index
 		 *  @param avail	Minimum available index
 		 */
-		forgotten_state_error(uind req, uind avail) throw() 
+		forgotten_state_error(ind req, ind avail) throw() 
 			: req(req), avail(avail) {}
 		
 		/** Inherited from std::exception. */
@@ -39,9 +38,9 @@ namespace parse {
 		}
 		
 		/** requested index */
-		uind req;
+		ind req;
 		/** minimum available index */
-		uind avail;
+		ind avail;
 	}; /* struct forgotten_range_error */
 	
 	/** Parser state */
@@ -51,7 +50,7 @@ namespace parse {
 		typedef std::deque<char>::iterator			iterator;
 		typedef std::pair<iterator, iterator>		range_type;
 		typedef std::deque<char>::difference_type	difference_type;
-		typedef uind								size_type;
+		typedef ind								size_type;
 		
 		/** Default constructor.
 		 *  Initializes state at beginning of input stream.
@@ -74,12 +73,12 @@ namespace parse {
 			if ( i < str_off ) throw forgotten_state_error(i, str_off);
 			
 			// Get index into stored input
-			uind ii = i - str_off;
+			ind ii = i - str_off;
 			
 			// Expand stored input if needed
 			if ( ii > str.size() ) {
-				uind n = ii - str.size();
-				uind r = read(n);
+				ind n = ii - str.size();
+				ind r = read(n);
 				if ( r < n ) return '\0';
 			}
 			
@@ -104,12 +103,12 @@ namespace parse {
 			if ( i < str_off ) throw forgotten_state_error(i, str_off);
 			
 			// Get index into stored input
-			uind ib = i - str_off;
-			uind ie = ib + n;
+			ind ib = i - str_off;
+			ind ie = ib + n;
 			
 			// Expand stored input if needed
 			if ( ie > str.size() ) {
-				uind nn = ie - str.size();
+				ind nn = ie - str.size();
 				read(nn);
 			}
 			
@@ -142,7 +141,7 @@ namespace parse {
 			if ( i <= str_off ) return;
 			
 			// Get index in stored input to forget
-			uind ii = i - str_off;
+			ind ii = i - str_off;
 			
 			// Forget stored input
 			str.erase(str.begin(), str.begin()+ii);
@@ -158,7 +157,7 @@ namespace parse {
 			// Read into buffer
 			in.read(s, n);
 			// Count read characters
-			uind r = in.gcount();
+			ind r = in.gcount();
 			// Add to stored input
 			str.insert(str.end(), s, s+r);
 			return r;

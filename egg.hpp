@@ -1,31 +1,55 @@
 #ifndef _EGG_EGG_HPP_
 #define _EGG_EGG_HPP_
 
-#include <string>
+//--
+#include <iostream>
+//--
+
+#include "parse.hpp"
 
 namespace egg {
 
-	typedef std::string String;
-
-	/** Type of AST node  */
-	enum NodeType {
-		GRAMMAR,		/**< egg grammar  */
-		NONTERMINAL,	/**< nonterminal */
-		TERMINAL		/**< terminal */
-	};
+	/** Parsing root. Call to parse an Egg grammar.
+	 *  @param in		The input stream to read from
+	 *  @return Did the input stream contain an Egg grammar?
+	 */
+	bool parse(std::istream& in) {
+		return parse(parse::state(in));
+	}
 	
-	/** Abstract syntax tree node */
-	struct Node {
+	/** Parsing root. Call to parse an Egg grammar.
+	 *  @param st		The parsing state to start from
+	 *  @return Did the input contained in the passed state contain an Egg 
+	 *  		grammar?
+	 */
+	bool parse(parse::state& st) {
+		return grammar(st);
+	}
+	
+	bool grammar(parse::state& st) {
+		parse::ind startPos = st.pos;
 		
-		Node(NodeType type);
-
-		NodeType type;
-	}; /* class Node */
-	
-	/** Gets the description corresponding to a given node type */
-	String NodeDesc(NodeType type);
-	/** Convenience for NodeDesc(node.type) */
-	String NodeDesc(Node const& node);
+		if ( ! _(st) ) {
+			st.pos = startPos;
+			return false;
+		}
+		
+		if ( ! nonterminal(st) ) {
+			st.pos = startPos;
+			return false;
+		}
+		
+		while ( nonterminal(st) ) {}
+		
+		if ( ! EOF(st) ) {
+			st.pos = startPos;
+			return false;
+		}
+		
+		parse::ind endPos = st.pos;
+		
+		{ std::cout << "grammar [" << startPos << "," << endPos << "]" << std::endl; }
+	}
 
 } /* namespace egg */
 
