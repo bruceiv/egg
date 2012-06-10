@@ -1,0 +1,54 @@
+# Egg grammar for Egg grammars.
+# Derived from the Leg grammar at http://piumarta.com/software/peg/peg.1.html .
+#
+# Author: Aaron Moss
+
+grammar =		_ nonterminal+ EOF
+
+nonterminal =	identifier EQUAL rule SEMI?
+
+identifier =	< [A-Za-z_][A-Za-z_0-9]* > _
+
+rule =			expression ( PIPE expression )*
+
+expression =	( ( AND | NOT )? primary ( OPT | STAR | PLUS )? )+
+
+primary =		identifier !EQUAL
+				| OPEN expression CLOSE
+				| char_literal
+				| str_literal
+				| char_class
+				| ANY
+				| BEGIN expression END
+
+char_literal =	'\'' < character > '\'' _
+
+str_literal =	'\"' < character* > '\"' _
+
+char_class =	'[' < ( !']' char_range )* > ']' _
+
+char_range =	character '-' character 
+				| character
+
+character =		'\\' [abefnrtv\'\"\\]
+				| ![\'\"\\] .
+
+EQUAL =			'=' _
+SEMI =			';' _
+PIPE =			'|' _
+AND =			'&' _
+NOT =			'!' _
+OPT =			'?' _
+STAR =			'*' _
+PLUS =			'+' _
+OPEN =			'(' _
+CLOSE =			')' _
+ANY =			'.' _
+BEGIN =			'<' _
+END =			'>' _
+
+_ =		 		( space | comment )*
+space =			' ' | '\t' | EOL
+comment =		'#' ( !EOL . )* EOL
+EOL = 			"\r\n" | '\n' | '\r'
+EOF = 			!.
