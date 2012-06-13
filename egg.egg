@@ -3,7 +3,7 @@
 #
 # Author: Aaron Moss
 
-grammar =		_ rule+ EOF
+grammar =		_ rule+ end_of_file
 
 rule =			identifier EQUAL choice SEMI?
 
@@ -48,7 +48,7 @@ BEGIN =			'<' _
 END =			'>' _
 
 _ =		 		( space | comment )*
-space =			' ' | '\t' | EOL
-comment =		'#' ( !EOL . )* EOL
-EOL = 			"\r\n" | '\n' | '\r'
-EOF = 			!.
+space =			' ' | '\t' | end_of_line
+comment =		'#' ( !end_of_line . )* end_of_line
+end_of_line = 	"\r\n" | '\n' | '\r'
+end_of_file = 	!.

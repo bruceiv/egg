@@ -60,8 +60,8 @@ namespace egg {
 	bool _(parse::state& ps);
 	bool space(parse::state& ps);
 	bool comment(parse::state& ps);
-	bool EOL(parse::state& ps);
-	bool EOF(parse::state& ps);
+	bool end_of_line(parse::state& ps);
+	bool end_of_file(parse::state& ps);
 	
 	/** Parsing root. Call to parse an Egg grammar.
 	 *  @param ps		The parsing state to start from
@@ -89,7 +89,7 @@ namespace egg {
 		if ( ! rule(ps) ) { ps.pos = psStart; return false; }
 		while ( rule(ps) ) {}
 		
-		if ( ! EOF(ps) ) { ps.pos = psStart; return false; }
+		if ( ! end_of_file(ps) ) { ps.pos = psStart; return false; }
 		
 		parse::ind psLen = ps.pos - psStart;
 		{ std::cout << "grammar [" << psStart << "," << psStart+psLen << "]" << std::endl; }
@@ -115,22 +115,20 @@ namespace egg {
 	}
 	
 	bool identifier_1(parse::state& ps) {
-		parse::state::value_type c = ps[ps.pos];
+		if ( ! (parse::in_range<'A', 'Z'>(ps) 
+			|| parse::in_range<'a', 'z'>(ps)
+			|| parse::matches<'_'>(ps)) ) { return false; }
 		
-		if ( 'A' <= c && c <= 'Z' 
-			|| 'a' <= c && c <= 'z'
-			|| '_' == c ) { ++ps.pos; return true; }
-		else { return false; }
+		return true;
 	}
 	
 	bool identifier_2(parse::state& ps) {
-		parse::state::value_type c = ps[ps.pos];
+		if ( ! (parse::in_range<'A', 'Z'>(ps) 
+			|| parse::in_range<'a', 'z'>(ps)
+			|| parse::matches<'_'>(ps)
+			|| parse::in_range<'0', '9'>(ps)) ) { return false; }
 		
-		if ( 'A' <= c && c <= 'Z' 
-			|| 'a' <= c && c <= 'z'
-			|| '_' == c
-			|| '0' <= c && c <= '9' ) { ++ps.pos; return true; }
-		else { return false; }
+		return true;
 	}
 	
 	bool identifier(parse::state& ps) {
@@ -260,7 +258,7 @@ namespace egg {
 	bool char_literal(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('\'' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! (parse::matches<'\''>(ps)) ) { ps.pos = psStart; return false; }
 		
 		parse::ind psCatch = ps.pos;
 		
@@ -269,7 +267,7 @@ namespace egg {
 		parse::ind psCatchLen = ps.pos - psCatch;
 		std::string psCapture(ps.string(psCatch, psCatchLen));
 		
-		if ( ! ('\'' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! (parse::matches<'\''>(ps)) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -281,7 +279,7 @@ namespace egg {
 	bool str_literal(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('\"' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! (parse::matches<'\"'>(ps)) ) { ps.pos = psStart; return false; }
 		
 		parse::ind psCatch = ps.pos;
 		
@@ -290,7 +288,7 @@ namespace egg {
 		parse::ind psCatchLen = ps.pos - psCatch;
 		std::string psCapture(ps.string(psCatch, psCatchLen));
 		
-		if ( ! ('\"' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! (parse::matches<'\"'>(ps)) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -302,7 +300,7 @@ namespace egg {
 	bool char_class_1(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( (']' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( parse::matches<']'>(ps) ) { ps.pos = psStart; return false; }
 		else { ps.pos = psStart; }
 		
 		if ( ! char_range(ps) ) { return false; }
@@ -313,7 +311,7 @@ namespace egg {
 	bool char_class(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('[' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! (parse::matches<'['>(ps)) ) { ps.pos = psStart; return false; }
 		
 		parse::ind psCatch = ps.pos;
 		
@@ -322,7 +320,7 @@ namespace egg {
 		parse::ind psCatchLen = ps.pos - psCatch;
 		std::string psCapture(ps.string(psCatch, psCatchLen));
 		
-		if ( ! (']' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! (parse::matches<']'>(ps)) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -334,7 +332,7 @@ namespace egg {
 	bool char_range(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( character(ps) && ('-' == ps[ps.pos++]) && character(ps) ) { return true; }
+		if ( character(ps) && parse::matches<'-'>(ps) && character(ps) ) { return true; }
 		else { ps.pos = psStart; }
 		
 		if ( character(ps) ) { return true; }
@@ -342,16 +340,20 @@ namespace egg {
 	}
 	
 	bool character_1_1(parse::state& ps) {
-		char c = ps[ps.pos];
+		if ( ! (parse::matches<'n'>(ps)
+			|| parse::matches<'r'>(ps)
+			|| parse::matches<'t'>(ps)
+			|| parse::matches<'\''>(ps)
+			|| parse::matches<'\"'>(ps)
+			|| parse::matches<'\\'>(ps)) ) { return false; }
 		
-		if ( 'n' == c || 'r' == c || 't' == c || '\'' == c || '\"' == c || '\\' == c ) { ps.pos++; return true; }
-		else { return false; }
+		return true;
 	}
 	
 	bool character_1(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('\\' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! (parse::matches<'\\'>(ps)) ) { ps.pos = psStart; return false; }
 		
 		if ( ! character_1_1(ps) ) { ps.pos = psStart; return false; }
 		
@@ -359,10 +361,11 @@ namespace egg {
 	}
 	
 	bool character_2_1(parse::state& ps) {
-		char c = ps[ps.pos];
+		if ( ! (parse::matches<'\''>(ps)
+			|| parse::matches<'\"'>(ps)
+			|| parse::matches<'\\'>(ps)) ) { return false; }
 		
-		if ( '\'' == c || '\"' == c || '\\' == c ) { ps.pos++; return true; }
-		else { return false; }
+		return true;
 	}
 	
 	bool character_2(parse::state& ps) {
@@ -371,7 +374,7 @@ namespace egg {
 		if ( character_2_1(ps) ) { ps.pos = psStart; return false; }
 		else { ps.pos = psStart; }
 		
-		if ( ! ('\0' != ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::any(ps) ) { ps.pos = psStart; return false; }
 		
 		return true;
 	}
@@ -389,7 +392,7 @@ namespace egg {
 	bool EQUAL(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('=' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<'='>(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -399,7 +402,7 @@ namespace egg {
 	bool SEMI(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! (';' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<';'>(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -409,7 +412,7 @@ namespace egg {
 	bool PIPE(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('|' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<'|'>(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -419,7 +422,7 @@ namespace egg {
 	bool AND(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('&' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<'&'>(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -429,7 +432,7 @@ namespace egg {
 	bool NOT(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('!' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<'!'>(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -439,7 +442,7 @@ namespace egg {
 	bool OPT(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('?' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<'?'>(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -449,7 +452,7 @@ namespace egg {
 	bool STAR(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('*' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<'*'>(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -459,7 +462,7 @@ namespace egg {
 	bool PLUS(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('+' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<'+'>(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -469,7 +472,7 @@ namespace egg {
 	bool OPEN(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('(' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<'('>(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -479,7 +482,7 @@ namespace egg {
 	bool CLOSE(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! (')' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<')'>(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -489,7 +492,7 @@ namespace egg {
 	bool ANY(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('.' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<'.'>(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -499,7 +502,7 @@ namespace egg {
 	bool BEGIN(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('<' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<'<'>(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -509,7 +512,7 @@ namespace egg {
 	bool END(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('>' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<'>'>(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
@@ -537,22 +540,22 @@ namespace egg {
 	bool space(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( (' ' == ps[ps.pos++]) ) { return true; }
+		if ( parse::matches<' '>(ps) ) { return true; }
 		else { ps.pos = psStart; }
 		
-		if ( ('\t' == ps[ps.pos++]) ) { return true; }
+		if ( parse::matches<'\t'>(ps) ) { return true; }
 		else { ps.pos = psStart; }
 		
-		if ( EOL(ps) ) { return true; }
+		if ( end_of_line(ps) ) { return true; }
 		else { ps.pos = psStart; return false; }
 	}
 	
 	bool comment_1(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( EOL(ps) ) { ps.pos = psStart; return false; }
+		if ( end_of_line(ps) ) { ps.pos = psStart; return false; }
 		
-		if ( ! ('\0' != ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::any(ps) ) { ps.pos = psStart; return false; }
 		
 		return true;
 	}
@@ -560,11 +563,11 @@ namespace egg {
 	bool comment(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! ('#' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<'#'>(ps) ) { ps.pos = psStart; return false; }
 		
 		while ( comment_1(ps) ) {}
 		
-		if ( ! EOL(ps) ) { ps.pos = psStart; return false; }
+		if ( ! end_of_line(ps) ) { ps.pos = psStart; return false; }
 		
 		parse::ind psLen = ps.pos - psStart;
 		{ std::cout << "comment [" << psStart << "," << psStart+psLen << "] `" << strings::escapeWhitespace(ps.string(psStart, psLen)) << "`" << std::endl; }
@@ -572,27 +575,32 @@ namespace egg {
 		return true;
 	}
 	
-	bool EOL(parse::state& ps) {
+	bool end_of_line(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ('\r' == ps[ps.pos++]
-			&& '\n' == ps[ps.pos++]) ) { return true; }
+		if ( [&ps]() {
+			parse::ind psStart = ps.pos;
+			
+			if ( ! ('\r' == ps[ps.pos++] && '\n' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+			
+			return true;
+		}() ) { return true; }
 		else { ps.pos = psStart; }
 		
-		if ( ('\n' == ps[ps.pos++]) ) { return true; }
+		if ( parse::matches<'\n'>(ps) ) { return true; }
 		else { ps.pos = psStart; }
 		
-		if ( ('\r' == ps[ps.pos++]) ) { return true; }
+		if ( parse::matches<'\r'>(ps) ) { return true; }
 		else { ps.pos = psStart; return false; }
 	}
 	
-	bool EOF(parse::state& ps) {
+	bool end_of_file(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ('\0' != ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( parse::any(ps) ) { ps.pos = psStart; return false; }
 		else { ps.pos = psStart; }
 		
-		{ std::cout << "EOF [" << psStart << "]" << std::endl; }
+		{ std::cout << "end_of_file [" << psStart << "]" << std::endl; }
 		
 		return true;
 	}

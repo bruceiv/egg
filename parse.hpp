@@ -17,6 +17,7 @@ namespace parse {
 	
 	typedef unsigned long	ind;	/**< unsigned index type */
 	
+	
 	/** Error thrown when a parser is asked for state it has forgotten. */
 	struct forgotten_state_error : public std::range_error {
 		
@@ -189,6 +190,36 @@ namespace parse {
 		/** Input stream to read characters from */
 		std::istream& in;
 	}; /* class state */
+	
+	/** Matching function. 
+	 *  Any valid matcher should update the parsing state only on a successful 
+	 *  match (true result), otherwise (false return) leaving it unchanged.
+	 */
+	typedef bool (*matcher)(state&);
+	
+	bool any(state& ps) {
+		if ( ps[ps.pos] == '\0' ) return false;
+		
+		++ps.pos;
+		return true;
+	}
+	
+	template<state::value_type c>
+	bool matches(parse::state& ps) {
+		if ( ps[ps.pos] != c ) return false;
+		
+		++ps.pos;
+		return true;
+	}
+	
+	template<state::value_type s, state::value_type e>
+	bool in_range(parse::state& ps) {
+		state::value_type c = ps[ps.pos];
+		if ( c < s || c > e ) return false;
+		
+		++ps.pos;
+		return true;
+	}
 	
 } /* namespace parse */
 
