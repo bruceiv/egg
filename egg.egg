@@ -3,18 +3,18 @@
 #
 # Author: Aaron Moss
 
-grammar =		_ nonterminal+ EOF
+grammar =		_ rule+ EOF
 
-nonterminal =	identifier EQUAL rule SEMI?
+rule =			identifier EQUAL choice SEMI?
 
 identifier =	< [A-Za-z_][A-Za-z_0-9]* > _
 
-rule =			expression ( PIPE expression )*
+choice =		expression ( PIPE expression )*
 
 expression =	( ( AND | NOT )? primary ( OPT | STAR | PLUS )? )+
 
 primary =		identifier !EQUAL
-				| OPEN expression CLOSE
+				| OPEN choice CLOSE
 				| char_literal
 				| str_literal
 				| char_class
@@ -30,7 +30,7 @@ char_class =	'[' < ( !']' char_range )* > ']' _
 char_range =	character '-' character 
 				| character
 
-character =		'\\' [abefnrtv\'\"\\]
+character =		'\\' [nrt\'\"\\]
 				| ![\'\"\\] .
 
 EQUAL =			'=' _

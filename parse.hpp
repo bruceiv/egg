@@ -5,6 +5,7 @@
 #include <istream>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 /** Implements parser state for an Egg parser.
@@ -24,7 +25,8 @@ namespace parse {
 		 *  @param avail	Minimum available index
 		 */
 		forgotten_state_error(ind req, ind avail) throw() 
-			: req(req), avail(avail) {}
+			: std::range_error("Forgotten state error"), 
+			req(req), avail(avail) {}
 		
 		/** Inherited from std::exception. */
 		const char* what() const throw() {
@@ -76,8 +78,8 @@ namespace parse {
 			ind ii = i - str_off;
 			
 			// Expand stored input if needed
-			if ( ii > str.size() ) {
-				ind n = ii - str.size();
+			if ( ii >= str.size() ) {
+				ind n = 1 + ii - str.size();
 				ind r = read(n);
 				if ( r < n ) return '\0';
 			}
@@ -128,6 +130,18 @@ namespace parse {
 			}
 			
 			return range_type(bIter, eIter);
+		}
+		
+		/** Substring operator.
+		 *  Convenience for the string formed by the characters in range(i, n).
+		 *  @param i		The index of the beginning of the range
+		 *  @param n		The maximum number of elements in the range
+		 *  @throws forgotten_state_error on i < str_begin (that is, asking for 
+		 *  		input previously discarded)
+		 */
+		std::string string(size_type i, size_type n) {
+			range_type iters = range(i, n);
+			return std::string(iters.first, iters.second);
 		}
 		
 		/** Forgets all parsing state before the given index.
