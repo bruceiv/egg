@@ -1,4 +1,7 @@
 Build Parser Generator
+- update egg.hpp to account for changes to choice, sequence, 
+  expression, action
+- add &{ /* actions */ } to the language
 Make it Packrat
 Look at adding cut syntax
 Make sure you include an optional string literal description

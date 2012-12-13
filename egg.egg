@@ -9,9 +9,11 @@ rule =			identifier EQUAL choice SEMI?
 
 identifier =	< [A-Za-z_][A-Za-z_0-9]* > _
 
-choice =		expression ( PIPE expression )*
+choice =		sequence ( PIPE sequence )*
 
-expression =	( ( AND | NOT )? primary ( OPT | STAR | PLUS )? )+
+sequence =		( expression | action )+
+
+expression =	( AND | NOT )? primary ( OPT | STAR | PLUS )?
 
 primary =		identifier !EQUAL
 				| OPEN choice CLOSE
@@ -19,7 +21,9 @@ primary =		identifier !EQUAL
 				| str_literal
 				| char_class
 				| ANY
-				| BEGIN expression END
+				| BEGIN sequence END
+
+action =		'{' ( action | !'}' . )* '}' _
 
 char_literal =	'\'' < character > '\'' _
 
