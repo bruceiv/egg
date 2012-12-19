@@ -4,7 +4,9 @@
 
 int main(int argc, char** argv) {
 	
-	egg::parse(std::cin);
+	if ( ! egg::parse(std::cin) ) {
+		std::cout << "\tPARSE FAILURE" << std::endl;
+	}
 
 	return 0;
 } /* main() */

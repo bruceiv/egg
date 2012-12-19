@@ -35,8 +35,10 @@ namespace egg {
 	bool rule(parse::state& ps);
 	bool identifier(parse::state& ps);
 	bool choice(parse::state& ps);
+	bool sequence(parse::state& ps);
 	bool expression(parse::state& ps);
 	bool primary(parse::state& ps);
+	bool action(parse::state& ps);
 	bool char_literal(parse::state& ps);
 	bool str_literal(parse::state& ps);
 	bool char_class(parse::state& ps);
@@ -155,7 +157,7 @@ namespace egg {
 		
 		if ( ! PIPE(ps) ) { ps.pos = psStart; return false; }
 		
-		if ( ! expression(ps) ) { ps.pos = psStart; return false; }
+		if ( ! sequence(ps) ) { ps.pos = psStart; return false; }
 		
 		return true;
 	}
@@ -163,7 +165,7 @@ namespace egg {
 	bool choice(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! expression(ps) ) { ps.pos = psStart; return false; }
+		if ( ! sequence(ps) ) { ps.pos = psStart; return false; }
 		
 		while ( choice_1(ps) ) {}
 		
@@ -172,8 +174,31 @@ namespace egg {
 		
 		return true;
 	}
+
+	bool sequence_1(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+
+		if ( expression(ps) ) { return true; }
+		else { ps.pos = psStart; }
+
+		if ( action(ps) ) { return true; }
+		else { ps.pos = psStart; return false; }
+	}
+
+	bool sequence(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+		
+		if ( ! sequence_1(ps) ) { ps.pos = psStart; return false; }
+
+		while ( sequence_1(ps) ) {}
+
+		parse::ind psLen = ps.pos - psStart;
+		{ std::cout << "sequence [" << psStart << "," << psStart+psLen << "]" << std::endl; }
+
+		return true;
+	}
 	
-	bool expression_1_1(parse::state& ps) {
+	bool expression_1(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( AND(ps) ) { return true; }
@@ -183,7 +208,7 @@ namespace egg {
 		else { ps.pos = psStart; return false; }
 	}
 	
-	bool expression_1_2(parse::state& ps) {
+	bool expression_2(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( OPT(ps) ) { return true; }
@@ -196,23 +221,16 @@ namespace egg {
 		else { ps.pos = psStart; return false; }
 	}
 	
-	bool expression_1(parse::state& ps) {
-		parse::ind psStart = ps.pos;
-		
-		expression_1_1(ps);
-		
-		if ( ! primary(ps) ) { psStart = ps.pos; return false; }
-		
-		expression_1_2(ps);
-		
-		return true;
-	}
-	
 	bool expression(parse::state& ps) {
 		parse::ind psStart = ps.pos;
-		
-		if ( ! expression_1(ps) ) { ps.pos = psStart; return false; }
-		while ( expression_1(ps) ) {}
+
+		expression_1(ps);
+
+		if ( ! primary(ps) ) { ps.pos = psStart; return false; }
+
+		expression_2(ps);
+
+		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		
 		parse::ind psLen = ps.pos - psStart;
 		{ std::cout << "expression [" << psStart << "," << psStart+psLen << "] `" << strings::escapeWhitespace(ps.string(psStart, psLen)) << "`" << std::endl; }
@@ -251,8 +269,49 @@ namespace egg {
 		if ( ANY(ps) ) { return true; }
 		else { ps.pos = psStart; }
 		
-		if ( BEGIN(ps) && expression(ps) && END(ps) ) { return true; }
+		if ( BEGIN(ps) && sequence(ps) && END(ps) ) { return true; }
 		else { ps.pos = psStart; return false; }
+	}
+
+	bool action_1_1(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+
+		if ( (parse::matches<'}'>(ps)) ) { ps.pos = psStart; return false; }
+
+		if ( ! (parse::any(ps)) ) { ps.pos = psStart; return false; }
+
+		return true;
+	}
+
+	bool action_1(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+
+		if ( action(ps) ) { return true; }
+		else { ps.pos = psStart; }
+
+		if ( action_1_1(ps) ) { return true; }
+		else { ps.pos = psStart; return false; }
+	}
+
+	bool action(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+
+		if ( ! (parse::matches<'{'>(ps)) ) { ps.pos = psStart; return false; }
+
+		parse::ind psCatch = ps.pos;
+
+		while ( action_1(ps) ) {}
+
+		parse::ind psCatchLen = ps.pos - psCatch;
+		std::string psCapture(ps.string(psCatch, psCatchLen));
+
+		if ( ! (parse::matches<'}'>(ps)) ) { ps.pos = psStart; return false; }
+
+		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+
+		{ std::cout << "action `" << psCapture << "`" << std::endl; }
+
+		return true;
 	}
 	
 	bool char_literal(parse::state& ps) {

@@ -1,6 +1,7 @@
 #generated files
 *.o
 egg
+egg.exe
 
 #project files
 *.kdev4

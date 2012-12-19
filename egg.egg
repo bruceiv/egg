@@ -13,7 +13,7 @@ choice =		sequence ( PIPE sequence )*
 
 sequence =		( expression | action )+
 
-expression =	( AND | NOT )? primary ( OPT | STAR | PLUS )?
+expression =	( AND | NOT )? primary ( OPT | STAR | PLUS )? _
 
 primary =		identifier !EQUAL
 				| OPEN choice CLOSE
@@ -23,7 +23,7 @@ primary =		identifier !EQUAL
 				| ANY
 				| BEGIN sequence END
 
-action =		'{' ( action | !'}' . )* '}' _
+action =		'{' < ( action | !'}' . )* > '}' _
 
 char_literal =	'\'' < character > '\'' _
 
