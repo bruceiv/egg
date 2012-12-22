@@ -32,7 +32,17 @@ A sequence of matching rules can also be bracketed by '<' and '>', denoting a ca
 A grammar rule may optionally be assigned a type by following the rule identifier with a colon and a second identifier. 
 The return value of this type can be accessed as the variable "psVal" in semantic actions inside the rule. 
 Similarly, a matcher for a typed grammar rule can be bound to a variable by following it with a colon and a second identifer; the return value of the rule will be bound to the given variable. 
-Note that the identfier for the type of the rule must be a valid Egg identifier - C++ types that do not fit this pattern (such as templated types) can be aliased to a valid identifier using typedef.
+Note that the identfier for the type of the rule must be a valid Egg identifier - C++ types that do not fit this pattern (such as templated types) can be aliased to a valid identifier using typedef. 
+The following simple grammar functions as a basic calculator:
+
+    sum : int =  prod : i { psVal = i; } ( 
+                 '+' prod : i { psVal += i; } 
+                 | '-' prod : i { psVal -= i; } )*
+    prod : int = elem : i { psVal = i; } (
+                 '*' elem : i { psVal *= i; } 
+                 | '/' elem : i { psVal /= i; } )*
+    elem : int = '(' sum : i ')' { psVal = i; }
+                 | < [0-9]+ > { psVal = atoi(psCatch.c_str()); } 
 
 ## Semantic Actions ##
 
