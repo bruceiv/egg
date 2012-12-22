@@ -5,9 +5,11 @@
 
 grammar =		_ rule+ end_of_file
 
-rule =			identifier EQUAL choice SEMI?
+rule =			bindable_id EQUAL choice SEMI?
 
 identifier =	< [A-Za-z_][A-Za-z_0-9]* > _
+
+bindable_id =	identifier ( ':' _ identifier )?
 
 choice =		sequence ( PIPE sequence )*
 
@@ -15,7 +17,7 @@ sequence =		( expression | action )+
 
 expression =	( AND | NOT )? primary ( OPT | STAR | PLUS )? _
 
-primary =		identifier !EQUAL
+primary =		bindable_id !EQUAL
 				| OPEN choice CLOSE
 				| char_literal
 				| str_literal

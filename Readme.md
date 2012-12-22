@@ -27,7 +27,12 @@ These lookahead capabilities allow PEGs to match some grammars that cannot be re
     A = 'a' A 'b' | ; # ; denotes end of rule, # introduces a comment
     B = 'b' B 'c' | ;
 
-A sequence of matching rules can also be bracketed by '<' and '>', denoting a capturing block; the string that matches the rules inside the capturing block will be provided to the parser for use in its semantic rules.
+A sequence of matching rules can also be bracketed by '<' and '>', denoting a capturing block; the string that matches the rules inside the capturing block will be provided to the parser for use in its semantic actions.
+
+A grammar rule may optionally be assigned a type by following the rule identifier with a colon and a second identifier. 
+The return value of this type can be accessed as the variable "psVal" in semantic actions inside the rule. 
+Similarly, a matcher for a typed grammar rule can be bound to a variable by following it with a colon and a second identifer; the return value of the rule will be bound to the given variable. 
+Note that the identfier for the type of the rule must be a valid Egg identifier - C++ types that do not fit this pattern (such as templated types) can be aliased to a valid identifier using typedef.
 
 ## Semantic Actions ##
 
@@ -44,6 +49,7 @@ Variables made available to the semantic actions include the following:
   * psCatch - the index of the start of the most recent capture (also valid inside capturing sequences)
   * psCatchLen - the length of the most recent capture
   * psCapture - the string contained in the current capture
+* psVal - the variable containing the return value of a typed rule
 
 ## Egg Grammar ##
 
@@ -51,9 +57,11 @@ The following is an Egg grammar for Egg grammars - it is the authoritative repre
 
     grammar =		_ rule+ end_of_file
     
-    rule =			identifier EQUAL choice SEMI?
+    rule =			bindable_id EQUAL choice SEMI?
     
     identifier =	< [A-Za-z_][A-Za-z_0-9]* > _
+
+    bindable_id =	identifier ( ':' _ identifier )?
     
     choice =		sequence ( PIPE sequence )*
     
@@ -61,7 +69,7 @@ The following is an Egg grammar for Egg grammars - it is the authoritative repre
     
     expression =	( AND | NOT )? primary ( OPT | STAR | PLUS )? _
     
-    primary =		identifier !EQUAL
+    primary =		bindable_id !EQUAL
     				| OPEN choice CLOSE
     				| char_literal
     				| str_literal

@@ -34,6 +34,7 @@ namespace egg {
 	bool grammar(parse::state& ps);
 	bool rule(parse::state& ps);
 	bool identifier(parse::state& ps);
+	bool bindable_id(parse::state& ps);
 	bool choice(parse::state& ps);
 	bool sequence(parse::state& ps);
 	bool expression(parse::state& ps);
@@ -102,7 +103,7 @@ namespace egg {
 	bool rule(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! identifier(ps) ) { ps.pos = psStart; return false; }
+		if ( ! bindable_id(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! EQUAL(ps) ) { ps.pos = psStart; return false; }
 		
@@ -149,6 +150,30 @@ namespace egg {
 		
 		{ std::cout << "identifier `" << psCapture << "`" << std::endl; }
 		
+		return true;
+	}
+	
+	bool bindable_id_1(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+
+		if ( ! parse::matches<':'>(ps) ) { ps.pos = psStart; return false; }
+
+		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+
+		if ( ! identifier(ps) ) { ps.pos = psStart; return false; }
+
+		return true;
+	}
+	
+	bool bindable_id(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+
+		if ( ! identifier(ps) ) { ps.pos = psStart; return false; }
+
+		bindable_id_1(ps);
+
+		{ std::cout << "bindable_id [" << psStart << "," << ps.pos << "]" << std::endl; }
+
 		return true;
 	}
 	
@@ -241,7 +266,7 @@ namespace egg {
 	bool primary_1(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! identifier(ps) ) { ps.pos = psStart; return false; }
+		if ( ! bindable_id(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( EQUAL(ps) ) { ps.pos = psStart; return false; }
 		
