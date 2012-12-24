@@ -21,7 +21,7 @@ namespace strings {
 		}
 		return ss.str();
 	}
-}
+} /* namespace strings */
 //--
 
 #include <string>
@@ -34,7 +34,7 @@ namespace egg {
 	bool out_action(parse::state& ps);
 	bool rule(parse::state& ps);
 	bool identifier(parse::state& ps);
-	bool bindable_id(parse::state& ps);
+	bool type_id(parse::state& ps);
 	bool choice(parse::state& ps);
 	bool sequence(parse::state& ps);
 	bool expression(parse::state& ps);
@@ -48,6 +48,7 @@ namespace egg {
 
 	bool OUT_BEGIN(parse::state& ps);
 	bool OUT_END(parse::state& ps);
+	bool BIND(parse::state& ps);
 	bool EQUAL(parse::state& ps);
 	bool PIPE(parse::state& ps);
 	bool AND(parse::state& ps);
@@ -90,9 +91,13 @@ namespace egg {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+
+		out_action(ps);
 		
 		if ( ! rule(ps) ) { ps.pos = psStart; return false; }
 		while ( rule(ps) ) {}
+
+		out_action(ps);
 		
 		if ( ! end_of_file(ps) ) { ps.pos = psStart; return false; }
 		
@@ -125,7 +130,19 @@ namespace egg {
 
 		if ( ! OUT_END(ps) ) { ps.pos = psStart; return false; }
 
+		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+
 		{ std::cout << "out_action `" << ps.string(psCatch, psCatchLen) << "`" << std::endl; }
+
+		return true;
+	}
+
+	bool rule_1(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+
+		if ( ! BIND(ps) ) { ps.pos = psStart; return false; }
+
+		if ( ! type_id(ps) ) { ps.pos = psStart; return false; }
 
 		return true;
 	}
@@ -133,7 +150,9 @@ namespace egg {
 	bool rule(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! bindable_id(ps) ) { ps.pos = psStart; return false; }
+		if ( ! identifier(ps) ) { ps.pos = psStart; return false; }
+
+		rule_1(ps);
 		
 		if ( ! EQUAL(ps) ) { ps.pos = psStart; return false; }
 		
@@ -180,27 +199,63 @@ namespace egg {
 		
 		return true;
 	}
-	
-	bool bindable_id_1(parse::state& ps) {
+
+	bool type_id_1(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 
-		if ( ! parse::matches<':'>(ps) ) { ps.pos = psStart; return false; }
+		if ( ! (':' == ps[ps.pos++] && ':' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
 
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 
-		if ( ! identifier(ps) ) { ps.pos = psStart; return false; }
+		if ( ! type_id(ps) ) { ps.pos = psStart; return false; }
 
 		return true;
 	}
-	
-	bool bindable_id(parse::state& ps) {
+
+	bool type_id_2_1(parse::state& ps) {
 		parse::ind psStart = ps.pos;
+
+		if ( ! parse::matches<','>(ps) ) { ps.pos = psStart; return false; }
+
+		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+
+		if ( ! type_id(ps) ) { ps.pos = psStart; return false; }
+		
+		return true;
+	}
+
+	bool type_id_2(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+
+		if ( ! parse::matches<'<'>(ps) ) { ps.pos = psStart; return false; }
+
+		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+
+		if ( ! type_id(ps) ) { ps.pos = psStart; return false; }
+
+		while ( type_id_2_1(ps) ) {}
+
+		if ( ! parse::matches<'>'>(ps) ) { ps.pos = psStart; return false; }
+
+		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+		
+		return true;
+	}
+
+	bool type_id(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+		parse::ind psCatch = ps.pos;
 
 		if ( ! identifier(ps) ) { ps.pos = psStart; return false; }
 
-		bindable_id_1(ps);
+		while ( type_id_1(ps) ) {}
 
-		{ std::cout << "bindable_id [" << psStart << "," << ps.pos << "]" << std::endl; }
+		type_id_2(ps);
+
+		parse::ind psCatchLen = ps.pos - psCatch;
+		std::string psCapture(ps.string(psCatch, psCatchLen));
+
+		{ std::cout << "type_id `" << psCapture << "`" << std::endl; }
 
 		return true;
 	}
@@ -290,11 +345,23 @@ namespace egg {
 		
 		return true;
 	}
+
+	bool primary_1_1(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+
+		if ( ! BIND(ps) ) { ps.pos = psStart; return false; }
+
+		if ( ! identifier(ps) ) { ps.pos = psStart; return false; }
+
+		return true;
+	}
 	
 	bool primary_1(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! bindable_id(ps) ) { ps.pos = psStart; return false; }
+		if ( ! identifier(ps) ) { ps.pos = psStart; return false; }
+
+		primary_1_1(ps);
 		
 		if ( EQUAL(ps) ) { ps.pos = psStart; return false; }
 		
@@ -516,6 +583,16 @@ namespace egg {
 		parse::ind psStart = ps.pos;
 
 		if ( ! ('%' == ps[ps.pos++] && '}' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+
+		return true;
+	}
+
+	bool BIND(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+
+		if ( ! parse::matches<':'>(ps) ) { ps.pos = psStart; return false; }
+
+		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 
 		return true;
 	}

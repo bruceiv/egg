@@ -1,17 +1,23 @@
 # Egg grammar for Egg grammars.
-# Derived from the Leg grammar at http://piumarta.com/software/peg/peg.1.html .
 #
 # Author: Aaron Moss
+
+{%
+#include <string>
+
+#include "ast.hpp"
+%}
 
 grammar =		_ out_action? rule+ out_action? end_of_file
 
 out_action =	OUT_BEGIN < ( !OUT_END . )* > OUT_END _
 
-rule =			bindable_id EQUAL choice
+rule =			identifier ( BIND type_id )? EQUAL choice
 
 identifier =	< [A-Za-z_][A-Za-z_0-9]* > _
 
-bindable_id =	identifier ( ':' _ identifier )?
+type_id =		< identifier ( "::" _ type_id )* 
+					( '<' _ type_id ( ',' _ type_id )* '>' _ )? >
 
 choice =		sequence ( PIPE sequence )*
 
@@ -19,7 +25,7 @@ sequence =		( expression | action )+
 
 expression =	( AND | NOT )? primary ( OPT | STAR | PLUS )? _
 
-primary =		bindable_id !EQUAL
+primary =		identifier ( BIND identifier )? !EQUAL
 				| OPEN choice CLOSE
 				| char_literal
 				| str_literal
@@ -44,6 +50,7 @@ character =		'\\' [nrt\'\"\\]
 
 OUT_BEGIN =		"{%"
 OUT_END =		"%}"
+BIND =			':' _
 EQUAL =			'=' _
 PIPE =			'|' _
 AND =			'&' _
@@ -63,3 +70,4 @@ space =			' ' | '\t' | end_of_line
 comment =		'#' ( !end_of_line . )* end_of_line
 end_of_line = 	"\r\n" | '\n' | '\r'
 end_of_file = 	!.
+

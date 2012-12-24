@@ -31,9 +31,9 @@ These lookahead capabilities allow PEGs to match some grammars that cannot be re
 A sequence of matching rules can also be bracketed by '<' and '>', denoting a capturing block; the string that matches the rules inside the capturing block will be provided to the parser for use in its semantic actions.
 
 A grammar rule may optionally be assigned a type by following the rule identifier with a colon and a second identifier. 
+This second identifier can be any C++ type - namespaces & member typedefs are supported, as are templated classes. 
 The return value of this type can be accessed as the variable "psVal" in semantic actions inside the rule. 
-Similarly, a matcher for a typed grammar rule can be bound to a variable by following it with a colon and a second identifer; the return value of the rule will be bound to out_action =	OUT_BEGIN < ( !OUT_END . )* > OUT_END _the given variable. 
-Note that the identfier for the type of the rule must be a valid Egg identifier - C++ types that do not fit this pattern (such as templated types) can be aliased to a valid identifier using typedef. 
+Similarly, a matcher for a typed grammar rule can be bound to a variable by following it with a colon and a second identifer; the return value of the rule will be bound to the given variable.  
 The following simple grammar functions as a basic calculator:
 
     sum : int =  prod : i { psVal = i; } ( 
@@ -69,17 +69,18 @@ The usual ps* variables are not defined in these actions.
 
 ## Egg Grammar ##
 
-The following is an Egg grammar for Egg grammars - it is the authoritative representation of Egg syntax, and should also be an illustrative example of a moderately complex grammar: 
+The following is an Egg grammar for Egg grammars - it is an authoritative representation of Egg syntax, and should also be an illustrative example of a moderately complex grammar (see egg.egg for how to build an abstract syntax tree from this grammar): 
 
     grammar =		_ out_action? rule+ out_action? end_of_file
 
     out_action =	OUT_BEGIN < ( !OUT_END . )* > OUT_END _
     
-    rule =			bindable_id EQUAL choice
+    rule =			identifier ( BIND type_id )? EQUAL choice
     
     identifier =	< [A-Za-z_][A-Za-z_0-9]* > _
 
-    bindable_id =	identifier ( ':' _ identifier )?
+    type_id =		< identifier ( "::" _ type_id )* 
+    					( '<' _ type_id ( ',' _ type_id )* '>' _ )? >
     
     choice =		sequence ( PIPE sequence )*
     
@@ -87,7 +88,7 @@ The following is an Egg grammar for Egg grammars - it is the authoritative repre
     
     expression =	( AND | NOT )? primary ( OPT | STAR | PLUS )? _
     
-    primary =		bindable_id !EQUAL
+    primary =		identifier ( BIND identifier )? !EQUAL
     				| OPEN choice CLOSE
     				| char_literal
     				| str_literal
@@ -112,6 +113,7 @@ The following is an Egg grammar for Egg grammars - it is the authoritative repre
     
 	OUT_BEGIN =		"{%"
     OUT_END =		"%}"
+    BIND =			':' _
     EQUAL =			'=' _
     PIPE =			'|' _
     AND =			'&' _
