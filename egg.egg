@@ -3,7 +3,9 @@
 #
 # Author: Aaron Moss
 
-grammar =		_ rule+ end_of_file
+grammar =		_ out_action? rule+ out_action? end_of_file
+
+out_action =	OUT_BEGIN < ( !OUT_END . )* > OUT_END _
 
 rule =			bindable_id EQUAL choice
 
@@ -40,6 +42,8 @@ char_range =	character '-' character
 character =		'\\' [nrt\'\"\\]
 				| ![\'\"\\] .
 
+OUT_BEGIN =		"{%"
+OUT_END =		"%}"
 EQUAL =			'=' _
 PIPE =			'|' _
 AND =			'&' _

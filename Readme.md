@@ -62,6 +62,9 @@ Variables made available to the semantic actions include the following:
   * psCapture - the string contained in the current capture
 * psVal - the variable containing the return value of a typed rule
 
+You may also include a special semantic action before and after the grammar rules; these rules are delimited with "{$" and "$}" and will be placed before and after the generated rules. 
+The usual ps* variables are not defined in these actions.
+
 ## Egg Grammar ##
 
 The following is an Egg grammar for Egg grammars - it is the authoritative representation of Egg syntax, and should also be an illustrative example of a moderately complex grammar: 

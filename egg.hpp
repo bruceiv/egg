@@ -32,6 +32,7 @@ namespace strings {
 namespace egg {
 
 	bool grammar(parse::state& ps);
+	bool out_action(parse::state& ps);
 	bool rule(parse::state& ps);
 	bool identifier(parse::state& ps);
 	bool bindable_id(parse::state& ps);
@@ -45,7 +46,9 @@ namespace egg {
 	bool char_class(parse::state& ps);
 	bool char_range(parse::state& ps);
 	bool character(parse::state& ps);
-	
+
+	bool OUT_BEGIN(parse::state& ps);
+	bool OUT_END(parse::state& ps);
 	bool EQUAL(parse::state& ps);
 	bool PIPE(parse::state& ps);
 	bool AND(parse::state& ps);
@@ -97,6 +100,34 @@ namespace egg {
 		parse::ind psLen = ps.pos - psStart;
 		{ std::cout << "grammar [" << psStart << "," << psStart+psLen << "]" << std::endl; }
 		
+		return true;
+	}
+
+	bool out_action_1(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+		
+		if ( OUT_END(ps) ) { ps.pos = psStart; return false; }
+
+		if ( ! parse::any(ps) ) { ps.pos = psStart; return false; }
+
+		return true;
+	}
+
+	bool out_action(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+
+		if ( ! OUT_BEGIN(ps) ) { ps.pos = psStart; return false; }
+
+		parse::ind psCatch = ps.pos;
+
+		while ( out_action_1(ps) ) {}
+
+		parse::ind psCatchLen = ps.pos - psCatch;
+
+		if ( ! OUT_END(ps) ) { ps.pos = psStart; return false; }
+
+		{ std::cout << "out_action `" << ps.string(psCatch, psCatchLen) << "`" << std::endl; }
+
 		return true;
 	}
 	
@@ -472,6 +503,22 @@ namespace egg {
 		
 		if ( character_2(ps) ) { return true; }
 		else { ps.pos = psStart; return false; }
+	}
+
+	bool OUT_BEGIN(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+
+		if ( ! ('{' == ps[ps.pos++] && '%' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+
+		return true;
+	}
+
+	bool OUT_END(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+
+		if ( ! ('%' == ps[ps.pos++] && '}' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+
+		return true;
 	}
 	
 	bool EQUAL(parse::state& ps) {
