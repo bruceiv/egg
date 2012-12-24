@@ -25,14 +25,14 @@ Similarly, a matcher prefixed with '!' does not consume the input, and only succ
 These lookahead capabilities allow PEGs to match some grammars that cannot be represented by CFGs, such as the well-known a^n b^n c^n, which can be matched by the following Egg grammar: 
 
     G = &A 'a'* B
-    A = 'a' A 'b' | ; # ; denotes end of rule, # introduces a comment
+    A = 'a' A 'b' | ;
     B = 'b' B 'c' | ;
 
 A sequence of matching rules can also be bracketed by '<' and '>', denoting a capturing block; the string that matches the rules inside the capturing block will be provided to the parser for use in its semantic actions.
 
 A grammar rule may optionally be assigned a type by following the rule identifier with a colon and a second identifier. 
 The return value of this type can be accessed as the variable "psVal" in semantic actions inside the rule. 
-Similarly, a matcher for a typed grammar rule can be bound to a variable by following it with a colon and a second identifer; the return value of the rule will be bound to the given variable. 
+Similarly, a matcher for a typed grammar rule can be bound to a variable by following it with a colon and a second identifer; the return value of the rule will be bound to out_action =	OUT_BEGIN < ( !OUT_END . )* > OUT_END _the given variable. 
 Note that the identfier for the type of the rule must be a valid Egg identifier - C++ types that do not fit this pattern (such as templated types) can be aliased to a valid identifier using typedef. 
 The following simple grammar functions as a basic calculator:
 
@@ -43,7 +43,9 @@ The following simple grammar functions as a basic calculator:
                  '*' elem : i { psVal *= i; } 
                  | '/' elem : i { psVal /= i; } )*
     elem : int = '(' sum : i ')' { psVal = i; }
-                 | < [0-9]+ > { psVal = atoi(psCatch.c_str()); } 
+                 | < [0-9]+ > { psVal = atoi(psCatch.c_str()); }
+
+Finally, comments can be started with a '#', they end at end-of-line.
 
 ## Semantic Actions ##
 
@@ -69,9 +71,11 @@ The usual ps* variables are not defined in these actions.
 
 The following is an Egg grammar for Egg grammars - it is the authoritative representation of Egg syntax, and should also be an illustrative example of a moderately complex grammar: 
 
-    grammar =		_ rule+ end_of_file
+    grammar =		_ out_action? rule+ out_action? end_of_file
+
+    out_action =	OUT_BEGIN < ( !OUT_END . )* > OUT_END _
     
-    rule =			bindable_id EQUAL choice SEMI?
+    rule =			bindable_id EQUAL choice
     
     identifier =	< [A-Za-z_][A-Za-z_0-9]* > _
 
@@ -89,6 +93,7 @@ The following is an Egg grammar for Egg grammars - it is the authoritative repre
     				| str_literal
     				| char_class
     				| ANY
+    				| EMPTY
     				| BEGIN sequence END
     
     action =		'{' < ( action | !'}' . )* > '}' _
@@ -105,8 +110,9 @@ The following is an Egg grammar for Egg grammars - it is the authoritative repre
     character =		'\\' [nrt\'\"\\]
     				| ![\'\"\\] .
     
+	OUT_BEGIN =		"{%"
+    OUT_END =		"%}"
     EQUAL =			'=' _
-    SEMI =			';' _
     PIPE =			'|' _
     AND =			'&' _
     NOT =			'!' _
@@ -116,6 +122,7 @@ The following is an Egg grammar for Egg grammars - it is the authoritative repre
     OPEN =			'(' _
     CLOSE =			')' _
     ANY =			'.' _
+    EMPTY =			';' _
     BEGIN =			'<' _
     END =			'>' _
     

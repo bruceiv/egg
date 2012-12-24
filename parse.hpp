@@ -1,5 +1,4 @@
-#ifndef _EGG_PARSE_HPP_
-#define _EGG_PARSE_HPP_
+#pragma once
 
 #include <deque>
 #include <istream>
@@ -223,4 +222,3 @@ namespace parse {
 	
 } /* namespace parse */
 
-#endif /* _EGG_PARSE_HPP_ */

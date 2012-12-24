@@ -1,5 +1,4 @@
-#ifndef _EGG_EGG_HPP_
-#define _EGG_EGG_HPP_
+#pragma once
 
 //--
 #include <iostream>
@@ -738,6 +737,4 @@ namespace egg {
 	}
 
 } /* namespace egg */
-
-#endif /* _EGG_EGG_HPP_ */
 
