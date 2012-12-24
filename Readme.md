@@ -10,6 +10,7 @@ Due to this quality, a PEG-based parser generator such as Egg does not need a se
 An Egg grammar consists of a list of rules, where each rule gives an identifier to a sequence of matching statements. 
 Rule identifiers consist of a letter or underscore followed by any number of further letters, digits, or underscores. 
 The most basic matching statements are character and string literals, surrounded by single or double quotes, respectively; a period '.' matches any single character. 
+A semicolon ';' is an empty matcher; it always matches without consuming any input; it can be safely placed at the end of any grammar rule for stylistic purposes, or used at the end of an alternation to match an empty case. 
 Grammar rules can also be matched (possibly recursively) by writing their identifier. 
 Matching statements can be made optional by following them with a '?', repeatable by following them with '*', or repeatable at least once with '+'; statements can also be grouped with parentheses. 
 The '|' operator can be used to introduce alternation into grammar rules; this alternation is ordered - if a sequence is matched, then a later sequence will not be tested. As an example, consider the following two grammar rules: 
@@ -54,7 +55,7 @@ Variables made available to the semantic actions include the following:
   * ps[i] - the i'th character of the input stream
   * ps.range(i, n) - returns a pair of iterators representing index i and n characters after index i (or the end of the input stream, if less than n characters)
   * ps.string(i, n) - the string represented by ps.range(i, n)
-* psStart - the index of the start of the current match
+* psStart - the index of the start of the current match (or parenthesized matcher)
 * included if after a capture:
   * psCatch - the index of the start of the most recent capture (also valid inside capturing sequences)
   * psCatchLen - the length of the most recent capture

@@ -47,7 +47,6 @@ namespace egg {
 	bool character(parse::state& ps);
 	
 	bool EQUAL(parse::state& ps);
-	bool SEMI(parse::state& ps);
 	bool PIPE(parse::state& ps);
 	bool AND(parse::state& ps);
 	bool NOT(parse::state& ps);
@@ -57,6 +56,7 @@ namespace egg {
 	bool OPEN(parse::state& ps);
 	bool CLOSE(parse::state& ps);
 	bool ANY(parse::state& ps);
+	bool EMPTY(parse::state& ps);
 	bool BEGIN(parse::state& ps);
 	bool END(parse::state& ps);
 	
@@ -108,8 +108,6 @@ namespace egg {
 		if ( ! EQUAL(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! choice(ps) ) { ps.pos = psStart; return false; }
-		
-		SEMI(ps);
 		
 		parse::ind psLen = ps.pos - psStart;
 		{ std::cout << "rule [" << psStart << "," << psStart+psLen << "]" << std::endl; }
@@ -292,6 +290,9 @@ namespace egg {
 		else { ps.pos = psStart; }
 		
 		if ( ANY(ps) ) { return true; }
+		else { ps.pos = psStart; }
+
+		if ( EMPTY(ps) ) { return true; }
 		else { ps.pos = psStart; }
 		
 		if ( BEGIN(ps) && sequence(ps) && END(ps) ) { return true; }
@@ -483,16 +484,6 @@ namespace egg {
 		return true;
 	}
 	
-	bool SEMI(parse::state& ps) {
-		parse::ind psStart = ps.pos;
-		
-		if ( ! parse::matches<';'>(ps) ) { ps.pos = psStart; return false; }
-		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
-		
-		return true;
-	}
-	
 	bool PIPE(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
@@ -577,6 +568,16 @@ namespace egg {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! parse::matches<'.'>(ps) ) { ps.pos = psStart; return false; }
+		
+		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+		
+		return true;
+	}
+
+	bool EMPTY(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+		
+		if ( ! parse::matches<';'>(ps) ) { ps.pos = psStart; return false; }
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return false; }
 		

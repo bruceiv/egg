@@ -5,7 +5,7 @@
 
 grammar =		_ rule+ end_of_file
 
-rule =			bindable_id EQUAL choice SEMI?
+rule =			bindable_id EQUAL choice
 
 identifier =	< [A-Za-z_][A-Za-z_0-9]* > _
 
@@ -23,6 +23,7 @@ primary =		bindable_id !EQUAL
 				| str_literal
 				| char_class
 				| ANY
+				| EMPTY
 				| BEGIN sequence END
 
 action =		'{' < ( action | !'}' . )* > '}' _
@@ -40,7 +41,6 @@ character =		'\\' [nrt\'\"\\]
 				| ![\'\"\\] .
 
 EQUAL =			'=' _
-SEMI =			';' _
 PIPE =			'|' _
 AND =			'&' _
 NOT =			'!' _
@@ -50,6 +50,7 @@ PLUS =			'+' _
 OPEN =			'(' _
 CLOSE =			')' _
 ANY =			'.' _
+EMPTY =			';' _
 BEGIN =			'<' _
 END =			'>' _
 
