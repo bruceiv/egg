@@ -6,62 +6,82 @@
 #include <string>
 
 #include "ast.hpp"
+#include "utils/strings.hpp"
 %}
 
 grammar: ast::ptr<ast::grammar> =
-		_ out_action? rule+ out_action? end_of_file
+		{ psVal = ast::make_ptr<ast::grammar>(); }
+			_ (out_action : s { psVal->pre = s; })? 
+			(rule : r { *psVal += r; })+ 
+			(out_action : s { psVal->post = s; } )? end_of_file
 
 out_action: std::string =
-		OUT_BEGIN < ( !OUT_END . )* > OUT_END _
+		OUT_BEGIN < ( !OUT_END . )* > OUT_END _ { psVal = psCapture; }
 
 rule: ast::ptr<ast::grammar_rule> =
-		identifier ( BIND type_id )? EQUAL choice
+		identifier : s { psVal = ast::make_ptr<ast::grammar_rule>(s); } 
+			( BIND type_id : s { psVal->type = s; } )? 
+			EQUAL choice : m { psVal->m = m; }
 
 identifier: std::string =
-		< [A-Za-z_][A-Za-z_0-9]* > _
+		< [A-Za-z_][A-Za-z_0-9]* > _ { psVal = psCapture; }
 
 type_id: std::string =
 		< identifier ( "::" _ type_id )* 
-			( '<' _ type_id ( ',' _ type_id )* '>' _ )? >
+			( '<' _ type_id ( ',' _ type_id )* '>' _ )? > { psVal = psCapture; }
 
 choice: ast::ptr<ast::alt_matcher> =
-		sequence ( PIPE sequence )*
+		sequence : m { psVal = ast::make_ptr<ast::alt_matcher>(); *psVal += m; } 
+			( PIPE sequence : m { *psVal += m; } )*
 
 sequence: ast::ptr<ast::seq_matcher> =
-		( expression | action )+
+		{ psVal = ast::make_ptr<ast::seq_matcher>(); }
+			( expression : e { *psVal += e; } | action : a { *psVal += a; } )+
 
 expression: ast::ptr<ast::matcher> =
-		( AND | NOT )? primary ( OPT | STAR | PLUS )? _
+		AND primary : m { psVal = ast::make_ptr<ast::look_matcher>(m); }
+		| NOT primary : m { psVal = ast::make_ptr<ast::not_matcher>(m); }
+		| primary : m { psVal = m; } ( 
+			OPT { psVal = ast::make_ptr<ast::opt_matcher>(m); }
+			| STAR { psVal = ast::make_ptr<ast::many_matcher>(m); }
+			| PLUS { psVal = ast::make_ptr<ast::some_matcher>(m); } )?
 
 primary: ast::ptr<ast::matcher> =
-		identifier !( ( BIND type_id )? EQUAL ) ( BIND identifier )?
-		| OPEN choice CLOSE
-		| char_literal
-		| str_literal
-		| char_class
-		| ANY
-		| EMPTY
-		| BEGIN sequence END
+		identifier : s !( ( BIND type_id )? EQUAL ) 
+			{ psVal = ast::make_ptr<ast::rule_matcher>(s); } 
+			( BIND identifier : s 
+				{ ast::as_ptr<ast::rule_matcher>(psVal)->var = s; } )?
+		| OPEN choice : am CLOSE { psVal = am; }
+		| char_literal : cm { psVal = cm; }
+		| str_literal : sm { psVal = sm; }
+		| char_class : rm { psVal = rm; }
+		| ANY { psVal = ast::make_ptr<ast::any_matcher>(); }
+		| EMPTY { psVal = ast::make_ptr<ast::empty_matcher>(); }
+		| BEGIN sequence : bm END { psVal = bm; }
 
 action: ast::ptr<ast::action_matcher> =
-		'{' < ( action | !'}' . )* > '}' _
+		'{' < ( action | !'}' . )* > '}' _ 
+			{ psVal = ast::make_ptr<ast::action_matcher>(psCapture); }
 
 char_literal: ast::ptr<ast::char_matcher> =
 		'\'' < character > '\'' _
+			{ psVal = ast::make_ptr<ast::char_matcher>(ps[psCatch]); }
 
 str_literal: ast::ptr<ast::str_matcher> =
 		'\"' < character* > '\"' _
+			{ psVal = ast::make_ptr<ast::str_matcher>(psCapture); }
 
 char_class: ast::ptr<ast::range_matcher> =
-		'[' < ( !']' char_range )* > ']' _
+		'[' { psVal = ast::make_ptr<ast::range_matcher>() } 
+			( !']' char_range : r { *psVal += r; } )* ']' _
 
 char_range: ast::char_range =
-		character '-' character 
-		| character
+		character : f '-' character : t { psVal = ast::char_range(f,t); }
+		| character : c { psVal = ast::char_range(c); }
 
 character: char =
-		'\\' [nrt\'\"\\]
-		| ![\'\"\\] .
+		'\\' [nrt\'\"\\] { psVal = strings::unescaped_char(ps[psStart+1]); }
+		| ![\'\"\\] . { psVal = ps[psStart]; }
 
 OUT_BEGIN =		"{%"
 OUT_END =		"%}"

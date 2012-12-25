@@ -31,7 +31,8 @@ These lookahead capabilities allow PEGs to match some grammars that cannot be re
 A sequence of matching rules can also be surrounded by angle brackets '<' and '>', denoting a capturing block; the string that matches the rules inside the capturing block will be provided to the parser for use in its semantic actions.
 
 A grammar rule may optionally be assigned a type by following the rule identifier with a colon and a second identifier. 
-This second identifier can be any C++ type - namespaces & member typedefs are supported, as are templated classes. 
+This second identifier can be a C++ type - namespaces & member typedefs are supported, as are templated classes, though pointer and reference types are not supported for implementation reasons (you may, however, use smart pointer classes). 
+The type of a rule must also be default-constructable. 
 The return value of this type can be accessed as the variable "psVal" in semantic actions inside the rule. 
 Similarly, a matcher for a typed grammar rule can be bound to a variable by following it with a colon and a second identifer; the return value of the rule will be bound to the given variable.  
 The following simple grammar functions as a basic calculator:
@@ -62,7 +63,7 @@ Variables made available to the semantic actions include the following:
   * psCatch - the index of the start of the most recent capture (also valid inside capturing sequences)
   * psCatchLen - the length of the most recent capture
   * psCapture - the string contained in the current capture
-* psVal - the variable containing the return value of a typed rule
+* psVal - the variable containing the return value of a typed rule; will be default-constructed by caller on rule start.
 
 You may also include a special semantic action before and after the grammar rules; these rules are delimited with "{$" and "$}" and will be placed before and after the generated rules. 
 The usual ps* variables are not defined in these actions.
@@ -86,7 +87,9 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     
     sequence =		( expression | action )+
     
-    expression =	( AND | NOT )? primary ( OPT | STAR | PLUS )? _
+    expression =	AND primary
+    				| NOT primary 
+    				| primary ( OPT | STAR | PLUS )? 
     
     primary =		identifier !( ( BIND type_id )? EQUAL ) ( BIND identifier )?
     				| OPEN choice CLOSE

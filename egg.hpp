@@ -309,16 +309,6 @@ namespace egg {
 	bool expression_1(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( AND(ps) ) { return true; }
-		else { ps.pos = psStart; }
-		
-		if ( NOT(ps) ) { return true; }
-		else { ps.pos = psStart; return false; }
-	}
-	
-	bool expression_2(parse::state& ps) {
-		parse::ind psStart = ps.pos;
-		
 		if ( OPT(ps) ) { return true; }
 		else { ps.pos = psStart; }
 		
@@ -332,18 +322,21 @@ namespace egg {
 	bool expression(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 
-		expression_1(ps);
-
-		if ( ! primary(ps) ) { ps.pos = psStart; return false; }
-
-		expression_2(ps);
-
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+		if ( AND(ps) && primary(ps) ) { 
+			{ std::cout << "expression [" << psStart << "," << ps.pos << "] `" << strings::escapeWhitespace(ps.string(psStart, ps.pos-psStart)) << "`" << std::endl; }
+			return true;
+		} else { ps.pos = psStart; }
 		
-		parse::ind psLen = ps.pos - psStart;
-		{ std::cout << "expression [" << psStart << "," << psStart+psLen << "] `" << strings::escapeWhitespace(ps.string(psStart, psLen)) << "`" << std::endl; }
-		
-		return true;
+		if ( NOT(ps) && primary(ps) ) { 
+			{ std::cout << "expression [" << psStart << "," << ps.pos << "] `" << strings::escapeWhitespace(ps.string(psStart, ps.pos-psStart)) << "`" << std::endl; }
+			return true;
+		} else { ps.pos = psStart; }
+
+		if ( primary(ps) ) {
+			expression_1(ps);
+			{ std::cout << "expression [" << psStart << "," << ps.pos << "] `" << strings::escapeWhitespace(ps.string(psStart, ps.pos-psStart)) << "`" << std::endl; }
+			return true;
+		} else { ps.pos = psStart; return false; }
 	}
 
 	bool primary_1_1_1(parse::state& ps) {
