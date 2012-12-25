@@ -346,12 +346,28 @@ namespace egg {
 		return true;
 	}
 
+	bool primary_1_1_1(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+
+		if ( ! (BIND(ps) && type_id(ps))  ) { ps.pos = psStart; return false; }
+
+		return true;
+	}
+
 	bool primary_1_1(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 
-		if ( ! BIND(ps) ) { ps.pos = psStart; return false; }
+		primary_1_1_1(ps);
 
-		if ( ! identifier(ps) ) { ps.pos = psStart; return false; }
+		if ( ! EQUAL(ps) ) { ps.pos = psStart; return false; }
+
+		return true;
+	}
+
+	bool primary_1_2(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+
+		if ( ! (BIND(ps) && identifier(ps)) ) { ps.pos = psStart; return false; }
 
 		return true;
 	}
@@ -361,9 +377,9 @@ namespace egg {
 		
 		if ( ! identifier(ps) ) { ps.pos = psStart; return false; }
 
-		primary_1_1(ps);
+		if ( primary_1_1(ps) ) { ps.pos = psStart; return false; }
 		
-		if ( EQUAL(ps) ) { ps.pos = psStart; return false; }
+		primary_1_2(ps);
 		
 		return true;
 	}

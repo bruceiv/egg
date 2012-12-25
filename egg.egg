@@ -8,45 +8,60 @@
 #include "ast.hpp"
 %}
 
-grammar =		_ out_action? rule+ out_action? end_of_file
+grammar: ast::ptr<ast::grammar> =
+		_ out_action? rule+ out_action? end_of_file
 
-out_action =	OUT_BEGIN < ( !OUT_END . )* > OUT_END _
+out_action: std::string =
+		OUT_BEGIN < ( !OUT_END . )* > OUT_END _
 
-rule =			identifier ( BIND type_id )? EQUAL choice
+rule: ast::ptr<ast::grammar_rule> =
+		identifier ( BIND type_id )? EQUAL choice
 
-identifier =	< [A-Za-z_][A-Za-z_0-9]* > _
+identifier: std::string =
+		< [A-Za-z_][A-Za-z_0-9]* > _
 
-type_id =		< identifier ( "::" _ type_id )* 
-					( '<' _ type_id ( ',' _ type_id )* '>' _ )? >
+type_id: std::string =
+		< identifier ( "::" _ type_id )* 
+			( '<' _ type_id ( ',' _ type_id )* '>' _ )? >
 
-choice =		sequence ( PIPE sequence )*
+choice: ast::ptr<ast::alt_matcher> =
+		sequence ( PIPE sequence )*
 
-sequence =		( expression | action )+
+sequence: ast::ptr<ast::seq_matcher> =
+		( expression | action )+
 
-expression =	( AND | NOT )? primary ( OPT | STAR | PLUS )? _
+expression: ast::ptr<ast::matcher> =
+		( AND | NOT )? primary ( OPT | STAR | PLUS )? _
 
-primary =		identifier ( BIND identifier )? !EQUAL
-				| OPEN choice CLOSE
-				| char_literal
-				| str_literal
-				| char_class
-				| ANY
-				| EMPTY
-				| BEGIN sequence END
+primary: ast::ptr<ast::matcher> =
+		identifier !( ( BIND type_id )? EQUAL ) ( BIND identifier )?
+		| OPEN choice CLOSE
+		| char_literal
+		| str_literal
+		| char_class
+		| ANY
+		| EMPTY
+		| BEGIN sequence END
 
-action =		'{' < ( action | !'}' . )* > '}' _
+action: ast::ptr<ast::action_matcher> =
+		'{' < ( action | !'}' . )* > '}' _
 
-char_literal =	'\'' < character > '\'' _
+char_literal: ast::ptr<ast::char_matcher> =
+		'\'' < character > '\'' _
 
-str_literal =	'\"' < character* > '\"' _
+str_literal: ast::ptr<ast::str_matcher> =
+		'\"' < character* > '\"' _
 
-char_class =	'[' < ( !']' char_range )* > ']' _
+char_class: ast::ptr<ast::range_matcher> =
+		'[' < ( !']' char_range )* > ']' _
 
-char_range =	character '-' character 
-				| character
+char_range: ast::char_range =
+		character '-' character 
+		| character
 
-character =		'\\' [nrt\'\"\\]
-				| ![\'\"\\] .
+character: char =
+		'\\' [nrt\'\"\\]
+		| ![\'\"\\] .
 
 OUT_BEGIN =		"{%"
 OUT_END =		"%}"

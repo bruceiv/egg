@@ -28,7 +28,7 @@ These lookahead capabilities allow PEGs to match some grammars that cannot be re
     A = 'a' A 'b' | ;
     B = 'b' B 'c' | ;
 
-A sequence of matching rules can also be bracketed by '<' and '>', denoting a capturing block; the string that matches the rules inside the capturing block will be provided to the parser for use in its semantic actions.
+A sequence of matching rules can also be surrounded by angle brackets '<' and '>', denoting a capturing block; the string that matches the rules inside the capturing block will be provided to the parser for use in its semantic actions.
 
 A grammar rule may optionally be assigned a type by following the rule identifier with a colon and a second identifier. 
 This second identifier can be any C++ type - namespaces & member typedefs are supported, as are templated classes. 
@@ -88,7 +88,7 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     
     expression =	( AND | NOT )? primary ( OPT | STAR | PLUS )? _
     
-    primary =		identifier ( BIND identifier )? !EQUAL
+    primary =		identifier !( ( BIND type_id )? EQUAL ) ( BIND identifier )?
     				| OPEN choice CLOSE
     				| char_literal
     				| str_literal
@@ -125,8 +125,7 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     CLOSE =			')' _
     ANY =			'.' _
     EMPTY =			';' _
-    BEGIN =			'<' _
-    END =			'>' _
+    CAPT =			'-' _
     
     _ =		 		( space | comment )*
     space =			' ' | '\t' | end_of_line
