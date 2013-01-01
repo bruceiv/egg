@@ -9,7 +9,7 @@
 #include "utils/strings.hpp"
 %}
 
-grammar: ast::ptr<ast::grammar> =
+grammar: ast::grammar_ptr =
 		{ psVal = ast::make_ptr<ast::grammar>(); }
 			_ (out_action : s { psVal->pre = s; })? 
 			(rule : r { *psVal += r; })+ 
@@ -18,7 +18,7 @@ grammar: ast::ptr<ast::grammar> =
 out_action: std::string =
 		OUT_BEGIN < ( !OUT_END . )* > OUT_END _ { psVal = psCapture; }
 
-rule: ast::ptr<ast::grammar_rule> =
+rule: ast::grammar_rule_ptr =
 		identifier : s { psVal = ast::make_ptr<ast::grammar_rule>(s); } 
 			( BIND type_id : s { psVal->type = s; } )? 
 			EQUAL choice : m { psVal->m = m; }
@@ -30,15 +30,15 @@ type_id: std::string =
 		< identifier ( "::" _ type_id )* 
 			( '<' _ type_id ( ',' _ type_id )* '>' _ )? > { psVal = psCapture; }
 
-choice: ast::ptr<ast::alt_matcher> =
+choice: ast::alt_matcher_ptr =
 		sequence : m { psVal = ast::make_ptr<ast::alt_matcher>(); *psVal += m; } 
 			( PIPE sequence : m { *psVal += m; } )*
 
-sequence: ast::ptr<ast::seq_matcher> =
+sequence: ast::seq_matcher_ptr =
 		{ psVal = ast::make_ptr<ast::seq_matcher>(); }
 			( expression : e { *psVal += e; } | action : a { *psVal += a; } )+
 
-expression: ast::ptr<ast::matcher> =
+expression: ast::matcher_ptr =
 		AND primary : m { psVal = ast::make_ptr<ast::look_matcher>(m); }
 		| NOT primary : m { psVal = ast::make_ptr<ast::not_matcher>(m); }
 		| primary : m { psVal = m; } ( 
@@ -46,7 +46,7 @@ expression: ast::ptr<ast::matcher> =
 			| STAR { psVal = ast::make_ptr<ast::many_matcher>(m); }
 			| PLUS { psVal = ast::make_ptr<ast::some_matcher>(m); } )?
 
-primary: ast::ptr<ast::matcher> =
+primary: ast::matcher_ptr =
 		identifier : s !( ( BIND type_id )? EQUAL ) 
 			{ psVal = ast::make_ptr<ast::rule_matcher>(s); } 
 			( BIND identifier : s 
@@ -59,23 +59,23 @@ primary: ast::ptr<ast::matcher> =
 		| EMPTY { psVal = ast::make_ptr<ast::empty_matcher>(); }
 		| BEGIN sequence : bm END { psVal = bm; }
 
-action: ast::ptr<ast::action_matcher> =
+action: ast::action_matcher_ptr =
 		'{' < ( action | !'}' . )* > '}' _ 
 			{ psVal = ast::make_ptr<ast::action_matcher>(psCapture); }
 
-char_literal: ast::ptr<ast::char_matcher> =
+char_literal: ast::char_matcher_ptr =
 		'\'' < character > '\'' _
 			{ psVal = ast::make_ptr<ast::char_matcher>(ps[psCatch]); }
 
-str_literal: ast::ptr<ast::str_matcher> =
+str_literal: ast::str_matcher_ptr =
 		'\"' < character* > '\"' _
 			{ psVal = ast::make_ptr<ast::str_matcher>(psCapture); }
 
-char_class: ast::ptr<ast::range_matcher> =
+char_class: ast::range_matcher_ptr =
 		'[' { psVal = ast::make_ptr<ast::range_matcher>() } 
-			( !']' char_range : r { *psVal += r; } )* ']' _
+			( !']' characters : r { *psVal += r; } )* ']' _
 
-char_range: ast::char_range =
+characters: ast::char_range =
 		character : f '-' character : t { psVal = ast::char_range(f,t); }
 		| character : c { psVal = ast::char_range(c); }
 

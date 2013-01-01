@@ -1,27 +1,10 @@
 #pragma once
 
 //--
-#include <iostream>
-#include <sstream>
 #include <string>
 
-namespace strings {
-	
-	std::string escapeWhitespace(const std::string& s) {
-		std::stringstream ss;
-		for (std::string::const_iterator iter = s.begin(); iter != s.end(); ++iter) {
-			char c = *iter;
-			switch ( c ) {
-			case '\n': ss << "\\n"; break;
-			case '\r': ss << "\\r"; break;
-			case '\t': ss << "\\t"; break;
-			case '\\': ss << "\\\\"; break;
-			default: ss << c; break;
-			}
-		}
-		return ss.str();
-	}
-} /* namespace strings */
+#include "ast.hpp"
+#include "utils/strings.hpp"
 //--
 
 #include <string>
@@ -30,81 +13,71 @@ namespace strings {
 
 namespace egg {
 
-	bool grammar(parse::state& ps);
-	bool out_action(parse::state& ps);
-	bool rule(parse::state& ps);
-	bool identifier(parse::state& ps);
-	bool type_id(parse::state& ps);
-	bool choice(parse::state& ps);
-	bool sequence(parse::state& ps);
-	bool expression(parse::state& ps);
-	bool primary(parse::state& ps);
-	bool action(parse::state& ps);
-	bool char_literal(parse::state& ps);
-	bool str_literal(parse::state& ps);
-	bool char_class(parse::state& ps);
-	bool char_range(parse::state& ps);
-	bool character(parse::state& ps);
+	parse::result<ast::grammar_ptr> grammar(parse::state&);
+	parse::result<std::string> out_action(parse::state&);
+	parse::result<ast::grammar_rule_ptr> rule(parse::state&);
+	parse::result<std::string> identifier(parse::state&);
+	parse::result<std::string> type_id(parse::state&);
+	parse::result<ast::alt_matcher_ptr> choice(parse::state&);
+	parse::result<ast::seq_matcher_ptr> sequence(parse::state&);
+	parse::result<ast::matcher_ptr> expression(parse::state&);
+	parse::result<ast::matcher_ptr> primary(parse::state&);
+	parse::result<ast::action_matcher_ptr> action(parse::state&);
+	parse::result<ast::char_matcher_ptr> char_literal(parse::state&);
+	parse::result<ast::str_matcher_ptr> str_literal(parse::state&);
+	parse::result<ast::range_matcher_ptr> char_class(parse::state&);
+	parse::result<ast::char_range> characters(parse::state&);
+	parse::result<char> character(parse::state&);
 
-	bool OUT_BEGIN(parse::state& ps);
-	bool OUT_END(parse::state& ps);
-	bool BIND(parse::state& ps);
-	bool EQUAL(parse::state& ps);
-	bool PIPE(parse::state& ps);
-	bool AND(parse::state& ps);
-	bool NOT(parse::state& ps);
-	bool OPT(parse::state& ps);
-	bool STAR(parse::state& ps);
-	bool PLUS(parse::state& ps);
-	bool OPEN(parse::state& ps);
-	bool CLOSE(parse::state& ps);
-	bool ANY(parse::state& ps);
-	bool EMPTY(parse::state& ps);
-	bool BEGIN(parse::state& ps);
-	bool END(parse::state& ps);
+	parse::result<parse::value> OUT_BEGIN(parse::state&);
+	parse::result<parse::value> OUT_END(parse::state&);
+	parse::result<parse::value> BIND(parse::state&);
+	parse::result<parse::value> EQUAL(parse::state&);
+	parse::result<parse::value> PIPE(parse::state&);
+	parse::result<parse::value> AND(parse::state&);
+	parse::result<parse::value> NOT(parse::state&);
+	parse::result<parse::value> OPT(parse::state&);
+	parse::result<parse::value> STAR(parse::state&);
+	parse::result<parse::value> PLUS(parse::state&);
+	parse::result<parse::value> OPEN(parse::state&);
+	parse::result<parse::value> CLOSE(parse::state&);
+	parse::result<parse::value> ANY(parse::state&);
+	parse::result<parse::value> EMPTY(parse::state&);
+	parse::result<parse::value> BEGIN(parse::state&);
+	parse::result<parse::value> END(parse::state&);
 	
-	bool _(parse::state& ps);
-	bool space(parse::state& ps);
-	bool comment(parse::state& ps);
-	bool end_of_line(parse::state& ps);
-	bool end_of_file(parse::state& ps);
+	parse::result<parse::value> _(parse::state&);
+	parse::result<parse::value> space(parse::state&);
+	parse::result<parse::value> comment(parse::state&);
+	parse::result<parse::value> end_of_line(parse::state&);
+	parse::result<parse::value> end_of_file(parse::state&);
 	
-	/** Parsing root. Call to parse an Egg grammar.
-	 *  @param ps		The parsing state to start from
-	 *  @return Did the input contained in the passed state contain an Egg 
-	 *  		grammar?
-	 */
-	bool parse(parse::state& ps) {
-		return grammar(ps);
-	}
-	
-	/** Parsing root. Call to parse an Egg grammar.
-	 *  @param in		The input stream to read from
-	 *  @return Did the input stream contain an Egg grammar?
-	 */
-	bool parse(std::istream& in) {
-		parse::state ps(in);
-		return parse(ps);
-	}
-	
-	bool grammar(parse::state& ps) {
+
+	 parse::result<ast::grammar_ptr> grammar(parse::state& ps) {
 		parse::ind psStart = ps.pos;
+		ast::grammar_ptr psVal;
 		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+		std::string s;
+		ast::grammar_rule_ptr r;
 
-		out_action(ps);
+		{ psVal = ast::make_ptr<ast::grammar>(); }
 		
-		if ( ! rule(ps) ) { ps.pos = psStart; return false; }
-		while ( rule(ps) ) {}
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<ast::grammar_ptr>(); }
 
-		out_action(ps);
+		if ( parse::bind(out_action, ps, s) ) { psVal->pre = s; }
 		
-		if ( ! end_of_file(ps) ) { ps.pos = psStart; return false; }
+		if ( parse::bind(rule, ps, r) ) { *psVal += r; } 
+		else { ps.pos = psStart; return parse::fail<ast::grammar_ptr>(); }
+		while ( parse::bind(rule, ps, r) ) { *psVal += r; }
+
+		if ( parse::bind(out_action, ps, s) ) { psVal->post = s; }
+		
+		if ( ! end_of_file(ps) ) { ps.pos = psStart; return parse::fail<ast::grammar_ptr>(); }
 		
 		parse::ind psLen = ps.pos - psStart;
-		{ std::cout << "grammar [" << psStart << "," << psStart+psLen << "]" << std::endl; }
+		//{ std::cout << "grammar [" << psStart << "," << psStart+psLen << "]" << std::endl; }
 		
-		return true;
+		return parse::match(psVal);
 	}
 
 	bool out_action_1(parse::state& ps) {
@@ -117,51 +90,62 @@ namespace egg {
 		return true;
 	}
 
-	bool out_action(parse::state& ps) {
+	parse::result<std::string> out_action(parse::state& ps) {
 		parse::ind psStart = ps.pos;
+		std::string psVal;
 
-		if ( ! OUT_BEGIN(ps) ) { ps.pos = psStart; return false; }
+		if ( ! OUT_BEGIN(ps) ) { ps.pos = psStart; return parse::fail<std::string>(); }
 
 		parse::ind psCatch = ps.pos;
 
 		while ( out_action_1(ps) ) {}
 
 		parse::ind psCatchLen = ps.pos - psCatch;
+		std::string psCapture(ps.string(psCatch, psCatchLen));
 
-		if ( ! OUT_END(ps) ) { ps.pos = psStart; return false; }
+		if ( ! OUT_END(ps) ) { ps.pos = psStart; return parse::fail<std::string>(); }
 
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<std::string>(); }
 
-		{ std::cout << "out_action `" << ps.string(psCatch, psCatchLen) << "`" << std::endl; }
+		{ psVal = psCapture; }
+		
+		//{ std::cout << "out_action `" << ps.string(psCatch, psCatchLen) << "`" << std::endl; }
 
-		return true;
+		return parse::match(psVal);
 	}
 
-	bool rule_1(parse::state& ps) {
+	bool rule_1(parse::state& ps, ast::grammar_rule_ptr& psVal) {
 		parse::ind psStart = ps.pos;
+		std::string s;
 
 		if ( ! BIND(ps) ) { ps.pos = psStart; return false; }
 
-		if ( ! type_id(ps) ) { ps.pos = psStart; return false; }
+		if ( parse::bind(type_id, ps, s) ) { psVal->type = s; }
+		else { ps.pos = psStart; return false; }
 
 		return true;
 	}
 	
-	bool rule(parse::state& ps) {
+	parse::result<ast::grammar_rule_ptr> rule(parse::state& ps) {
 		parse::ind psStart = ps.pos;
+		ast::grammar_rule_ptr psVal;
+		std::string s;
+		ast::alt_matcher_ptr m;
 		
-		if ( ! identifier(ps) ) { ps.pos = psStart; return false; }
+		if ( parse::bind(identifier, ps, s) ) { psVal = ast::make_ptr<ast::grammar_rule>(s); } 
+		else { ps.pos = psStart; return parse::fail<ast::grammar_rule_ptr>(); }
 
-		rule_1(ps);
+		rule_1(ps, psVal);
 		
-		if ( ! EQUAL(ps) ) { ps.pos = psStart; return false; }
+		if ( ! EQUAL(ps) ) { ps.pos = psStart; return parse::fail<ast::grammar_rule_ptr>(); }
 		
-		if ( ! choice(ps) ) { ps.pos = psStart; return false; }
+		if ( parse::bind(choice, ps, m) ) { psVal->m = m; }
+		else { ps.pos = psStart; return parse::fail<ast::grammar_rule_ptr>(); }
 		
 		parse::ind psLen = ps.pos - psStart;
-		{ std::cout << "rule [" << psStart << "," << psStart+psLen << "]" << std::endl; }
+		//{ std::cout << "rule [" << psStart << "," << psStart+psLen << "]" << std::endl; }
 		
-		return true;
+		return parse::match(psVal);
 	}
 	
 	bool identifier_1(parse::state& ps) {
@@ -181,23 +165,26 @@ namespace egg {
 		return true;
 	}
 	
-	bool identifier(parse::state& ps) {
+	parse::result<std::string> identifier(parse::state& ps) {
 		parse::ind psStart = ps.pos;
+		std::string psVal;
 		
 		parse::ind psCatch = ps.pos;
 		
-		if ( ! identifier_1(ps) ) { ps.pos = psStart; return false; }
+		if ( ! identifier_1(ps) ) { ps.pos = psStart; return parse::fail<std::string>(); }
 		
 		while ( identifier_2(ps) ) {}
 		
 		parse::ind psCatchLen = ps.pos - psCatch;
 		std::string psCapture(ps.string(psCatch, psCatchLen));
 		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<std::string>(); }
+
+		{ psVal = psCapture; }
 		
-		{ std::cout << "identifier `" << psCapture << "`" << std::endl; }
+		//{ std::cout << "identifier `" << psCapture << "`" << std::endl; }
 		
-		return true;
+		return parse::match(psVal);
 	}
 
 	bool type_id_1(parse::state& ps) {
@@ -242,11 +229,12 @@ namespace egg {
 		return true;
 	}
 
-	bool type_id(parse::state& ps) {
+	parse::result<std::string> type_id(parse::state& ps) {
 		parse::ind psStart = ps.pos;
+		std::string psVal;
 		parse::ind psCatch = ps.pos;
 
-		if ( ! identifier(ps) ) { ps.pos = psStart; return false; }
+		if ( ! identifier(ps) ) { ps.pos = psStart; return parse::fail<std::string>(); }
 
 		while ( type_id_1(ps) ) {}
 
@@ -255,88 +243,104 @@ namespace egg {
 		parse::ind psCatchLen = ps.pos - psCatch;
 		std::string psCapture(ps.string(psCatch, psCatchLen));
 
-		{ std::cout << "type_id `" << psCapture << "`" << std::endl; }
+		{ psVal = psCapture; }
 
-		return true;
+		//{ std::cout << "type_id `" << psCapture << "`" << std::endl; }
+
+		return parse::match(psVal);
 	}
 	
-	bool choice_1(parse::state& ps) {
+	bool choice_1(parse::state& ps, ast::alt_matcher_ptr& psVal) {
 		parse::ind psStart = ps.pos;
+		ast::seq_matcher_ptr m;
 		
 		if ( ! PIPE(ps) ) { ps.pos = psStart; return false; }
 		
-		if ( ! sequence(ps) ) { ps.pos = psStart; return false; }
+		if ( parse::bind(sequence, ps, m) ) { *psVal += m; }
+		else { ps.pos = psStart; return false; }
 		
 		return true;
 	}
 	
-	bool choice(parse::state& ps) {
+	parse::result<ast::alt_matcher_ptr> choice(parse::state& ps) {
 		parse::ind psStart = ps.pos;
+		ast::alt_matcher_ptr psVal;
+		ast::seq_matcher_ptr m;
 		
-		if ( ! sequence(ps) ) { ps.pos = psStart; return false; }
+		if ( parse::bind(sequence, ps, m) ) { psVal = ast::make_ptr<ast::alt_matcher>(); *psVal += m; } 
+		else { ps.pos = psStart; return parse::fail<ast::alt_matcher_ptr>(); }
 		
-		while ( choice_1(ps) ) {}
+		while ( choice_1(ps, psVal) ) {}
 		
 		parse::ind psLen = ps.pos - psStart;
-		{ std::cout << "choice [" << psStart << "," << psStart+psLen << "]" << std::endl; }
+		//{ std::cout << "choice [" << psStart << "," << psStart+psLen << "]" << std::endl; }
 		
-		return true;
+		return parse::match(psVal);
 	}
 
-	bool sequence_1(parse::state& ps) {
+	bool sequence_1(parse::state& ps, ast::seq_matcher_ptr& psVal) {
 		parse::ind psStart = ps.pos;
+		ast::matcher_ptr e;
+		ast::action_matcher_ptr a;
 
-		if ( expression(ps) ) { return true; }
+		if ( parse::bind(expression, ps, e) ) { *psVal += e; return true; }
 		else { ps.pos = psStart; }
 
-		if ( action(ps) ) { return true; }
+		if ( parse::bind(action, ps, a) ) { *psVal += a; return true; }
 		else { ps.pos = psStart; return false; }
 	}
 
-	bool sequence(parse::state& ps) {
+	parse::result<ast::seq_matcher_ptr> sequence(parse::state& ps) {
 		parse::ind psStart = ps.pos;
-		
-		if ( ! sequence_1(ps) ) { ps.pos = psStart; return false; }
+		ast::seq_matcher_ptr psVal;
 
-		while ( sequence_1(ps) ) {}
+		{ psVal = ast::make_ptr<ast::seq_matcher>(); }
+		if ( ! sequence_1(ps, psVal) ) { ps.pos = psStart; return parse::fail<ast::seq_matcher_ptr>(); }
+
+		while ( sequence_1(ps, psVal) ) {}
 
 		parse::ind psLen = ps.pos - psStart;
-		{ std::cout << "sequence [" << psStart << "," << psStart+psLen << "]" << std::endl; }
+		//{ std::cout << "sequence [" << psStart << "," << psStart+psLen << "]" << std::endl; }
 
-		return true;
+		return parse::match(psVal);
 	}
 	
-	bool expression_1(parse::state& ps) {
+	bool expression_1(parse::state& ps, ast::matcher_ptr& psVal, ast::matcher_ptr& m) {
 		parse::ind psStart = ps.pos;
 		
-		if ( OPT(ps) ) { return true; }
+		if ( OPT(ps) ) { psVal = ast::make_ptr<ast::opt_matcher>(m); return true; }
 		else { ps.pos = psStart; }
 		
-		if ( STAR(ps) ) { return true; }
+		if ( STAR(ps) ) { psVal = ast::make_ptr<ast::many_matcher>(m); return true; }
 		else { ps.pos = psStart; }
 		
-		if ( PLUS(ps) ) { return true; }
+		if ( PLUS(ps) ) { psVal = ast::make_ptr<ast::some_matcher>(m); return true; }
 		else { ps.pos = psStart; return false; }
 	}
 	
-	bool expression(parse::state& ps) {
+	parse::result<ast::matcher_ptr> expression(parse::state& ps) {
 		parse::ind psStart = ps.pos;
+		ast::matcher_ptr psVal;
+		ast::matcher_ptr m;
 
-		if ( AND(ps) && primary(ps) ) { 
-			{ std::cout << "expression [" << psStart << "," << ps.pos << "] `" << strings::escapeWhitespace(ps.string(psStart, ps.pos-psStart)) << "`" << std::endl; }
-			return true;
+		if ( AND(ps) && parse::bind(primary, ps, m) ) { 
+			//{ std::cout << "expression [" << psStart << "," << ps.pos << "] `" << strings::escape(ps.string(psStart, ps.pos-psStart)) << "`" << std::endl; }
+			{ psVal = ast::make_ptr<ast::look_matcher>(m); }
+			return parse::match(psVal);
 		} else { ps.pos = psStart; }
 		
-		if ( NOT(ps) && primary(ps) ) { 
-			{ std::cout << "expression [" << psStart << "," << ps.pos << "] `" << strings::escapeWhitespace(ps.string(psStart, ps.pos-psStart)) << "`" << std::endl; }
-			return true;
+		if ( NOT(ps) && parse::bind(primary, ps, m) ) { 
+			//{ std::cout << "expression [" << psStart << "," << ps.pos << "] `" << strings::escape(ps.string(psStart, ps.pos-psStart)) << "`" << std::endl; }
+			{ psVal = ast::make_ptr<ast::not_matcher>(m); }
+			return parse::match(psVal);
 		} else { ps.pos = psStart; }
 
-		if ( primary(ps) ) {
-			expression_1(ps);
-			{ std::cout << "expression [" << psStart << "," << ps.pos << "] `" << strings::escapeWhitespace(ps.string(psStart, ps.pos-psStart)) << "`" << std::endl; }
-			return true;
-		} else { ps.pos = psStart; return false; }
+		if ( parse::bind(primary, ps, m) ) {
+			{ psVal = m; }
+			expression_1(ps, psVal, m);
+			//{ std::cout << "expression [" << psStart << "," << ps.pos << "] `" << strings::escape(ps.string(psStart, ps.pos-psStart)) << "`" << std::endl; }
+			return parse::match(psVal);
+		} else { ps.pos = psStart; return parse::fail<ast::matcher_ptr>(); }
 	}
 
 	bool primary_1_1_1(parse::state& ps) {
@@ -357,52 +361,63 @@ namespace egg {
 		return true;
 	}
 
-	bool primary_1_2(parse::state& ps) {
+	bool primary_1_2(parse::state& ps, ast::matcher_ptr& psVal) {
 		parse::ind psStart = ps.pos;
+		std::string s;
 
-		if ( ! (BIND(ps) && identifier(ps)) ) { ps.pos = psStart; return false; }
+		if ( (BIND(ps) && parse::bind(identifier, ps, s)) ) { ast::as_ptr<ast::rule_matcher>(psVal)->var = s; }
+		else { ps.pos = psStart; return false; }
 
 		return true;
 	}
 	
-	bool primary_1(parse::state& ps) {
+	bool primary_1(parse::state& ps, ast::matcher_ptr& psVal) {
 		parse::ind psStart = ps.pos;
+		std::string s;
 		
-		if ( ! identifier(ps) ) { ps.pos = psStart; return false; }
+		if ( ! parse::bind(identifier, ps, s) ) { ps.pos = psStart; return false; }
 
 		if ( primary_1_1(ps) ) { ps.pos = psStart; return false; }
+
+		{ psVal = ast::make_ptr<ast::rule_matcher>(s); }
 		
-		primary_1_2(ps);
+		primary_1_2(ps, psVal);
 		
 		return true;
 	}
 	
-	bool primary(parse::state& ps) {
+	parse::result<ast::matcher_ptr> primary(parse::state& ps) {
 		parse::ind psStart = ps.pos;
+		ast::matcher_ptr psVal;
+		ast::alt_matcher_ptr am;
+		ast::char_matcher_ptr cm;
+		ast::str_matcher_ptr sm;
+		ast::range_matcher_ptr rm;
+		ast::seq_matcher_ptr bm;
 		
-		if ( primary_1(ps) ) { return true; }
+		if ( primary_1(ps, psVal) ) { return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
-		if ( OPEN(ps) && choice(ps) && CLOSE(ps) ) { return true; }
+		if ( OPEN(ps) && parse::bind(choice, ps, am) && CLOSE(ps) ) { psVal = am; return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
-		if ( char_literal(ps) ) { return true; }
+		if ( parse::bind(char_literal, ps, cm) ) { psVal = cm; return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
-		if ( str_literal(ps) ) { return true; }
+		if ( parse::bind(str_literal, ps, sm) ) { psVal = sm; return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
-		if ( char_class(ps) ) { return true; }
+		if ( parse::bind(char_class, ps, rm) ) { psVal = rm; return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
-		if ( ANY(ps) ) { return true; }
+		if ( ANY(ps) ) { psVal = ast::make_ptr<ast::any_matcher>(); return parse::match(psVal); }
 		else { ps.pos = psStart; }
 
-		if ( EMPTY(ps) ) { return true; }
+		if ( EMPTY(ps) ) { psVal = ast::make_ptr<ast::empty_matcher>(); return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
-		if ( BEGIN(ps) && sequence(ps) && END(ps) ) { return true; }
-		else { ps.pos = psStart; return false; }
+		if ( BEGIN(ps) && parse::bind(sequence, ps, bm) && END(ps) ) { psVal = bm; return parse::match(psVal); }
+		else { ps.pos = psStart; return parse::fail<ast::matcher_ptr>(); }
 	}
 
 	bool action_1_1(parse::state& ps) {
@@ -425,10 +440,11 @@ namespace egg {
 		else { ps.pos = psStart; return false; }
 	}
 
-	bool action(parse::state& ps) {
+	parse::result<ast::action_matcher_ptr> action(parse::state& ps) {
 		parse::ind psStart = ps.pos;
+		ast::action_matcher_ptr psVal;
 
-		if ( ! (parse::matches<'{'>(ps)) ) { ps.pos = psStart; return false; }
+		if ( ! (parse::matches<'{'>(ps)) ) { ps.pos = psStart; return parse::fail<ast::action_matcher_ptr>(); }
 
 		parse::ind psCatch = ps.pos;
 
@@ -437,40 +453,44 @@ namespace egg {
 		parse::ind psCatchLen = ps.pos - psCatch;
 		std::string psCapture(ps.string(psCatch, psCatchLen));
 
-		if ( ! (parse::matches<'}'>(ps)) ) { ps.pos = psStart; return false; }
+		if ( ! (parse::matches<'}'>(ps)) ) { ps.pos = psStart; return parse::fail<ast::action_matcher_ptr>(); }
 
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<ast::action_matcher_ptr>(); }
 
-		{ std::cout << "action `" << psCapture << "`" << std::endl; }
+		//{ std::cout << "action `" << psCapture << "`" << std::endl; }
+		{ psVal = ast::make_ptr<ast::action_matcher>(psCapture); }
 
-		return true;
+		return parse::match(psVal);
 	}
 	
-	bool char_literal(parse::state& ps) {
+	parse::result<ast::char_matcher_ptr> char_literal(parse::state& ps) {
 		parse::ind psStart = ps.pos;
+		ast::char_matcher_ptr psVal;
 		
-		if ( ! (parse::matches<'\''>(ps)) ) { ps.pos = psStart; return false; }
+		if ( ! (parse::matches<'\''>(ps)) ) { ps.pos = psStart; return parse::fail<ast::char_matcher_ptr>(); }
 		
 		parse::ind psCatch = ps.pos;
 		
-		if ( ! character(ps) ) { ps.pos = psStart; return false; }
+		if ( ! character(ps) ) { ps.pos = psStart; return parse::fail<ast::char_matcher_ptr>(); }
 		
 		parse::ind psCatchLen = ps.pos - psCatch;
 		std::string psCapture(ps.string(psCatch, psCatchLen));
 		
-		if ( ! (parse::matches<'\''>(ps)) ) { ps.pos = psStart; return false; }
+		if ( ! (parse::matches<'\''>(ps)) ) { ps.pos = psStart; return parse::fail<ast::char_matcher_ptr>(); }
 		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<ast::char_matcher_ptr>(); }
 		
-		{ std::cout << "char_literal `" << psCapture << "`" << std::endl; }
+		//{ std::cout << "char_literal `" << psCapture << "`" << std::endl; }
+		{ psVal = ast::make_ptr<ast::char_matcher>(ps[psCatch]); }
 		
-		return true;
+		return parse::match(psVal);
 	}
 	
-	bool str_literal(parse::state& ps) {
+	parse::result<ast::str_matcher_ptr> str_literal(parse::state& ps) {
 		parse::ind psStart = ps.pos;
+		ast::str_matcher_ptr psVal;
 		
-		if ( ! (parse::matches<'\"'>(ps)) ) { ps.pos = psStart; return false; }
+		if ( ! (parse::matches<'\"'>(ps)) ) { ps.pos = psStart; return parse::fail<ast::str_matcher_ptr>(); }
 		
 		parse::ind psCatch = ps.pos;
 		
@@ -479,55 +499,63 @@ namespace egg {
 		parse::ind psCatchLen = ps.pos - psCatch;
 		std::string psCapture(ps.string(psCatch, psCatchLen));
 		
-		if ( ! (parse::matches<'\"'>(ps)) ) { ps.pos = psStart; return false; }
+		if ( ! (parse::matches<'\"'>(ps)) ) { ps.pos = psStart; return parse::fail<ast::str_matcher_ptr>(); }
 		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<ast::str_matcher_ptr>(); }
 		
-		{ std::cout << "str_literal `" << psCapture << "`" << std::endl; }
+		//{ std::cout << "str_literal `" << psCapture << "`" << std::endl; }
+		{ psVal = ast::make_ptr<ast::str_matcher>(psCapture); }
 		
-		return true;
+		return parse::match(psVal);
 	}
 	
-	bool char_class_1(parse::state& ps) {
+	bool char_class_1(parse::state& ps, ast::range_matcher_ptr& psVal) {
 		parse::ind psStart = ps.pos;
+		ast::char_range r;
 		
 		if ( parse::matches<']'>(ps) ) { ps.pos = psStart; return false; }
 		else { ps.pos = psStart; }
 		
-		if ( ! char_range(ps) ) { return false; }
+		if ( parse::bind(characters, ps, r) ) { *psVal += r; }
+		else { return false; }
 		
 		return true;
 	}
 	
-	bool char_class(parse::state& ps) {
+	parse::result<ast::range_matcher_ptr> char_class(parse::state& ps) {
 		parse::ind psStart = ps.pos;
+		ast::range_matcher_ptr psVal;
 		
-		if ( ! (parse::matches<'['>(ps)) ) { ps.pos = psStart; return false; }
+		if ( ! (parse::matches<'['>(ps)) ) { ps.pos = psStart; return parse::fail<ast::range_matcher_ptr>(); }
+
+		{ psVal = ast::make_ptr<ast::range_matcher>(); }
 		
 		parse::ind psCatch = ps.pos;
 		
-		while ( char_class_1(ps) ) {}
+		while ( char_class_1(ps, psVal) ) {}
 		
 		parse::ind psCatchLen = ps.pos - psCatch;
 		std::string psCapture(ps.string(psCatch, psCatchLen));
 		
-		if ( ! (parse::matches<']'>(ps)) ) { ps.pos = psStart; return false; }
+		if ( ! (parse::matches<']'>(ps)) ) { ps.pos = psStart; return parse::fail<ast::range_matcher_ptr>(); }
 		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<ast::range_matcher_ptr>(); }
 		
-		{ std::cout << "char_class `" << psCapture << "`" << std::endl; }
+		//{ std::cout << "char_class `" << psCapture << "`" << std::endl; }
 		
-		return true;
+		return parse::match(psVal);
 	}
 	
-	bool char_range(parse::state& ps) {
+	parse::result<ast::char_range> characters(parse::state& ps) {
 		parse::ind psStart = ps.pos;
+		ast::char_range psVal;
+		char f, t, c;
 		
-		if ( character(ps) && parse::matches<'-'>(ps) && character(ps) ) { return true; }
+		if ( parse::bind(character, ps, f) && parse::matches<'-'>(ps) && parse::bind(character, ps, t) ) { psVal = ast::char_range(f, t); return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
-		if ( character(ps) ) { return true; }
-		else { ps.pos = psStart; return false; }
+		if ( parse::bind(character, ps, c) ) { psVal = ast::char_range(c); return parse::match(psVal); }
+		else { ps.pos = psStart; return parse::fail<ast::char_range>(); }
 	}
 	
 	bool character_1_1(parse::state& ps) {
@@ -570,170 +598,171 @@ namespace egg {
 		return true;
 	}
 	
-	bool character(parse::state& ps) {
+	parse::result<char> character(parse::state& ps) {
 		parse::ind psStart = ps.pos;
+		char psVal;
 		
-		if ( character_1(ps) ) { return true; }
+		if ( character_1(ps) ) { psVal = strings::unescaped_char(ps[psStart+1]); return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
-		if ( character_2(ps) ) { return true; }
-		else { ps.pos = psStart; return false; }
+		if ( character_2(ps) ) { psVal = ps[psStart]; return parse::match(psVal); }
+		else { ps.pos = psStart; return parse::fail<char>(); }
 	}
 
-	bool OUT_BEGIN(parse::state& ps) {
+	parse::result<parse::value> OUT_BEGIN(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 
-		if ( ! ('{' == ps[ps.pos++] && '%' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
+		if ( ! ('{' == ps[ps.pos++] && '%' == ps[ps.pos++]) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
 
-		return true;
-	}
-
-	bool OUT_END(parse::state& ps) {
-		parse::ind psStart = ps.pos;
-
-		if ( ! ('%' == ps[ps.pos++] && '}' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
-
-		return true;
+		return parse::match(parse::val);
 	}
 
-	bool BIND(parse::state& ps) {
+	parse::result<parse::value> OUT_END(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 
-		if ( ! parse::matches<':'>(ps) ) { ps.pos = psStart; return false; }
+		if ( ! ('%' == ps[ps.pos++] && '}' == ps[ps.pos++]) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
 
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
-
-		return true;
-	}
-	
-	bool EQUAL(parse::state& ps) {
-		parse::ind psStart = ps.pos;
-		
-		if ( ! parse::matches<'='>(ps) ) { ps.pos = psStart; return false; }
-		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
-		
-		return true;
-	}
-	
-	bool PIPE(parse::state& ps) {
-		parse::ind psStart = ps.pos;
-		
-		if ( ! parse::matches<'|'>(ps) ) { ps.pos = psStart; return false; }
-		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
-		
-		return true;
-	}
-	
-	bool AND(parse::state& ps) {
-		parse::ind psStart = ps.pos;
-		
-		if ( ! parse::matches<'&'>(ps) ) { ps.pos = psStart; return false; }
-		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
-		
-		return true;
-	}
-	
-	bool NOT(parse::state& ps) {
-		parse::ind psStart = ps.pos;
-		
-		if ( ! parse::matches<'!'>(ps) ) { ps.pos = psStart; return false; }
-		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
-		
-		return true;
-	}
-	
-	bool OPT(parse::state& ps) {
-		parse::ind psStart = ps.pos;
-		
-		if ( ! parse::matches<'?'>(ps) ) { ps.pos = psStart; return false; }
-		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
-		
-		return true;
-	}
-	
-	bool STAR(parse::state& ps) {
-		parse::ind psStart = ps.pos;
-		
-		if ( ! parse::matches<'*'>(ps) ) { ps.pos = psStart; return false; }
-		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
-		
-		return true;
-	}
-	
-	bool PLUS(parse::state& ps) {
-		parse::ind psStart = ps.pos;
-		
-		if ( ! parse::matches<'+'>(ps) ) { ps.pos = psStart; return false; }
-		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
-		
-		return true;
-	}
-	
-	bool OPEN(parse::state& ps) {
-		parse::ind psStart = ps.pos;
-		
-		if ( ! parse::matches<'('>(ps) ) { ps.pos = psStart; return false; }
-		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
-		
-		return true;
-	}
-	
-	bool CLOSE(parse::state& ps) {
-		parse::ind psStart = ps.pos;
-		
-		if ( ! parse::matches<')'>(ps) ) { ps.pos = psStart; return false; }
-		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
-		
-		return true;
-	}
-	
-	bool ANY(parse::state& ps) {
-		parse::ind psStart = ps.pos;
-		
-		if ( ! parse::matches<'.'>(ps) ) { ps.pos = psStart; return false; }
-		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
-		
-		return true;
+		return parse::match(parse::val);
 	}
 
-	bool EMPTY(parse::state& ps) {
+	parse::result<parse::value> BIND(parse::state& ps) {
 		parse::ind psStart = ps.pos;
-		
-		if ( ! parse::matches<';'>(ps) ) { ps.pos = psStart; return false; }
-		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
-		
-		return true;
+
+		if ( ! parse::matches<':'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+
+		return parse::match(parse::val);
 	}
 	
-	bool BEGIN(parse::state& ps) {
+	parse::result<parse::value> EQUAL(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! parse::matches<'<'>(ps) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<'='>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
 		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
 		
-		return true;
+		return parse::match(parse::val);
 	}
 	
-	bool END(parse::state& ps) {
+	parse::result<parse::value> PIPE(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! parse::matches<'>'>(ps) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<'|'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
 		
-		if ( ! _(ps) ) { ps.pos = psStart; return false; }
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
 		
-		return true;
+		return parse::match(parse::val);
+	}
+	
+	parse::result<parse::value> AND(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+		
+		if ( ! parse::matches<'&'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		return parse::match(parse::val);
+	}
+	
+	parse::result<parse::value> NOT(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+		
+		if ( ! parse::matches<'!'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		return parse::match(parse::val);
+	}
+	
+	parse::result<parse::value> OPT(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+		
+		if ( ! parse::matches<'?'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		return parse::match(parse::val);
+	}
+	
+	parse::result<parse::value> STAR(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+		
+		if ( ! parse::matches<'*'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		return parse::match(parse::val);
+	}
+	
+	parse::result<parse::value> PLUS(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+		
+		if ( ! parse::matches<'+'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		return parse::match(parse::val);
+	}
+	
+	parse::result<parse::value> OPEN(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+		
+		if ( ! parse::matches<'('>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		return parse::match(parse::val);
+	}
+	
+	parse::result<parse::value> CLOSE(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+		
+		if ( ! parse::matches<')'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		return parse::match(parse::val);
+	}
+	
+	parse::result<parse::value> ANY(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+		
+		if ( ! parse::matches<'.'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		return parse::match(parse::val);
+	}
+
+	parse::result<parse::value> EMPTY(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+		
+		if ( ! parse::matches<';'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		return parse::match(parse::val);
+	}
+	
+	parse::result<parse::value> BEGIN(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+		
+		if ( ! parse::matches<'<'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		return parse::match(parse::val);
+	}
+	
+	parse::result<parse::value> END(parse::state& ps) {
+		parse::ind psStart = ps.pos;
+		
+		if ( ! parse::matches<'>'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
+		
+		return parse::match(parse::val);
 	}
 	
 	bool __1(parse::state& ps) {
@@ -746,25 +775,25 @@ namespace egg {
 		else { ps.pos = psStart; return false; }
 	}
 	
-	bool _(parse::state& ps) {
+	parse::result<parse::value> _(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		while ( __1(ps) ) {}
 		
-		return true;
+		return parse::match(parse::val);
 	}
 	
-	bool space(parse::state& ps) {
+	parse::result<parse::value> space(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( parse::matches<' '>(ps) ) { return true; }
+		if ( parse::matches<' '>(ps) ) { return parse::match(parse::val); }
 		else { ps.pos = psStart; }
 		
-		if ( parse::matches<'\t'>(ps) ) { return true; }
+		if ( parse::matches<'\t'>(ps) ) { return parse::match(parse::val); }
 		else { ps.pos = psStart; }
 		
-		if ( end_of_line(ps) ) { return true; }
-		else { ps.pos = psStart; return false; }
+		if ( end_of_line(ps) ) { return parse::match(parse::val); }
+		else { ps.pos = psStart; return parse::fail<parse::value>(); }
 	}
 	
 	bool comment_1(parse::state& ps) {
@@ -777,22 +806,22 @@ namespace egg {
 		return true;
 	}
 	
-	bool comment(parse::state& ps) {
+	parse::result<parse::value> comment(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( ! parse::matches<'#'>(ps) ) { ps.pos = psStart; return false; }
+		if ( ! parse::matches<'#'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
 		
 		while ( comment_1(ps) ) {}
 		
-		if ( ! end_of_line(ps) ) { ps.pos = psStart; return false; }
+		if ( ! end_of_line(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
 		
 		parse::ind psLen = ps.pos - psStart;
-		{ std::cout << "comment [" << psStart << "," << psStart+psLen << "] `" << strings::escapeWhitespace(ps.string(psStart, psLen)) << "`" << std::endl; }
+		//{ std::cout << "comment [" << psStart << "," << psStart+psLen << "] `" << strings::escape(ps.string(psStart, psLen)) << "`" << std::endl; }
 		
-		return true;
+		return parse::match(parse::val);
 	}
 	
-	bool end_of_line(parse::state& ps) {
+	parse::result<parse::value> end_of_line(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( [&ps]() {
@@ -801,25 +830,25 @@ namespace egg {
 			if ( ! ('\r' == ps[ps.pos++] && '\n' == ps[ps.pos++]) ) { ps.pos = psStart; return false; }
 			
 			return true;
-		}() ) { return true; }
+		}() ) { return parse::match(parse::val); }
 		else { ps.pos = psStart; }
 		
-		if ( parse::matches<'\n'>(ps) ) { return true; }
+		if ( parse::matches<'\n'>(ps) ) { return parse::match(parse::val); }
 		else { ps.pos = psStart; }
 		
-		if ( parse::matches<'\r'>(ps) ) { return true; }
-		else { ps.pos = psStart; return false; }
+		if ( parse::matches<'\r'>(ps) ) { return parse::match(parse::val); }
+		else { ps.pos = psStart; return parse::fail<parse::value>(); }
 	}
 	
-	bool end_of_file(parse::state& ps) {
+	parse::result<parse::value> end_of_file(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
-		if ( parse::any(ps) ) { ps.pos = psStart; return false; }
+		if ( parse::any(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
 		else { ps.pos = psStart; }
 		
-		{ std::cout << "end_of_file [" << psStart << "]" << std::endl; }
+		//{ std::cout << "end_of_file [" << psStart << "]" << std::endl; }
 		
-		return true;
+		return parse::match(parse::val);
 	}
 
 } /* namespace egg */

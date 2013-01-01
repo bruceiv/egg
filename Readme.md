@@ -92,6 +92,7 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     				| primary ( OPT | STAR | PLUS )? 
     
     primary =		identifier !( ( BIND type_id )? EQUAL ) ( BIND identifier )?
+    					# above rule avoids parsing rule def'n as invocation
     				| OPEN choice CLOSE
     				| char_literal
     				| str_literal

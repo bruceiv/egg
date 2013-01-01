@@ -189,35 +189,105 @@ namespace parse {
 		/** Input stream to read characters from */
 		std::istream& in;
 	}; /* class state */
+
+	/** A generic parse result. */
+	struct value {
+		value() {}
+		value(int) {}
+	};
+
+	/** A generic unsuccessful parse result. */
+	struct failure {
+		failure() {}
+		failure(int) {}
+	};
+
+	/** A value instance */
+	const value val = 0;
 	
-	/** Matching function. 
-	 *  Any valid matcher should update the parsing state only on a successful 
-	 *  match (true result), otherwise (false return) leaving it unchanged.
+	/** A failure instance */
+	const failure fails = 0;
+
+	/** Wraps a parsing result. ps[ps.pos++]
+	 *  Returns either the wrapped result or false.
+	 *  @param T The wrapped result; should be default constructable. */
+	template<typename T> 
+	class result {
+	public:
+		result(const T& v) : val(v), success(true) {}
+		result(const failure& f) : success(false) {}
+		result() : success(false) {}
+
+		result<T>& operator = (const T& v) { 
+			val = v; success = true; return *this;
+		}
+		result<T>& operator = (const failure& f) { 
+			success = false; return *this;
+		}
+		result<T>& operator = (const result<T>& o) {
+			if ( o.success ) { success = true; val = o.val; }
+			else { success = false; }
+			return *this;
+		}
+
+		operator T () { return val; }
+		operator bool () { return success; }
+
+		T operator * () { return val; }
+		
+	private:
+		T val;			/**< The wrapped value. */
+		bool success;	/**< The success of the parse. */
+	}; /* class result<T> */
+
+	/** Builds a positive result from a value.
+	 *  @param T	The type of the wrapped result	
+	 *  @param v	The value to wrap. */
+	template<typename T>
+	result<T> match(const T& v) { return result<T>(v); }
+
+	/** Builds a failure result.
+	 *  @param T	The type of the failure result. */
+	template<typename T>
+	result<T> fail() { return result<T>(fails); }
+
+	/** Binds the result of a matcher to a local variable.
+	 *  @param T		The type of the result.
+	 *  @param matcher	The matcher to bind
+	 *  @param ps		The current parse state
+	 *  @param val		The value to return on successful match
 	 */
-	typedef bool (*matcher)(state&);
-	
-	bool any(state& ps) {
-		if ( ps[ps.pos] == '\0' ) return false;
-		
-		++ps.pos;
-		return true;
+	template<typename T>
+	bool bind(result<T> (*matcher)(state&), state& ps, T& val) {
+		result<T> res = matcher(ps);
+		if ( res ) { val = *res; return true; }
+		else { return false; }
 	}
 	
+	/** Matcher for any character */
+	result<state::value_type> any(state& ps) {
+		if ( ps[ps.pos] == '\0' ) return fail<state::value_type>();
+		return match(ps[ps.pos++]);
+	}
+
+	/** Matcher for a given character */
 	template<state::value_type c>
-	bool matches(parse::state& ps) {
-		if ( ps[ps.pos] != c ) return false;
-		
+	result<state::value_type> matches(parse::state& ps) {
+		if ( ps[ps.pos] != c ) return fail<state::value_type>();
 		++ps.pos;
-		return true;
+		return match(c);
 	}
-	
+
+	/** Matcher for a character range */
 	template<state::value_type s, state::value_type e>
-	bool in_range(parse::state& ps) {
+	result<std::pair<state::value_type, state::value_type>> 
+			in_range(parse::state& ps) {
 		state::value_type c = ps[ps.pos];
-		if ( c < s || c > e ) return false;
+		if ( c < s || c > e ) 
+			return fail<std::pair<state::value_type, state::value_type>>();
 		
 		++ps.pos;
-		return true;
+		return match(std::make_pair(s,e));
 	}
 	
 } /* namespace parse */
