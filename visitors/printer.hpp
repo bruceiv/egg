@@ -71,20 +71,20 @@ namespace visitor {
 		}
 
 		void visit(ast::seq_matcher& m) {
-			out << "( ";
+			if ( m.ms.size() != 1 ) { out << "( "; }
 			if ( ! m.ms.empty() ) {
 				std::string indent((4 * ++tabs), ' ');
-
+				
 				auto iter = m.ms.begin();
 				(*iter)->accept(this);
 				while ( ++iter != m.ms.end() ) {
-					out << "\n" << indent;
+					out << std::endl << indent;
 					(*iter)->accept(this);
 				}
 				
 				--tabs;
 			}
-			out << " )";
+			if ( m.ms.size() != 1 ) out << " )";
 		}
 
 		void visit(ast::alt_matcher& m) {

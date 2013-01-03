@@ -218,22 +218,37 @@ namespace parse {
 		result(const failure& f) : success(false) {}
 		result() : success(false) {}
 
+		/** Sets the result to a success containing v */
 		result<T>& operator = (const T& v) { 
 			val = v; success = true; return *this;
 		}
+
+		/** Sets the result to a failure */
 		result<T>& operator = (const failure& f) { 
 			success = false; return *this;
 		}
+
+		/** Copies a result */
 		result<T>& operator = (const result<T>& o) {
 			if ( o.success ) { success = true; val = o.val; }
 			else { success = false; }
 			return *this;
 		}
 
+		/** Gets result value out */
 		operator T () { return val; }
+
+		/** Gets the success value out */
 		operator bool () { return success; }
 
+		/** Gets result value out (explicit operator) */
 		T operator * () { return val; }
+
+		/** Binds the result (if successful) to a value */
+		result<T>& operator () (T& bind) {
+			if ( success ) { bind = val; }
+			return *this;
+		}
 		
 	private:
 		T val;			/**< The wrapped value. */
@@ -250,19 +265,6 @@ namespace parse {
 	 *  @param T	The type of the failure result. */
 	template<typename T>
 	result<T> fail() { return result<T>(fails); }
-
-	/** Binds the result of a matcher to a local variable.
-	 *  @param T		The type of the result.
-	 *  @param matcher	The matcher to bind
-	 *  @param ps		The current parse state
-	 *  @param val		The value to return on successful match
-	 */
-	template<typename T>
-	bool bind(result<T> (*matcher)(state&), state& ps, T& val) {
-		result<T> res = matcher(ps);
-		if ( res ) { val = *res; return true; }
-		else { return false; }
-	}
 	
 	/** Matcher for any character */
 	result<state::value_type> any(state& ps) {

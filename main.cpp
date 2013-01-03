@@ -42,7 +42,7 @@ int main(int argc, char** argv) {
 	parse::state ps(*a.input());
 	ast::grammar_ptr g;
 	
-	if ( parse::bind(egg::grammar, ps, g) ) {
+	if ( egg::grammar(ps)(g) ) {
 		//std::cout << "DONE PARSING" << std::endl;
 		visitor::printer p;
 		p.print(*g);

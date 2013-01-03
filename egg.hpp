@@ -64,13 +64,13 @@ namespace egg {
 		
 		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<ast::grammar_ptr>(); }
 
-		if ( parse::bind(out_action, ps, s) ) { psVal->pre = s; }
+		if ( out_action(ps)(s) ) { psVal->pre = s; }
 		
-		if ( parse::bind(rule, ps, r) ) { *psVal += r; } 
+		if ( rule(ps)(r) ) { *psVal += r; } 
 		else { ps.pos = psStart; return parse::fail<ast::grammar_ptr>(); }
-		while ( parse::bind(rule, ps, r) ) { *psVal += r; }
+		while ( rule(ps)(r) ) { *psVal += r; }
 
-		if ( parse::bind(out_action, ps, s) ) { psVal->post = s; }
+		if ( out_action(ps)(s) ) { psVal->post = s; }
 		
 		if ( ! end_of_file(ps) ) { ps.pos = psStart; return parse::fail<ast::grammar_ptr>(); }
 		
@@ -120,7 +120,7 @@ namespace egg {
 
 		if ( ! BIND(ps) ) { ps.pos = psStart; return false; }
 
-		if ( parse::bind(type_id, ps, s) ) { psVal->type = s; }
+		if ( type_id(ps)(s) ) { psVal->type = s; }
 		else { ps.pos = psStart; return false; }
 
 		return true;
@@ -132,14 +132,14 @@ namespace egg {
 		std::string s;
 		ast::alt_matcher_ptr m;
 		
-		if ( parse::bind(identifier, ps, s) ) { psVal = ast::make_ptr<ast::grammar_rule>(s); } 
+		if ( identifier(ps)(s) ) { psVal = ast::make_ptr<ast::grammar_rule>(s); } 
 		else { ps.pos = psStart; return parse::fail<ast::grammar_rule_ptr>(); }
 
 		rule_1(ps, psVal);
 		
 		if ( ! EQUAL(ps) ) { ps.pos = psStart; return parse::fail<ast::grammar_rule_ptr>(); }
 		
-		if ( parse::bind(choice, ps, m) ) { psVal->m = m; }
+		if ( choice(ps)(m) ) { psVal->m = m; }
 		else { ps.pos = psStart; return parse::fail<ast::grammar_rule_ptr>(); }
 		
 		parse::ind psLen = ps.pos - psStart;
@@ -256,7 +256,7 @@ namespace egg {
 		
 		if ( ! PIPE(ps) ) { ps.pos = psStart; return false; }
 		
-		if ( parse::bind(sequence, ps, m) ) { *psVal += m; }
+		if ( sequence(ps)(m) ) { *psVal += m; }
 		else { ps.pos = psStart; return false; }
 		
 		return true;
@@ -267,7 +267,7 @@ namespace egg {
 		ast::alt_matcher_ptr psVal;
 		ast::seq_matcher_ptr m;
 		
-		if ( parse::bind(sequence, ps, m) ) { psVal = ast::make_ptr<ast::alt_matcher>(); *psVal += m; } 
+		if ( sequence(ps)(m) ) { psVal = ast::make_ptr<ast::alt_matcher>(); *psVal += m; } 
 		else { ps.pos = psStart; return parse::fail<ast::alt_matcher_ptr>(); }
 		
 		while ( choice_1(ps, psVal) ) {}
@@ -283,10 +283,10 @@ namespace egg {
 		ast::matcher_ptr e;
 		ast::action_matcher_ptr a;
 
-		if ( parse::bind(expression, ps, e) ) { *psVal += e; return true; }
+		if ( expression(ps)(e) ) { *psVal += e; return true; }
 		else { ps.pos = psStart; }
 
-		if ( parse::bind(action, ps, a) ) { *psVal += a; return true; }
+		if ( action(ps)(a) ) { *psVal += a; return true; }
 		else { ps.pos = psStart; return false; }
 	}
 
@@ -323,19 +323,19 @@ namespace egg {
 		ast::matcher_ptr psVal;
 		ast::matcher_ptr m;
 
-		if ( AND(ps) && parse::bind(primary, ps, m) ) { 
+		if ( AND(ps) && primary(ps)(m) ) { 
 			//{ std::cout << "expression [" << psStart << "," << ps.pos << "] `" << strings::escape(ps.string(psStart, ps.pos-psStart)) << "`" << std::endl; }
 			{ psVal = ast::make_ptr<ast::look_matcher>(m); }
 			return parse::match(psVal);
 		} else { ps.pos = psStart; }
 		
-		if ( NOT(ps) && parse::bind(primary, ps, m) ) { 
+		if ( NOT(ps) && primary(ps)(m) ) { 
 			//{ std::cout << "expression [" << psStart << "," << ps.pos << "] `" << strings::escape(ps.string(psStart, ps.pos-psStart)) << "`" << std::endl; }
 			{ psVal = ast::make_ptr<ast::not_matcher>(m); }
 			return parse::match(psVal);
 		} else { ps.pos = psStart; }
 
-		if ( parse::bind(primary, ps, m) ) {
+		if ( primary(ps)(m) ) {
 			{ psVal = m; }
 			expression_1(ps, psVal, m);
 			//{ std::cout << "expression [" << psStart << "," << ps.pos << "] `" << strings::escape(ps.string(psStart, ps.pos-psStart)) << "`" << std::endl; }
@@ -365,7 +365,7 @@ namespace egg {
 		parse::ind psStart = ps.pos;
 		std::string s;
 
-		if ( (BIND(ps) && parse::bind(identifier, ps, s)) ) { ast::as_ptr<ast::rule_matcher>(psVal)->var = s; }
+		if ( (BIND(ps) && identifier(ps)(s)) ) { ast::as_ptr<ast::rule_matcher>(psVal)->var = s; }
 		else { ps.pos = psStart; return false; }
 
 		return true;
@@ -375,7 +375,7 @@ namespace egg {
 		parse::ind psStart = ps.pos;
 		std::string s;
 		
-		if ( ! parse::bind(identifier, ps, s) ) { ps.pos = psStart; return false; }
+		if ( ! identifier(ps)(s) ) { ps.pos = psStart; return false; }
 
 		if ( primary_1_1(ps) ) { ps.pos = psStart; return false; }
 
@@ -398,16 +398,16 @@ namespace egg {
 		if ( primary_1(ps, psVal) ) { return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
-		if ( OPEN(ps) && parse::bind(choice, ps, am) && CLOSE(ps) ) { psVal = am; return parse::match(psVal); }
+		if ( OPEN(ps) && choice(ps)(am) && CLOSE(ps) ) { psVal = am; return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
-		if ( parse::bind(char_literal, ps, cm) ) { psVal = cm; return parse::match(psVal); }
+		if ( char_literal(ps)(cm) ) { psVal = cm; return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
-		if ( parse::bind(str_literal, ps, sm) ) { psVal = sm; return parse::match(psVal); }
+		if ( str_literal(ps)(sm) ) { psVal = sm; return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
-		if ( parse::bind(char_class, ps, rm) ) { psVal = rm; return parse::match(psVal); }
+		if ( char_class(ps)(rm) ) { psVal = rm; return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
 		if ( ANY(ps) ) { psVal = ast::make_ptr<ast::any_matcher>(); return parse::match(psVal); }
@@ -416,7 +416,7 @@ namespace egg {
 		if ( EMPTY(ps) ) { psVal = ast::make_ptr<ast::empty_matcher>(); return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
-		if ( BEGIN(ps) && parse::bind(sequence, ps, bm) && END(ps) ) { psVal = bm; return parse::match(psVal); }
+		if ( BEGIN(ps) && sequence(ps)(bm) && END(ps) ) { psVal = bm; return parse::match(psVal); }
 		else { ps.pos = psStart; return parse::fail<ast::matcher_ptr>(); }
 	}
 
@@ -516,7 +516,7 @@ namespace egg {
 		if ( parse::matches<']'>(ps) ) { ps.pos = psStart; return false; }
 		else { ps.pos = psStart; }
 		
-		if ( parse::bind(characters, ps, r) ) { *psVal += r; }
+		if ( characters(ps)(r) ) { *psVal += r; }
 		else { return false; }
 		
 		return true;
@@ -551,10 +551,10 @@ namespace egg {
 		ast::char_range psVal;
 		char f, t, c;
 		
-		if ( parse::bind(character, ps, f) && parse::matches<'-'>(ps) && parse::bind(character, ps, t) ) { psVal = ast::char_range(f, t); return parse::match(psVal); }
+		if ( character(ps)(f) && parse::matches<'-'>(ps) && character(ps)(t) ) { psVal = ast::char_range(f, t); return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
-		if ( parse::bind(character, ps, c) ) { psVal = ast::char_range(c); return parse::match(psVal); }
+		if ( character(ps)(c) ) { psVal = ast::char_range(c); return parse::match(psVal); }
 		else { ps.pos = psStart; return parse::fail<ast::char_range>(); }
 	}
 	
