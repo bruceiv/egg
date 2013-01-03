@@ -5,6 +5,7 @@
 #include "egg.hpp"
 #include "parse.hpp"
 #include "visitors/printer.hpp"
+#include "visitors/normalizer.hpp"
 
 class args {
 public:
@@ -44,6 +45,8 @@ int main(int argc, char** argv) {
 	
 	if ( egg::grammar(ps)(g) ) {
 		//std::cout << "DONE PARSING" << std::endl;
+		visitor::normalizer n;
+		n.normalize(*g);
 		visitor::printer p;
 		p.print(*g);
 	} else {

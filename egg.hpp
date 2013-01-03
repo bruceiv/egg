@@ -466,12 +466,14 @@ namespace egg {
 	parse::result<ast::char_matcher_ptr> char_literal(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		ast::char_matcher_ptr psVal;
+
+		char c;
 		
 		if ( ! (parse::matches<'\''>(ps)) ) { ps.pos = psStart; return parse::fail<ast::char_matcher_ptr>(); }
 		
 		parse::ind psCatch = ps.pos;
 		
-		if ( ! character(ps) ) { ps.pos = psStart; return parse::fail<ast::char_matcher_ptr>(); }
+		if ( ! character(ps)(c) ) { ps.pos = psStart; return parse::fail<ast::char_matcher_ptr>(); }
 		
 		parse::ind psCatchLen = ps.pos - psCatch;
 		std::string psCapture(ps.string(psCatch, psCatchLen));
@@ -481,7 +483,7 @@ namespace egg {
 		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<ast::char_matcher_ptr>(); }
 		
 		//{ std::cout << "char_literal `" << psCapture << "`" << std::endl; }
-		{ psVal = ast::make_ptr<ast::char_matcher>(ps[psCatch]); }
+		{ psVal = ast::make_ptr<ast::char_matcher>(c); }
 		
 		return parse::match(psVal);
 	}
@@ -504,7 +506,7 @@ namespace egg {
 		if ( ! _(ps) ) { ps.pos = psStart; return parse::fail<ast::str_matcher_ptr>(); }
 		
 		//{ std::cout << "str_literal `" << psCapture << "`" << std::endl; }
-		{ psVal = ast::make_ptr<ast::str_matcher>(psCapture); }
+		{ psVal = ast::make_ptr<ast::str_matcher>(strings::unescape(psCapture)); }
 		
 		return parse::match(psVal);
 	}

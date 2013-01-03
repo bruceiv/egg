@@ -64,12 +64,12 @@ action: ast::action_matcher_ptr =
 			{ psVal = ast::make_ptr<ast::action_matcher>(psCapture); }
 
 char_literal: ast::char_matcher_ptr =
-		'\'' < character > '\'' _
-			{ psVal = ast::make_ptr<ast::char_matcher>(ps[psCatch]); }
+		'\'' character : c '\'' _
+			{ psVal = ast::make_ptr<ast::char_matcher>(c); }
 
 str_literal: ast::str_matcher_ptr =
 		'\"' < character* > '\"' _
-			{ psVal = ast::make_ptr<ast::str_matcher>(psCapture); }
+			{ psVal = ast::make_ptr<ast::str_matcher>(strings::unescape(psCapture)); }
 
 char_class: ast::range_matcher_ptr =
 		'[' { psVal = ast::make_ptr<ast::range_matcher>() } 
