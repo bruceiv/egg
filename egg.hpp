@@ -29,28 +29,28 @@ namespace egg {
 	parse::result<ast::char_range> characters(parse::state&);
 	parse::result<char> character(parse::state&);
 
-	parse::result<parse::value> OUT_BEGIN(parse::state&);
-	parse::result<parse::value> OUT_END(parse::state&);
-	parse::result<parse::value> BIND(parse::state&);
-	parse::result<parse::value> EQUAL(parse::state&);
-	parse::result<parse::value> PIPE(parse::state&);
-	parse::result<parse::value> AND(parse::state&);
-	parse::result<parse::value> NOT(parse::state&);
-	parse::result<parse::value> OPT(parse::state&);
-	parse::result<parse::value> STAR(parse::state&);
-	parse::result<parse::value> PLUS(parse::state&);
-	parse::result<parse::value> OPEN(parse::state&);
-	parse::result<parse::value> CLOSE(parse::state&);
-	parse::result<parse::value> ANY(parse::state&);
-	parse::result<parse::value> EMPTY(parse::state&);
-	parse::result<parse::value> BEGIN(parse::state&);
-	parse::result<parse::value> END(parse::state&);
+	parse::result<> OUT_BEGIN(parse::state&);
+	parse::result<> OUT_END(parse::state&);
+	parse::result<> BIND(parse::state&);
+	parse::result<> EQUAL(parse::state&);
+	parse::result<> PIPE(parse::state&);
+	parse::result<> AND(parse::state&);
+	parse::result<> NOT(parse::state&);
+	parse::result<> OPT(parse::state&);
+	parse::result<> STAR(parse::state&);
+	parse::result<> PLUS(parse::state&);
+	parse::result<> OPEN(parse::state&);
+	parse::result<> CLOSE(parse::state&);
+	parse::result<> ANY(parse::state&);
+	parse::result<> EMPTY(parse::state&);
+	parse::result<> BEGIN(parse::state&);
+	parse::result<> END(parse::state&);
 	
-	parse::result<parse::value> _(parse::state&);
-	parse::result<parse::value> space(parse::state&);
-	parse::result<parse::value> comment(parse::state&);
-	parse::result<parse::value> end_of_line(parse::state&);
-	parse::result<parse::value> end_of_file(parse::state&);
+	parse::result<> _(parse::state&);
+	parse::result<> space(parse::state&);
+	parse::result<> comment(parse::state&);
+	parse::result<> end_of_line(parse::state&);
+	parse::result<> end_of_file(parse::state&);
 	
 
 	 parse::result<ast::grammar_ptr> grammar(parse::state& ps) {
@@ -609,7 +609,7 @@ namespace egg {
 		else { ps.pos = psStart; return parse::fail<char>(); }
 	}
 
-	parse::result<parse::value> OUT_BEGIN(parse::state& ps) {
+	parse::result<> OUT_BEGIN(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 
 		if ( ! ('{' == ps[ps.pos++] && '%' == ps[ps.pos++]) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -617,7 +617,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 
-	parse::result<parse::value> OUT_END(parse::state& ps) {
+	parse::result<> OUT_END(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 
 		if ( ! ('%' == ps[ps.pos++] && '}' == ps[ps.pos++]) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -625,7 +625,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 
-	parse::result<parse::value> BIND(parse::state& ps) {
+	parse::result<> BIND(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 
 		if ( ! parse::matches<':'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -635,7 +635,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 	
-	parse::result<parse::value> EQUAL(parse::state& ps) {
+	parse::result<> EQUAL(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! parse::matches<'='>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -645,7 +645,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 	
-	parse::result<parse::value> PIPE(parse::state& ps) {
+	parse::result<> PIPE(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! parse::matches<'|'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -655,7 +655,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 	
-	parse::result<parse::value> AND(parse::state& ps) {
+	parse::result<> AND(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! parse::matches<'&'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -665,7 +665,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 	
-	parse::result<parse::value> NOT(parse::state& ps) {
+	parse::result<> NOT(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! parse::matches<'!'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -675,7 +675,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 	
-	parse::result<parse::value> OPT(parse::state& ps) {
+	parse::result<> OPT(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! parse::matches<'?'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -685,7 +685,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 	
-	parse::result<parse::value> STAR(parse::state& ps) {
+	parse::result<> STAR(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! parse::matches<'*'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -695,7 +695,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 	
-	parse::result<parse::value> PLUS(parse::state& ps) {
+	parse::result<> PLUS(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! parse::matches<'+'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -705,7 +705,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 	
-	parse::result<parse::value> OPEN(parse::state& ps) {
+	parse::result<> OPEN(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! parse::matches<'('>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -715,7 +715,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 	
-	parse::result<parse::value> CLOSE(parse::state& ps) {
+	parse::result<> CLOSE(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! parse::matches<')'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -725,7 +725,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 	
-	parse::result<parse::value> ANY(parse::state& ps) {
+	parse::result<> ANY(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! parse::matches<'.'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -735,7 +735,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 
-	parse::result<parse::value> EMPTY(parse::state& ps) {
+	parse::result<> EMPTY(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! parse::matches<';'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -745,7 +745,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 	
-	parse::result<parse::value> BEGIN(parse::state& ps) {
+	parse::result<> BEGIN(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! parse::matches<'<'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -755,7 +755,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 	
-	parse::result<parse::value> END(parse::state& ps) {
+	parse::result<> END(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! parse::matches<'>'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -775,7 +775,7 @@ namespace egg {
 		else { ps.pos = psStart; return false; }
 	}
 	
-	parse::result<parse::value> _(parse::state& ps) {
+	parse::result<> _(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		while ( __1(ps) ) {}
@@ -783,7 +783,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 	
-	parse::result<parse::value> space(parse::state& ps) {
+	parse::result<> space(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( parse::matches<' '>(ps) ) { return parse::match(parse::val); }
@@ -806,7 +806,7 @@ namespace egg {
 		return true;
 	}
 	
-	parse::result<parse::value> comment(parse::state& ps) {
+	parse::result<> comment(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( ! parse::matches<'#'>(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }
@@ -821,7 +821,7 @@ namespace egg {
 		return parse::match(parse::val);
 	}
 	
-	parse::result<parse::value> end_of_line(parse::state& ps) {
+	parse::result<> end_of_line(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( [&ps]() {
@@ -840,7 +840,7 @@ namespace egg {
 		else { ps.pos = psStart; return parse::fail<parse::value>(); }
 	}
 	
-	parse::result<parse::value> end_of_file(parse::state& ps) {
+	parse::result<> end_of_file(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		
 		if ( parse::any(ps) ) { ps.pos = psStart; return parse::fail<parse::value>(); }

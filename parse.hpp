@@ -211,7 +211,7 @@ namespace parse {
 	/** Wraps a parsing result. ps[ps.pos++]
 	 *  Returns either the wrapped result or false.
 	 *  @param T The wrapped result; should be default constructable. */
-	template<typename T> 
+	template<typename T = value> 
 	class result {
 	public:
 		result(const T& v) : val(v), success(true) {}
