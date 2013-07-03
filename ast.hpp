@@ -27,6 +27,8 @@ namespace ast {
 		char_range(const char_range& o) : from(o.from), to(o.to) {}
 		char_range() : from('\0'), to('\0') {}
 
+		bool single() { return from == to; }
+
 		char from;	/**< The first character in the range */
 		char to;	/**< The last character in the range. If this is the same 
 					 *   as the first character, represents a single character 
@@ -49,6 +51,25 @@ namespace ast {
 	class look_matcher;
 	class not_matcher;
 	class capt_matcher;
+
+	/** Type of AST node. */
+	enum matcher_type {
+		char_type,
+		str_type,
+		range_type,
+		rule_type,
+		any_type,
+		empty_type,
+		action_type,
+		opt_type,
+		many_type,
+		some_type,
+		seq_type,
+		alt_type,
+		look_type,
+		not_type,
+		capt_type
+	}; /* enum matcher_type */
 	
 	/** Abstract base class of all matcher visitors.
 	 *  Implements visitor pattern. */
@@ -75,7 +96,10 @@ namespace ast {
 	 *  Implements visitor pattern. */
 	class matcher {
 	public:
+		/** Implements visitor pattern. */
 		virtual void accept(visitor*) = 0;
+		/** Gets type tag. */
+		virtual matcher_type type() = 0;
 	}; /* class matcher */
 	typedef shared_ptr<matcher> matcher_ptr;
 	
@@ -86,6 +110,7 @@ namespace ast {
 		char_matcher() : c('\0') {}
 		
 		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return char_type; }
 		
 		char c; /**< char to match */
 	}; /* class char_matcher */
@@ -98,6 +123,7 @@ namespace ast {
 		str_matcher() : s("") {}
 
 		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return str_type; }
 
 		string s; /**< string to match */
 	}; /* class str_matcher */
@@ -109,6 +135,7 @@ namespace ast {
 		range_matcher() {}
 
 		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return range_type; }
 
 		range_matcher& operator += (char_range r) { rs.push_back(r); return *this; }
 
@@ -124,6 +151,7 @@ namespace ast {
 		rule_matcher() : rule(""), var("") {}
 
 		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return rule_type; }
 
 		string rule;	/**< The name of the rule to match */
 		string var;		/**< Variable to bind to the rule return. 
@@ -137,6 +165,7 @@ namespace ast {
 		any_matcher() {}
 
 		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return any_type; }
 	}; /* class any_matcher */
 	typedef shared_ptr<any_matcher> any_matcher_ptr;
 
@@ -146,6 +175,7 @@ namespace ast {
 		empty_matcher() {}
 
 		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return empty_type; }
 	}; /* class empty_matcher */
 	typedef shared_ptr<empty_matcher> empty_matcher_ptr;
 
@@ -156,6 +186,7 @@ namespace ast {
 		action_matcher() : a("") {}
 
 		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return action_type; }
 
 		string a; /**< The string representing the action */
 	}; /* class action_matcher */
@@ -168,6 +199,7 @@ namespace ast {
 		opt_matcher() {}
 
 		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return opt_type; }
 
 		shared_ptr<matcher> m; /**< contained matcher */
 	}; /* class opt_matcher */
@@ -180,6 +212,7 @@ namespace ast {
 		many_matcher() {}
 
 		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return many_type; }
 
 		shared_ptr<matcher> m; /**< contained matcher */
 	}; /* class many_matcher */
@@ -192,6 +225,7 @@ namespace ast {
 		some_matcher() {}
 
 		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return some_type; }
 
 		shared_ptr<matcher> m; /**< contained matcher */
 	}; /* class some_matcher */
@@ -203,6 +237,7 @@ namespace ast {
 		seq_matcher() {}
 
 		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return seq_type; }
 
 		seq_matcher& operator += (shared_ptr<matcher> m) { ms.push_back(m); return *this; }
 
@@ -216,6 +251,7 @@ namespace ast {
 		alt_matcher() {}
 
 		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return alt_type; }
 
 		alt_matcher& operator += (shared_ptr<matcher> m) { ms.push_back(m); return *this; }
 
@@ -230,6 +266,7 @@ namespace ast {
 		look_matcher() {}
 
 		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return look_type; }
 
 		shared_ptr<matcher> m; /**< The matcher to check on lookahead */
 	}; /* class look_matcher */
@@ -242,6 +279,7 @@ namespace ast {
 		not_matcher() {}
 
 		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return not_type; }
 
 		shared_ptr<matcher> m; /**< The matcher to check on lookahead */
 	}; /* class not_matcher */
@@ -254,6 +292,7 @@ namespace ast {
 		capt_matcher() {}
 
 		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return capt_type; }
 
 		shared_ptr<matcher> m; /**< Captured matcher */
 	}; /* class capt_matcher */

@@ -282,14 +282,12 @@ namespace parse {
 
 	/** Matcher for a character range */
 	template<state::value_type s, state::value_type e>
-	result<std::pair<state::value_type, state::value_type>> 
-			in_range(parse::state& ps) {
+	result<state::value_type> in_range(parse::state& ps) {
 		state::value_type c = ps[ps.pos];
-		if ( c < s || c > e ) 
-			return fail<std::pair<state::value_type, state::value_type>>();
+		if ( c < s || c > e ) return fail<state::value_type>();
 		
 		++ps.pos;
-		return match(std::make_pair(s,e));
+		return match(c);
 	}
 	
 } /* namespace parse */
