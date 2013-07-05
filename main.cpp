@@ -28,17 +28,17 @@ private:
 	std::string id_prefix(char* s) {
 		int len = 0;
 		char c = s[len];
-		if ( c >= 'A' && c <= 'Z'
-				|| c >= 'a' && c <= 'z'
+		if ( ( c >= 'A' && c <= 'Z' )
+				|| ( c >= 'a' && c <= 'z' )
 				|| c == '_' ) {
 			c = s[++len];
 		} else {
 			return std::string("");
 		}
 
-		while ( c >= 'A' && c <= 'Z'
-				|| c >= 'a' && c <= 'z'
-				|| c >= '0' && c <= '9'
+		while ( ( c >= 'A' && c <= 'Z' )
+				|| ( c >= 'a' && c <= 'z' )
+				|| ( c >= '0' && c <= '9' )
 				|| c == '_' ) {
 			c = s[++len];
 		}
