@@ -22,11 +22,11 @@ Of the above two rules, g2 will match "abc", while g1 will not, because the 'a'*
 
 PEGs also provide lookahead matchers, which match a given rule without consuming it; These can be constructed by prefixing a grammar rule with '&'. 
 Similarly, a matcher prefixed with '!' does not consume the input, and only succeeds if the prefixed matcher doesn't match. 
-These lookahead capabilities allow PEGs to match some grammars that cannot be represented by CFGs, such as the well-known a^n b^n c^n, which can be matched by the following Egg grammar: 
+These lookahead capabilities allow PEGs to match some grammars that cannot be represented by CFGs, such as the well-known a^n b^n c^n (n > 0), which can be matched by the following Egg grammar: 
 
-    G = &A 'a'* B
-    A = 'a' A 'b' | ;
-    B = 'b' B 'c' | ;
+    G = &(A 'c') 'a'+ B
+    A = 'a' A 'b' | "ab"
+    B = 'b' B 'c' | "bc"
 
 A sequence of matching rules can also be surrounded by angle brackets '<' and '>', denoting a capturing block; the string that matches the rules inside the capturing block will be provided to the parser for use in its semantic actions.
 
