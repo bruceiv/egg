@@ -1,3 +1,9 @@
+## Bugs ##
+- Fix post-actions
+
+
+## Features ##
+
 Build Parser Generator
 - update egg.hpp to account for changes to choice, sequence, 
   expression, action

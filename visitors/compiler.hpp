@@ -230,8 +230,8 @@ namespace visitor {
 			std::string indent(++tabs, '\t');
 
 			//bind all variables but psStart TODO check this syntax is correct
-			out << "[&,psStart]() { " << std::endl
-				<< indent << "psStart = ps.pos;" << std::endl
+			out << "[&]() { " << std::endl
+				<< indent << "parse::ind psStart = ps.pos;" << std::endl
 				<< indent << "if ( ";
 
 			//test that all matchers match
@@ -282,8 +282,8 @@ namespace visitor {
 			std::string indent(++tabs, '\t');
 
 			//bind all variables but psStart TODO syntax
-			out << "[&,psStart]() {" << std::endl
-				<< indent << "psStart = ps.pos;" << std::endl
+			out << "[&]() {" << std::endl
+				<< indent << "parse::ind psStart = ps.pos;" << std::endl
 				<< indent << "if ( ";
 			//match iff contained matcher matches, always reset
 			m.m->accept(this);
@@ -297,8 +297,8 @@ namespace visitor {
 			std::string indent(++tabs, '\t');
 
 			//bind all variables but psStart TODO syntax
-			out << "[&,psStart]() {" << std::endl
-				<< indent << "psStart = ps.pos;" << std::endl
+			out << "[&]() {" << std::endl
+				<< indent << "parse::ind psStart = ps.pos;" << std::endl
 				<< indent << "if ( ";
 			//match iff contained matcher fails, always reset
 			m.m->accept(this);
