@@ -1,6 +1,6 @@
 ## Bugs ##
 - Fix post-actions
-
+- Fix infinite loop in normalized version of egg print
 
 ## Features ##
 
