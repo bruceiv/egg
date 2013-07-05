@@ -72,7 +72,7 @@ str_literal: ast::str_matcher_ptr =
 			{ psVal = ast::make_ptr<ast::str_matcher>(strings::unescape(psCapture)); }
 
 char_class: ast::range_matcher_ptr =
-		'[' { psVal = ast::make_ptr<ast::range_matcher>() } 
+		'[' { psVal = ast::make_ptr<ast::range_matcher>(); } 
 			( !']' characters : r { *psVal += r; } )* ']' _
 
 characters: ast::char_range =
