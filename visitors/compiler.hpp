@@ -197,10 +197,17 @@ namespace visitor {
 		}
 
 		void visit(ast::many_matcher& m) {
+			std::string indent(tabs, '\t');
+			++tabs;
+
 			//runs matcher as many times as it will match
 			out << "[&]() { while ( ";
 			m.m->accept(this);
-			out << " ); return true; }()";
+			out << " )" << std::endl 
+			    << indent << "\t;" << std::endl
+			    << indent << "return true; }()";
+			
+			--tabs;
 		}
 
 		void visit(ast::some_matcher& m) {
@@ -213,7 +220,8 @@ namespace visitor {
 			out << " ) {" << std::endl
 				<< indent << "\twhile ( ";
 			m.m->accept(this);
-			out << " );" << std::endl
+			out << " )" << std::endl
+				<< indent << "\t\t;" << std::endl
 				<< indent << "\treturn true;" << std::endl
 				<< indent << "} else { return false; } }()";
 
