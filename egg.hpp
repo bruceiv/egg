@@ -447,7 +447,11 @@ namespace egg {
 
 		if ( [&]() { 
 			parse::ind psStart = ps.pos;
-			if ( parse::matches<'{'>(ps)
+			if ( [&]() {
+				parse::ind psStart = ps.pos;
+				if ( OUT_BEGIN(ps) ) { ps.pos = psStart; return false; }
+				else { ps.pos = psStart; return true; } }()
+				&& parse::matches<'{'>(ps)
 				&& [&]() {
 				psCatch = ps.pos;
 				if ( [&]() { while ( ( action(ps)

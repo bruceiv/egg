@@ -443,6 +443,8 @@ namespace egg {
 	parse::result<ast::action_matcher_ptr> action(parse::state& ps) {
 		parse::ind psStart = ps.pos;
 		ast::action_matcher_ptr psVal;
+		
+		if ( OUT_BEGIN(ps) ) { ps.pos = psStart; return parse::fail<ast::action_matcher_ptr>(); }
 
 		if ( ! (parse::matches<'{'>(ps)) ) { ps.pos = psStart; return parse::fail<ast::action_matcher_ptr>(); }
 

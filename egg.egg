@@ -60,7 +60,7 @@ primary: ast::matcher_ptr =
 		| BEGIN sequence : bm END { psVal = ast::make_ptr<ast::capt_matcher>(bm); }
 
 action: ast::action_matcher_ptr =
-		'{' < ( action | !'}' . )* > '}' _ 
+		!OUT_BEGIN '{' < ( action | !'}' . )* > '}' _ 
 			{ psVal = ast::make_ptr<ast::action_matcher>(psCapture); }
 
 char_literal: ast::char_matcher_ptr =

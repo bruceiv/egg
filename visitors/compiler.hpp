@@ -420,6 +420,15 @@ namespace visitor {
 			out << "} /* namespace " << name << " */" << std::endl
 				<< std::endl
 				;
+			
+			//print post-code
+			if ( ! g.post.empty() ) {
+				out << "// {%" << std::endl
+					<< g.post << std::endl
+					<< "// %}" << std::endl
+					<< std::endl
+					;
+			}
 		}
 		
 	private:

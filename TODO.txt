@@ -1,7 +1,3 @@
-## Bugs ##
-- Fix post-actions
-- Fix infinite loop in normalized version of egg print
-
 ## Features ##
 
 Build Parser Generator
@@ -11,3 +7,6 @@ Build Parser Generator
 Make it Packrat
 Look at adding cut syntax
 Make sure you include an optional string literal description
+
+## Bugs ##
+- None currently known
