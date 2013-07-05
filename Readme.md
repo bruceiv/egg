@@ -44,7 +44,7 @@ The following simple grammar functions as a basic calculator:
                  '*' elem : i { psVal *= i; } 
                  | '/' elem : i { psVal /= i; } )*
     elem : int = '(' sum : i ')' { psVal = i; }
-                 | < [0-9]+ > { psVal = atoi(psCatch.c_str()); }
+                 | < [0-9]+ > { psVal = atoi(psCapture.c_str()); }
 
 Finally, comments can be started with a '#', they end at end-of-line.
 
