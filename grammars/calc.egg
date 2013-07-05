@@ -1,0 +1,12 @@
+{%
+#include <cstdlib>
+%}
+
+sum : int = prod : i { psVal = i; } (
+            '+' prod : i { psVal += i; }
+            | '-' prod : i { psVal -= i; } )*
+prod : int = elem : i { psVal = i; } (
+             '*' elem : i { psVal *= i; }
+             | '/' elem : i { psVal /= i; } )*
+elem : int = '(' sum : i ')' { psVal = i; }
+              | < [0-9]+ > { psVal = atoi(psCatch.c_str()); }
