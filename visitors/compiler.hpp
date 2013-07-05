@@ -25,11 +25,7 @@ namespace visitor {
 
 		void visit(ast::char_matcher& m) {}
 		
-		void visit(ast::str_matcher& m) {
-			vars.insert(std::make_pair("psCatch", "parse::ind"));
-			vars.insert(std::make_pair("psCatchLen", "parse::ind"));
-			vars.insert(std::make_pair("psCapture", "std::string"));
-		}
+		void visit(ast::str_matcher& m) {}
 
 		void visit(ast::range_matcher& m) {}
 
@@ -76,6 +72,9 @@ namespace visitor {
 		}
 
 		void visit(ast::capt_matcher& m) {
+			vars.insert(std::make_pair("psCatch", "parse::ind"));
+			vars.insert(std::make_pair("psCatchLen", "parse::ind"));
+			vars.insert(std::make_pair("psCapture", "std::string"));
 			m.m->accept(this);
 		}
 
