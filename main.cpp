@@ -83,6 +83,7 @@ public:
 		out = (std::ofstream*)0;
 		pName = std::string("");
 		nameFlag = false;
+		normFlag = true;
 		eMode = COMPILE_MODE;
 
 		i = 1;
@@ -105,6 +106,8 @@ public:
 			} else if ( match("-n", "--name", argv[i]) ) {
 				if ( i+1 >= argc ) return;
 				parse_name(argv[++i]);
+			} else if ( eq("--no-norm", argv[i]) ) {
+				normFlag = false;
 			} else break;
 		}
 
@@ -124,6 +127,7 @@ public:
 	std::istream& input() { if ( in ) return *in; else return std::cin; }
 	std::ostream& output() { if ( out ) return *out; else return std::cout; }
 	std::string name() { return pName; }
+	bool norm() { return normFlag; }
 	egg_mode mode() { return eMode; }
 
 private:
@@ -132,6 +136,7 @@ private:
 	std::ofstream* out;	/**< pointer to output stream (0 for stdout) */
 	std::string pName;	/**< the name of the parser (empty if none) */
 	bool nameFlag;		/**< has the parser name been explicitly set? */
+	bool normFlag;      /**< should egg do grammar normalization? */
 	egg_mode eMode;		/**< compiler mode to use */
 };
 
@@ -145,6 +150,7 @@ private:
  *  -n --name		grammar name - if none given, takes the longest prefix of 
  *  				the input or output file name (output preferred) which is a 
  *  				valid Egg identifier (default empty)
+ *  --no-norm       turns off grammar normalization
  */
 int main(int argc, char** argv) {
 
@@ -155,8 +161,10 @@ int main(int argc, char** argv) {
 	
 	if ( egg::grammar(ps)(g) ) {
 		//std::cout << "DONE PARSING" << std::endl;
-		visitor::normalizer n;
-		n.normalize(*g);
+		if ( a.norm() ) {
+			visitor::normalizer n;
+			n.normalize(*g);
+		}
 
 		switch ( a.mode() ) {
 		case PRINT_MODE: {
