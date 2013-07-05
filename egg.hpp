@@ -416,7 +416,7 @@ namespace egg {
 		if ( EMPTY(ps) ) { psVal = ast::make_ptr<ast::empty_matcher>(); return parse::match(psVal); }
 		else { ps.pos = psStart; }
 		
-		if ( BEGIN(ps) && sequence(ps)(bm) && END(ps) ) { psVal = bm; return parse::match(psVal); }
+		if ( BEGIN(ps) && sequence(ps)(bm) && END(ps) ) { psVal = ast::make_ptr<ast::capt_matcher>(bm); return parse::match(psVal); }
 		else { ps.pos = psStart; return parse::fail<ast::matcher_ptr>(); }
 	}
 

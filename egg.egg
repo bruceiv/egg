@@ -57,7 +57,7 @@ primary: ast::matcher_ptr =
 		| char_class : rm { psVal = rm; }
 		| ANY { psVal = ast::make_ptr<ast::any_matcher>(); }
 		| EMPTY { psVal = ast::make_ptr<ast::empty_matcher>(); }
-		| BEGIN sequence : bm END { psVal = bm; }
+		| BEGIN sequence : bm END { psVal = ast::make_ptr<ast::capt_matcher>(bm); }
 
 action: ast::action_matcher_ptr =
 		'{' < ( action | !'}' . )* > '}' _ 
