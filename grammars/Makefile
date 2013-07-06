@@ -4,14 +4,14 @@ CXXFLAGS = -O0 -ggdb --std=c++0x
 parse.hpp:  
 	ln -s ../parse.hpp .
 
-%.hpp:  %.egg
+%.cpp:  %.egg
 	../egg -o $@ -i $<
 
-abc:  abc.cpp abc.hpp parse.hpp
+abc:  abc.cpp parse.hpp
 	$(CXX) $(CXXFLAGS) -o abc abc.cpp $(LDFLAGS)
 
-anbncn:  anbncn.cpp anbncn.hpp parse.hpp
+anbncn:  anbncn.cpp parse.hpp
 	$(CXX) $(CXXFLAGS) -o anbncn anbncn.cpp $(LDFLAGS)
 
-calc:  calc.cpp calc.hpp parse.hpp
+calc:  calc.cpp parse.hpp
 	$(CXX) $(CXXFLAGS) -o calc calc.cpp $(LDFLAGS)
