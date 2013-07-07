@@ -1,3 +1,8 @@
+# Matches the a^n b^n c^n (n >= 1) grammar which can't be matched by a CFG
+#
+# Author: Aaron Moss 
+#   (adapted from Bryan Ford's "Packrat Parsing: a Practical Linear-Time Algorithm with Backtracking")
+
 G = &(A 'c') 'a'+ B
 A = 'a' A 'b' | "ab"
 B = 'b' B 'c' | "bc"

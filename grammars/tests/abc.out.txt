@@ -1,0 +1,9 @@
+`' DOESN'T MATCH
+`abc' MATCHES
+`c' MATCHES
+`ac' MATCHES
+`aac' MATCHES
+`aaac' MATCHES
+`bbc' DOESN'T MATCH
+`bc' DOESN'T MATCH
+`x' DOESN'T MATCH

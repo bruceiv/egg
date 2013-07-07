@@ -1,3 +1,8 @@
+# Simple example grammar.
+#
+# Author: Aaron Moss 
+#   (adapted from Bryan Ford's "Packrat Parsing: a Practical Linear-Time Algorithm with Backtracking")
+
 g1 = ( "ab" | 'a'* ) 'c'
 
 {%
