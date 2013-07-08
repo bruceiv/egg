@@ -30,10 +30,37 @@
 #include "visitors/normalizer.hpp"
 #include "visitors/printer.hpp"
 
+/** Egg version */
+static const char* VERSION = "0.1.0";
+
+/** Egg usage string */
+static const char* USAGE = 
+"[-c print|compile] [-i input_file] [-o output_file] [--no-norm] [--help] [--version] [--usage]";
+
+/** Full Egg help string */
+static const char* HELP = 
+"egg [command] [flags] [input-file [output-file]]\n\
+\n\
+Supported flags are\n\
+ -i --input    input file (default stdin)\n\
+ -o --output   output file (default stdout)\n\
+ -c --command  command - either compile, print, help, usage, or version\n\
+               (default compile)\n\
+ -n --name     grammar name - if none given, takes the longest prefix of\n\
+               the input or output file name (output preferred) which is a\n\
+               valid Egg identifier (default empty)\n\
+ --no-norm     turns off grammar normalization\n\
+ --usage       print usage message\n\
+ --help        print full help message\n\
+ --version     print version string\n";
+
 /** Command to run */
 enum egg_mode {
 	PRINT_MODE,		/**< Print grammar */
-	COMPILE_MODE	/**< Compile grammar */
+	COMPILE_MODE,	/**< Compile grammar */
+	USAGE_MODE,     /**< Print usage */
+	HELP_MODE,      /**< Print help */
+	VERSION_MODE    /**< Print version */
 };
 
 class args {
@@ -74,6 +101,15 @@ private:
 			return true;
 		} else if ( eq("compile", s) ) {
 			eMode = COMPILE_MODE;
+			return true;
+		} else if ( eq("help", s) ) {
+			eMode = HELP_MODE;
+			return true;
+		} else if ( eq("usage", s) ) {
+			eMode = USAGE_MODE;
+			return true;
+		} else if ( eq("version", s) ) {
+			eMode = VERSION_MODE;
 			return true;
 		} else {
 			return false;
@@ -130,6 +166,12 @@ public:
 				parse_name(argv[++i]);
 			} else if ( eq("--no-norm", argv[i]) ) {
 				normFlag = false;
+			} else if ( eq("--usage", argv[i]) ) {
+				eMode = USAGE_MODE;
+			} else if ( eq("--help", argv[i]) ) {
+				eMode = HELP_MODE;
+			} else if ( eq("--version", argv[i]) ) {
+				eMode = VERSION_MODE;
 			} else break;
 		}
 
@@ -166,17 +208,34 @@ private:
  *  egg [command] [flags] [input-file [output-file]]
  *  
  *  Supported flags are
- *  -i --input		input file (default stdin)
- *  -o --output		output file (default stdout)
- *  -c --command	command - either compile or print (default compile)
- *  -n --name		grammar name - if none given, takes the longest prefix of 
- *  				the input or output file name (output preferred) which is a 
- *  				valid Egg identifier (default empty)
- *  --no-norm       turns off grammar normalization
+ *  -i --input    input file (default stdin)
+ *  -o --output   output file (default stdout)
+ *  -c --command  command - either compile, print, help, usage, or version 
+ *                (default compile)
+ *  -n --name     grammar name - if none given, takes the longest prefix of 
+ *                the input or output file name (output preferred) which is a 
+ *                valid Egg identifier (default empty)
+ *  --no-norm     turns off grammar normalization
+ *  --usage       print usage message
+ *  --help        print full help message
+ *  --version     print version string
  */
 int main(int argc, char** argv) {
 
 	args a(argc, argv);
+	
+	switch ( a.mode() ) {
+	case USAGE_MODE:
+		std::cout << argv[0] << " " << USAGE << std::endl;
+		return 0;
+	case HELP_MODE:
+		std::cout << HELP << std::endl;
+		return 0;
+	case VERSION_MODE:
+		std::cout << "Egg version " << VERSION << std::endl;
+		return 0;
+	default: break;
+	}
 
 	parse::state ps(a.input());
 	ast::grammar_ptr g;
@@ -198,6 +257,7 @@ int main(int argc, char** argv) {
 			c.compile(*g);
 			break;
 		}
+		default: break;
 		}
 		
 	} else {

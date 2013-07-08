@@ -4,7 +4,6 @@
 - Look at adding cut syntax
 - Unicode string support
   - Include Unicode escapes for character literals
-- Add --usage and --help flags to arg parser
 - Add interpreter visitor (this may be non-trivial)
 - Add doxygen-generated docs to the docs folder
 
@@ -18,4 +17,4 @@
 - Inline parse.hpp in generated grammars
   - This may have licencing ramifications - consider a Bison-style exception
 - Modify makefile to remake `egg` from `egg.egg` or `egg-back.hpp` as appropriate
-- Maybe Add flag to make "#pragma once" optional in generated files
+- Maybe add flag to make "#pragma once" optional in generated files
