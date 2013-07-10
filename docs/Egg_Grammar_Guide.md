@@ -9,26 +9,26 @@ Due to this quality, a PEG-based parser generator such as Egg does not need a se
 
 An Egg grammar consists of a list of rules, where each rule gives an identifier to a sequence of matching statements. 
 Rule identifiers consist of a letter or underscore followed by any number of further letters, digits, or underscores. 
-The most basic matching statements are character and string literals, surrounded by single or double quotes, respectively; a period '`.`' matches any single character. 
-A semicolon '`;`' is an empty matcher; it always matches without consuming any input; it can be safely placed at the end of any grammar rule for stylistic purposes, or used at the end of an alternation to match an empty case. 
+The most basic matching statements are character and string literals, surrounded by single or double quotes, respectively; a period `.` matches any single character. 
+A semicolon `;` is an empty matcher; it always matches without consuming any input; it can be safely placed at the end of any grammar rule for stylistic purposes, or used at the end of an alternation to match an empty case. 
 Grammar rules can also be matched (possibly recursively) by writing their identifier. 
-Matching statements can be made optional by following them with a '`?`', repeatable by following them with '`*`', or repeatable at least once with '`+`'; statements can also be grouped with parentheses. 
-The '`|`' operator can be used to introduce alternation into grammar rules; this alternation is ordered - if a sequence is matched, then a later sequence will not be tested. As an example, consider the following two grammar rules: 
+Matching statements can be made optional by following them with a `?`, repeatable by following them with `*`, or repeatable at least once with `+`; statements can also be grouped with parentheses. 
+The `|` operator can be used to introduce alternation into grammar rules; this alternation is ordered - if a sequence is matched, then a later sequence will not be tested. As an example, consider the following two grammar rules: 
 
     g1 = ( 'a'* | "ab" ) 'c'
     g2 = ( "ab" | 'a'* ) 'c'
 
 Of the above two rules, `g2` will match "abc", while `g1` will not, because the `'a'*` matcher will match, consuming the initial 'a', and then the following 'c' will not match, as the 'b' has yet to be consumed. 
 
-PEGs also provide lookahead matchers, which match a given rule without consuming it; These can be constructed by prefixing a grammar rule with '`&`'. 
-Similarly, a matcher prefixed with '`!`' does not consume the input, and only succeeds if the prefixed matcher doesn't match. 
+PEGs also provide lookahead matchers, which match a given rule without consuming it; These can be constructed by prefixing a grammar rule with `&`. 
+Similarly, a matcher prefixed with `!` does not consume the input, and only succeeds if the prefixed matcher doesn't match. 
 These lookahead capabilities allow PEGs to match some grammars that cannot be represented by CFGs, such as the well-known a^n b^n c^n (n > 0), which can be matched by the following Egg grammar: 
 
     G = &(A 'c') 'a'+ B
     A = 'a' A 'b' | "ab"
     B = 'b' B 'c' | "bc"
 
-A sequence of matching rules can also be surrounded by angle brackets '`<`' and '`>`', denoting a capturing block; the string that matches the rules inside the capturing block will be provided to the parser for use in its semantic actions.
+A sequence of matching rules can also be surrounded by angle brackets `<` and `>`, denoting a capturing block; the string that matches the rules inside the capturing block will be provided to the parser for use in its semantic actions.
 
 A grammar rule may optionally be assigned a type by following the rule identifier with a colon and a second identifier. 
 This second identifier can be a C++ type - namespaces & member typedefs are supported, as are templated classes, though pointer and reference types are not supported for implementation reasons (you may, however, use smart pointer classes). 
@@ -46,7 +46,7 @@ The following simple grammar functions as a basic calculator (an executable vers
     elem : int = '(' sum : i ')' { psVal = i; }
                  | < '-'?[0-9]+ > { psVal = atoi(psCapture.c_str()); }
 
-Finally, comments can be started with a '`#`', they end at end-of-line.
+Finally, comments can be started with a `#`, they end at end-of-line.
 
 ## Semantic Actions ##
 
@@ -66,7 +66,7 @@ Variables made available to the semantic actions include the following:
   - `psCapture` - the string contained in the current capture
 - `psVal` - the variable containing the return value of a typed rule; will be default-constructed by caller on rule start.
 
-You may also include a special semantic action before and after the grammar rules; these rules are delimited with "`{$`" and "`$}`" and will be placed before and after the generated rules. 
+You may also include a special semantic action before and after the grammar rules; these rules are delimited with `{$` and `$}` and will be placed before and after the generated rules. 
 The usual `ps`* variables are not defined in these actions.
 
 ## Egg Grammar ##
