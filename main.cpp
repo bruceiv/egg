@@ -20,6 +20,7 @@
  * THE SOFTWARE.
  */
 
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <string>
@@ -261,9 +262,22 @@ int main(int argc, char** argv) {
 		}
 		
 	} else {
-		std::cerr << "PARSE FAILURE" << std::endl;
+		int64_t maxPos=ps.maxRead();
+		int64_t startPos; for (startPos=maxPos-1;startPos>0&&ps[startPos]!='\n';--startPos); ++startPos;
+		int64_t endPos; for (endPos=maxPos;ps[endPos]!='\n'&&ps[endPos]!='\0';++endPos);
+		int64_t lineCount=1;
+		try {
+			for(int64_t pos=startPos;pos>0;--pos) lineCount+=(ps[pos]=='\n');
+		} catch(parse::forgotten_state_error& e) {
+			lineCount += e.newlines;
+		}
+		int64_t errPos=maxPos-startPos;
+
+		std::cerr << "Parse failure " << maxPos << " bytes into the input:" << std::endl;
+		std::cerr << "line " << lineCount << ":   " << ps.string(startPos,endPos-startPos) << std::endl;
+		std::cerr << std::string(5+ceil(log10(lineCount)+4),' ') << std::string(maxPos-startPos-1, ' ') << "^-- error, column " << errPos << std::endl;
+		return 1;
 	}
 
 	return 0;
 } /* main() */
-
