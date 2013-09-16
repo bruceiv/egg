@@ -46,15 +46,15 @@ namespace parse {
 		 *  @param req		Requested index
 		 *  @param avail	Minimum available index
 		 */
-		forgotten_state_error(ind req, ind avail) throw() 
+		forgotten_state_error(ind req, ind avail,ind newlines) throw()
 			: std::range_error("Forgotten state error"), 
-			req(req), avail(avail) {}
+			req(req), avail(avail), newlines(0) {}
 		
 		/** Inherited from std::exception. */
 		const char* what() const throw() {
 			try {
 				std::stringstream ss("Forgotten state error");
-				ss << ": requested " << req << " < " << avail;
+				ss << ": requested " << req << " < " << avail << " < " << newlines;
 				return ss.str().c_str();
 			} catch (std::exception const& e) {
 				return "Forgotten state error";
@@ -65,6 +65,8 @@ namespace parse {
 		ind req;
 		/** minimum available index */
 		ind avail;
+		/** number of newlines forgotten so far */
+		ind newlines;
 	}; /* struct forgotten_range_error */
 	
 	/** Parser state */
@@ -94,7 +96,7 @@ namespace parse {
 		value_type operator[] (size_type i) {
 			
 			// Fail on forgotten index
-			if ( i < str_off ) throw forgotten_state_error(i, str_off);
+			if ( i < str_off ) throw forgotten_state_error(i, str_off, newlines_off);
 			
 			// Get index into stored input
 			ind ii = i - str_off;
@@ -124,7 +126,7 @@ namespace parse {
 		range_type range(size_type i, size_type n) {
 			
 			// Fail on forgotten index
-			if ( i < str_off ) throw forgotten_state_error(i, str_off);
+			if ( i < str_off ) throw forgotten_state_error(i, str_off, newlines_off);
 			
 			// Get index into stored input
 			ind ib = i - str_off;
@@ -179,8 +181,21 @@ namespace parse {
 			// Get index in stored input to forget
 			ind ii = i - str_off;
 			
+			// Count the number of newlines we will forget
+			for ( auto iter = str.begin(), end=str.begin() + ii; iter != end; ++iter ) {
+				newlines_off += ( *iter == '\n' );
+			}
+
 			// Forget stored input
 			str.erase(str.begin(), str.begin()+ii);
+		}
+
+		/** Retrieves the maximum position inside the input that we have
+		 *  read so far.
+		 *  @return The number of characters we have read so far
+		 */
+		size_type maxRead() const {
+			return str_off + str.size();
 		}
 		
 	private:
@@ -208,6 +223,8 @@ namespace parse {
 		std::deque<value_type> str;
 		/** Offset of start of str from the beginning of the stream */
 		size_type str_off;
+		/** Number of newlines we have already forgotten about */
+		size_type newlines_off;
 		/** Input stream to read characters from */
 		std::istream& in;
 	}; /* class state */

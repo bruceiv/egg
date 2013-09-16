@@ -44,7 +44,10 @@ clean:
 	-rm anbncn anbncn.cpp 
 	-rm calc calc.cpp
 
-test: egg abc anbncn calc
+reporting:
+	../egg -i errorcalc.egg 2>&1 | grep -i -q "line 7"
+
+test: egg abc anbncn calc reporting
 	@echo
 	./abc < tests/abc.in.txt > tests/abc.test.txt
 	diff tests/abc.out.txt tests/abc.test.txt
@@ -55,3 +58,5 @@ test: egg abc anbncn calc
 	rm tests/*.test.txt
 	@echo
 	@echo TESTS PASSED
+
+.PHONY: reporting test clean
