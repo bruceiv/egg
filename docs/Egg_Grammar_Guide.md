@@ -130,7 +130,8 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     CLOSE =			')' _
     ANY =			'.' _
     EMPTY =			';' _
-    CAPT =			'-' _
+    BEGIN =			'<' _
+    END =			'>' _
     
     _ =		 		( space | comment )*
     space =			' ' | '\t' | end_of_line
