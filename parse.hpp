@@ -181,6 +181,9 @@ namespace parse {
 			
 			// Forget stored input
 			str.erase(str.begin(), str.begin()+ii);
+			
+			// Adjust offset
+			str_off = i;
 		}
 		
 	private:
