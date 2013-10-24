@@ -36,8 +36,19 @@
 
 namespace parse {
 	
-	typedef unsigned long	ind;	/**< unsigned index type */
+	typedef unsigned long ind;  /**< unsigned index type */
 	
+	/** Human-readable position type */
+	struct posn {
+		posn() : i(0), line(0), col(0) {}
+		posn(ind i, ind line, ind col) : i(i), line(line), col(col) {}
+		
+		bool operator < (const posn& o) { return i < o.i; }
+		
+		ind i;     /**< input index */
+		ind line;  /**< line number */
+		ind col;   /**< column number */
+	};
 	
 	/** Error thrown when a parser is asked for state it has forgotten. */
 	struct forgotten_state_error : public std::range_error {
@@ -46,7 +57,7 @@ namespace parse {
 		 *  @param req		Requested index
 		 *  @param avail	Minimum available index
 		 */
-		forgotten_state_error(ind req, ind avail) throw() 
+		forgotten_state_error(const posn& req, const posn& avail) throw() 
 			: std::range_error("Forgotten state error"), 
 			req(req), avail(avail) {}
 		
@@ -54,7 +65,8 @@ namespace parse {
 		const char* what() const throw() {
 			try {
 				std::stringstream ss("Forgotten state error");
-				ss << ": requested " << req << " < " << avail;
+				ss << ": requested " << req.line << ":" << req.col << " < " 
+				   << avail.line << ":" << avail.col;
 				return ss.str().c_str();
 			} catch (std::exception const& e) {
 				return "Forgotten state error";
@@ -62,72 +74,137 @@ namespace parse {
 		}
 		
 		/** requested index */
-		ind req;
+		posn req;
 		/** minimum available index */
-		ind avail;
+		posn avail;
 	}; /* struct forgotten_range_error */
 	
 	/** Parser state */
 	class state {
 	public:
-		typedef char								value_type;
-		typedef std::deque<char>::iterator			iterator;
-		typedef std::pair<iterator, iterator>		range_type;
-		typedef std::deque<char>::difference_type	difference_type;
-		typedef ind								size_type;
+		typedef char                               value_type;
+		typedef std::deque<char>::iterator         iterator;
+		typedef std::pair<iterator, iterator>      range_type;
+	
+	private:
+		/** Read a single character into the parser.
+		 *  @return was a character read?
+		 */
+		bool read() {
+			int c = in.get();
+			
+			// Check EOF
+			if ( c == std::char_traits<value_type>::eof ) return false;
+			
+			// Check newline
+			if ( c == '\n' ) lines.push_back(off.i + str.size() + 1);
+			
+			// Add to stored input
+			str.push_back(c);
+			return true;
+		}
 		
+		/** Read more characters into the parser.
+		 *  @param n		The number of characters to read
+		 *  @return The number of characters read
+		 */
+		ind read(ind n) {
+			char s[n];
+			// Read into buffer
+			in.read(s, n);
+			// Count read characters
+			ind r = in.gcount();
+			// Track newlines
+			ind i_max = off.i + str.size();
+			for (ind i = 0; i < r; ++i) {
+				if ( s[i] == '\n' ) { lines.push_back(i_max + i + 1); }
+			}
+			// Add to stored input
+			str.insert(str.end(), s, s+r);
+			return r;
+		}
+		
+	public:
 		/** Default constructor.
 		 *  Initializes state at beginning of input stream.
 		 *  @param in		The input stream to read from
 		 */
-		state(std::istream& in) : pos(0), str(), str_off(0), in(in) {}
+		state(std::istream& in) : pos(), off(), str(), lines(), in(in) {
+			lines.push_back(0);
+		}
 		
-		/** Indexing operator.
-		 *  Returns character at specified position in the input stream, 
-		 *  reading more input if necessary.
-		 *  @param i		The index of the character to get
-		 *  @return The i'th character of the input stream, or '\0' for i past 
-		 *  		the end of file
-		 *  @throws forgotten_state_error on i < str_begin (that is, asking for 
-		 *  		input previously discarded)
+		/** Reads at the cursor.
+		 *  @return The character at the current position, or '\0' for end of 
+		 *          stream.
 		 */
-		value_type operator[] (size_type i) {
-			
+		value_type operator() () const {
+			ind i = pos.i - off.i;
+			if ( i > str.size() ) return '\0';
+			return str[i];
+		}
+		
+		/** Gets the cursor.
+		 *  @return the current position 
+		 */
+		operator posn () const { return pos; }
+		
+		/** Sets the cursor.
+		 *  @param p    The position to set (should have previously been seen)
+		 *  @throws forgotten_state_error on p < off (that is, moving to 
+		 *  		position previously discarded)
+		 */
+		state& operator = (const posn& p) {
 			// Fail on forgotten index
-			if ( i < str_off ) throw forgotten_state_error(i, str_off);
+			if ( p < off ) throw forgotten_state_error(p, off);
 			
-			// Get index into stored input
-			ind ii = i - str_off;
+			pos = p;
 			
-			// Expand stored input if needed
-			if ( ii >= str.size() ) {
-				ind n = 1 + ii - str.size();
-				ind r = read(n);
-				if ( r < n ) return '\0';
+			return *this;
+		}
+		
+		/** Advances position one step. 
+		 *  Will not advance past end-of-stream.
+		 */
+		state& operator ++ () {
+			ind i = pos.i - off.i;
+			
+			// ignore if already end of stream
+			if ( i > str.size() ) return *this;
+			
+			// update index
+			++pos.i;
+			
+			// read more input if neccessary, terminating on end-of-stream
+			if ( i == str.size() && !read() ) return *this;
+			
+			// update row and column
+			ind j = pos.line - off.line;
+			if ( j == lines.size() - 1 || p.i < lines[j+1] ) {
+				++p.col;
+			} else {
+				++p.line;
+				p.col == 0;
 			}
 			
-			return str[ii];
+			return *this;
 		}
 		
 		/** Range operator.
 		 *  Returns a pair of iterators, begin and end, containing up to the 
-		 *  given number of elements, starting at the given index. The end 
-		 *  iterator is not guaranteed to be dereferencable, though any 
-		 *  iterator between it and the begin iterator (inclusive) is 
-		 *  dereferencable. Returned begin and end iterators may be invalidated 
-		 *  by calls to any non-const method of this class.
-		 *  @param i		The index of the beginning of the range
+		 *  given number of elements, starting at the given position. Returned 
+		 *  begin and end iterators may be invalidated by calls to any 
+		 *  non-const method of this class.
+		 *  @param p		The beginning of the range
 		 *  @param n		The maximum number of elements in the range
-		 *  @throws forgotten_state_error on i < str_begin (that is, asking for 
-		 *  		input previously discarded)
+		 *  @throws forgotten_state_error on p < off (that is, asking for input 
+		 *  		previously discarded)
 		 */
-		range_type range(size_type i, size_type n) {
-			
+		range_type range(const posn& p, ind n) {
 			// Fail on forgotten index
-			if ( i < str_off ) throw forgotten_state_error(i, str_off);
+			if ( p < off ) throw forgotten_state_error(p, off);
 			
 			// Get index into stored input
-			ind ib = i - str_off;
+			ind ib = p.i - off.i;
 			ind ie = ib + n;
 			
 			// Expand stored input if needed
@@ -155,62 +232,26 @@ namespace parse {
 		}
 		
 		/** Substring operator.
-		 *  Convenience for the string formed by the characters in range(i, n).
-		 *  @param i		The index of the beginning of the range
+		 *  Convenience for the string formed by the characters in range(p, n).
+		 *  @param p		The beginning of the range
 		 *  @param n		The maximum number of elements in the range
-		 *  @throws forgotten_state_error on i < str_begin (that is, asking for 
-		 *  		input previously discarded)
+		 *  @throws forgotten_state_error on i < off (that is, asking for input 
+		 *  		previously discarded)
 		 */
-		std::string string(size_type i, size_type n) {
+		std::string string(const posn& p, size_type n) {
 			range_type iters = range(i, n);
 			return std::string(iters.first, iters.second);
-		}
-		
-		/** Forgets all parsing state before the given index.
-		 *  After this, reads or indexes before the given index will fail with 
-		 *  an exception.
-		 *  @param i		The index to forget to
-		 */
-		void forgetTo(size_type i) {
-			
-			// Ignore if already forgotten
-			if ( i <= str_off ) return;
-			
-			// Get index in stored input to forget
-			ind ii = i - str_off;
-			
-			// Forget stored input
-			str.erase(str.begin(), str.begin()+ii);
-			
-			// Adjust offset
-			str_off = i;
-		}
-		
+		}	
+
 	private:
-		/** Read more characters into the parser.
-		 *  @param n		The number of characters to read
-		 *  @return The number of characters read
-		 */
-		size_type read(size_type n) {
-			char s[n];
-			// Read into buffer
-			in.read(s, n);
-			// Count read characters
-			ind r = in.gcount();
-			// Add to stored input
-			str.insert(str.end(), s, s+r);
-			return r;
-		}
-		
-	public:
 		/** Current parsing location */
-		size_type pos;
-		
-	private:
+		posn pos;
+		/** Offset of start of str from the beginning of the stream */
+		posn off;
 		/** Characters currently in use by the parser */
 		std::deque<value_type> str;
-		/** Offset of start of str from the beginning of the stream */
-		size_type str_off;
+		/** Beginning indices of each line, starting from off.line */
+		std::deque<ind> lines;
 		/** Input stream to read characters from */
 		std::istream& in;
 	}; /* class state */
@@ -232,16 +273,25 @@ namespace parse {
 	
 	/** A failure instance */
 	const failure fails = 0;
+	
+	/** Represents a parsing error.
+	 *  Provides details about position and error. */
+	struct error {
+		error(const posn& p) : pos(p) {}
+		error() : pos() {}
+		
+		posn pos;  /**< The position of the error */
+	};
 
-	/** Wraps a parsing result. ps[ps.pos++]
+	/** Wraps a parsing result.
 	 *  Returns either the wrapped result or false.
 	 *  @param T The wrapped result; should be default constructable. */
 	template<typename T = value> 
 	class result {
 	public:
-		result(const T& v) : val(v), success(true) {}
-		result(const failure& f) : success(false) {}
-		result() : success(false) {}
+		result(const T& v) : val(v), success(true), err() {}
+		result(const failure& f) : val(), success(false), err() {}
+		result() : val(), success(false), err() {}
 
 		/** Sets the result to a success containing v */
 		result<T>& operator = (const T& v) { 
@@ -257,6 +307,7 @@ namespace parse {
 		result<T>& operator = (const result<T>& o) {
 			if ( o.success ) { success = true; val = o.val; }
 			else { success = false; }
+			err = o.err;
 			return *this;
 		}
 
@@ -275,9 +326,13 @@ namespace parse {
 			return *this;
 		}
 		
+		/** Sets error information. */
+		result<T>& with(const error& e) { err = e; return *this; }
+		
+		error err;     /**< Error information for this parse. */
 	private:
-		T val;			/**< The wrapped value. */
-		bool success;	/**< The success of the parse. */
+		T val;         /**< The wrapped value. */
+		bool success;  /**< The success of the parse. */
 	}; /* class result<T> */
 
 	/** Builds a positive result from a value.
@@ -293,25 +348,33 @@ namespace parse {
 	
 	/** Matcher for any character */
 	result<state::value_type> any(state& ps) {
-		if ( ps[ps.pos] == '\0' ) return fail<state::value_type>();
-		return match(ps[ps.pos++]);
+		state::value_type c = ps();
+		if ( c == '\0' ) {
+			return fail<state::value_type>().with(error(ps));
+		}
+		++ps;
+		return match(c);
 	}
 
 	/** Matcher for a given character */
 	template<state::value_type c>
 	result<state::value_type> matches(parse::state& ps) {
-		if ( ps[ps.pos] != c ) return fail<state::value_type>();
-		++ps.pos;
+		if ( ps() != c ) {
+			return fail<state::value_type>().with(error(ps));
+		}
+		++ps;
 		return match(c);
 	}
 
 	/** Matcher for a character range */
 	template<state::value_type s, state::value_type e>
 	result<state::value_type> in_range(parse::state& ps) {
-		state::value_type c = ps[ps.pos];
-		if ( c < s || c > e ) return fail<state::value_type>();
+		state::value_type c = ps();
+		if ( c < s || c > e ) {
+			return fail<state::value_type>().with(error(ps));
+		}
 		
-		++ps.pos;
+		++ps;
 		return match(c);
 	}
 	
