@@ -102,8 +102,8 @@ characters: ast::char_range =
 		| character : c { psVal = ast::char_range(c); }
 
 character: char =
-		'\\' [nrt\'\"\\] { psVal = strings::unescaped_char(ps[psStart+1]); }
-		| ![\'\"\\] . { psVal = ps[psStart]; }
+		'\\' [nrt\'\"\\] : psVal
+		| ![\'\"\\] . : psVal
 
 OUT_BEGIN =		"{%"
 OUT_END =		"%}"

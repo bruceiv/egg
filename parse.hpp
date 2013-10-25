@@ -262,6 +262,9 @@ namespace parse {
 			return *this;
 		}
 		
+		/** Overload to make this act more like a posn object. */
+		ind operator - (const posn& p) { return posn(*this) - p; }
+		
 		/** Range operator.
 		 *  Returns a pair of iterators, begin and end, containing up to the 
 		 *  given number of elements, starting at the given position. Returned 
