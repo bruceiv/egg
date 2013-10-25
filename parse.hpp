@@ -43,7 +43,7 @@ namespace parse {
 		posn() : i(0), line(0), col(0) {}
 		posn(ind i, ind line, ind col) : i(i), line(line), col(col) {}
 		
-		bool operator < (const posn& o) { return i < o.i; }
+		bool operator < (const posn& o) const { return i < o.i; }
 		
 		ind i;     /**< input index */
 		ind line;  /**< line number */
@@ -82,9 +82,11 @@ namespace parse {
 	/** Parser state */
 	class state {
 	public:
-		typedef char                               value_type;
-		typedef std::deque<char>::iterator         iterator;
-		typedef std::pair<iterator, iterator>      range_type;
+		typedef char                              value_type;
+		typedef std::basic_string<value_type>     string_type;
+		typedef std::basic_istream<value_type>    stream_type;
+		typedef std::deque<value_type>::iterator  iterator;
+		typedef std::pair<iterator, iterator>     range_type;
 	
 	private:
 		/** Read a single character into the parser.
@@ -94,7 +96,7 @@ namespace parse {
 			int c = in.get();
 			
 			// Check EOF
-			if ( c == std::char_traits<value_type>::eof ) return false;
+			if ( c == std::char_traits<value_type>::eof() ) return false;
 			
 			// Check newline
 			if ( c == '\n' ) lines.push_back(off.i + str.size() + 1);
@@ -109,7 +111,7 @@ namespace parse {
 		 *  @return The number of characters read
 		 */
 		ind read(ind n) {
-			char s[n];
+			value_type s[n];
 			// Read into buffer
 			in.read(s, n);
 			// Count read characters
@@ -129,7 +131,7 @@ namespace parse {
 		 *  Initializes state at beginning of input stream.
 		 *  @param in		The input stream to read from
 		 */
-		state(std::istream& in) : pos(), off(), str(), lines(), in(in) {
+		state(stream_type& in) : pos(), off(), str(), lines(), in(in) {
 			lines.push_back(0);
 		}
 		
@@ -139,14 +141,15 @@ namespace parse {
 		 */
 		value_type operator() () const {
 			ind i = pos.i - off.i;
-			if ( i > str.size() ) return '\0';
+			if ( i >= str.size() ) return '\0';
 			return str[i];
 		}
 		
-		/** Gets the cursor.
-		 *  @return the current position 
-		 */
+		/** @return the current position */
 		operator posn () const { return pos; }
+		
+		/** @return the current offset in the stream */
+		posn offset() const { return off; }
 		
 		/** Sets the cursor.
 		 *  @param p    The position to set (should have previously been seen)
@@ -169,22 +172,51 @@ namespace parse {
 			ind i = pos.i - off.i;
 			
 			// ignore if already end of stream
-			if ( i > str.size() ) return *this;
+			if ( i >= str.size() ) return *this;
 			
 			// update index
 			++pos.i;
 			
 			// read more input if neccessary, terminating on end-of-stream
-			if ( i == str.size() && !read() ) return *this;
+			if ( ++i == str.size() && !read() ) { ++pos.col; return *this; }
 			
 			// update row and column
 			ind j = pos.line - off.line;
-			if ( j == lines.size() - 1 || p.i < lines[j+1] ) {
-				++p.col;
+			if ( j == lines.size() - 1 || pos.i < lines[j+1] ) {
+				++pos.col;
 			} else {
-				++p.line;
-				p.col == 0;
+				++pos.line;
+				pos.col = 0;
 			}
+			
+			return *this;
+		}
+		
+		/** Advances position n steps.
+		 *  Will not advance past end-of-stream
+		 */
+		state& operator += (ind n) {
+			ind i = pos.i - off.i;
+			
+			// check if we need to read more input
+			if ( i + n >= str.size() ) {
+				// ignore if already end of stream
+				if ( i >= str.size() ) return *this;
+				
+				// read extra
+				ind nn = i + n + 1 - str.size();
+				ind r = read(nn);
+				
+				// Check read to end of stream, update n to be there
+				if ( r < nn ) n = str.size() - i;
+			}
+			
+			// update position
+			pos.i += n;
+			for (ind j = pos.line - off.line + 1; j < lines.size(); ++j) {
+				if ( pos.i >= lines[j] ) { ++pos.line; } else break;
+			}
+			pos.col = pos.i - lines[pos.line - off.line];
 			
 			return *this;
 		}
@@ -238,9 +270,9 @@ namespace parse {
 		 *  @throws forgotten_state_error on i < off (that is, asking for input 
 		 *  		previously discarded)
 		 */
-		std::string string(const posn& p, size_type n) {
-			range_type iters = range(i, n);
-			return std::string(iters.first, iters.second);
+		string_type string(const posn& p, ind n) {
+			range_type iters = range(p, n);
+			return string_type(iters.first, iters.second);
 		}	
 
 	private:
@@ -253,7 +285,7 @@ namespace parse {
 		/** Beginning indices of each line, starting from off.line */
 		std::deque<ind> lines;
 		/** Input stream to read characters from */
-		std::istream& in;
+		stream_type& in;
 	}; /* class state */
 
 	/** A generic parse result. */
@@ -355,7 +387,7 @@ namespace parse {
 		++ps;
 		return match(c);
 	}
-
+	
 	/** Matcher for a given character */
 	template<state::value_type c>
 	result<state::value_type> matches(parse::state& ps) {
@@ -376,6 +408,19 @@ namespace parse {
 		
 		++ps;
 		return match(c);
+	}
+	
+	/** Matcher for a literal string */
+	result<state::string_type> matches(const char* s, parse::state& ps) {
+		ind n = std::char_traits<state::value_type>::length(s);
+		state::string_type t = ps.string(posn(ps), n);
+		
+		if ( t.compare(s) != 0 ) {
+			return fail<state::string_type>().with(error(ps));
+		}
+		
+		ps += n;
+		return match(t);
 	}
 	
 } /* namespace parse */
