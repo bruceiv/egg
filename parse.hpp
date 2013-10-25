@@ -38,16 +38,44 @@ namespace parse {
 	
 	typedef unsigned long ind;  /**< unsigned index type */
 	
+	class state;
+	
 	/** Human-readable position type */
 	struct posn {
-		posn() : i(0), line(0), col(0) {}
-		posn(ind i, ind line, ind col) : i(i), line(line), col(col) {}
+	friend state;
+	private:
+		// constructor only available to state; discourages messing with posn
+		posn(ind index, ind line, ind col) : i(index), ln(line), cl(col) {}
+	public:
+		posn() : i(0), ln(0), cl(0) {}
 		
+		/** Checks by index if one position precedes another */
 		bool operator < (const posn& o) const { return i < o.i; }
 		
-		ind i;     /**< input index */
-		ind line;  /**< line number */
-		ind col;   /**< column number */
+		bool operator <= (const posn& o) const { return i <= o.i; }
+		bool operator > (const posn& o) const { return i > o.i; }
+		bool operator >= (const posn& o) const { return i >= o.i; }
+		bool operator == (const posn& o) const { return i == o.i; }
+		bool operator != (const posn& o) const { return i != o.i; }
+		
+		/** @return the number of positions by which another position precedes 
+		 *          this position; 0 for this before that.
+		 */
+		ind operator - (const posn& o) const {
+			return ( i < o.i ) ? 0 : i - o.i;
+		}
+		
+		/** @return the character index */
+		ind index() const { return i; }
+		/** @return the line in the file */
+		ind line() const { return ln; }
+		/** @return the column in the file */
+		ind column() const { return cl; }
+		
+	private:
+		ind i;   /**< input index */
+		ind ln;  /**< line number */
+		ind cl;  /**< column number */
 	};
 	
 	/** Error thrown when a parser is asked for state it has forgotten. */
@@ -65,8 +93,8 @@ namespace parse {
 		const char* what() const throw() {
 			try {
 				std::stringstream ss("Forgotten state error");
-				ss << ": requested " << req.line << ":" << req.col << " < " 
-				   << avail.line << ":" << avail.col;
+				ss << ": requested " << req.line() << ":" << req.column() 
+				   << " < " << avail.line() << ":" << avail.column();
 				return ss.str().c_str();
 			} catch (std::exception const& e) {
 				return "Forgotten state error";
@@ -145,6 +173,19 @@ namespace parse {
 			return str[i];
 		}
 		
+		/** Reads at the given position.
+		 *  @param p    The position to read at (should have been previously seen)
+		 *  @return the character at the given position, or '\0' for end of 
+		 *          stream.
+		 */
+		value_type operator() (const posn& p) {
+			if ( p < off ) throw forgotten_state_error(p, off);
+			
+			ind i = p.i - off.i;
+			if ( i >= str.size() ) return '\0';
+			return str[i];
+		}
+		
 		/** @return the current position */
 		operator posn () const { return pos; }
 		
@@ -178,15 +219,15 @@ namespace parse {
 			++pos.i;
 			
 			// read more input if neccessary, terminating on end-of-stream
-			if ( ++i == str.size() && !read() ) { ++pos.col; return *this; }
+			if ( ++i == str.size() && !read() ) { ++pos.cl; return *this; }
 			
 			// update row and column
-			ind j = pos.line - off.line;
+			ind j = pos.ln - off.ln;
 			if ( j == lines.size() - 1 || pos.i < lines[j+1] ) {
-				++pos.col;
+				++pos.cl;
 			} else {
-				++pos.line;
-				pos.col = 0;
+				++pos.ln;
+				pos.cl = 0;
 			}
 			
 			return *this;
@@ -213,10 +254,10 @@ namespace parse {
 			
 			// update position
 			pos.i += n;
-			for (ind j = pos.line - off.line + 1; j < lines.size(); ++j) {
-				if ( pos.i >= lines[j] ) { ++pos.line; } else break;
+			for (ind j = pos.ln - off.ln + 1; j < lines.size(); ++j) {
+				if ( pos.i >= lines[j] ) { ++pos.ln; } else break;
 			}
-			pos.col = pos.i - lines[pos.line - off.line];
+			pos.cl = pos.i - lines[pos.ln - off.ln];
 			
 			return *this;
 		}
