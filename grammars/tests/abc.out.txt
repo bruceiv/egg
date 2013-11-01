@@ -1,9 +1,32 @@
-`' DOESN'T MATCH
+`' DOESN'T MATCH  @0
+    Expected "ab"
+    Expected 'a'
+    Expected 'c'
+    Expected g1
 `abc' MATCHES
 `c' MATCHES
 `ac' MATCHES
 `aac' MATCHES
 `aaac' MATCHES
-`bbc' DOESN'T MATCH
-`bc' DOESN'T MATCH
-`x' DOESN'T MATCH
+`bbc' DOESN'T MATCH  @0
+    Expected "ab"
+    Expected 'a'
+    Expected 'c'
+    Expected g1
+`bc' DOESN'T MATCH  @0
+    Expected "ab"
+    Expected 'a'
+    Expected 'c'
+    Expected g1
+`x' DOESN'T MATCH  @0
+    Expected "ab"
+    Expected 'a'
+    Expected 'c'
+    Expected g1
+`abcc' DOESN'T MATCH  @0
+    Expected g1
+`abbc' DOESN'T MATCH  @2
+    Expected 'c'
+`aabc' DOESN'T MATCH  @2
+    Expected 'a'
+    Expected 'c'

@@ -27,7 +27,7 @@
  */
 %}
 
-g1 = ( "ab" | 'a'* ) 'c'
+g1 = ( "ab" | 'a'* ) 'c' !.
 
 {%
 #include <iostream>
@@ -43,8 +43,21 @@ int main(int argc, char** argv) {
 	string s;
 	while ( getline(cin, s) ) {
 		stringstream ss(s);
-		parse::state ps(ss);
-		cout << "`" << s << "' " << (abc::g1(ps) ? "MATCHES" : "DOESN'T MATCH") << endl;
+		parser::state ps(ss);
+		
+		if ( abc::g1(ps) ) {
+			cout << "`" << s << "' MATCHES" << endl;
+		} else {
+			const parser::error& err = ps.error();
+			
+			cout << "`" << s << "' DOESN'T MATCH  @" << err.pos.col() << endl;
+			for (auto msg : err.messages) {
+				cout << "\t" << msg << endl;
+			}
+			for (auto exp : err.expected) {
+				cout << "\tExpected " << exp << endl;
+			}
+		}
 	}
 }
 %}

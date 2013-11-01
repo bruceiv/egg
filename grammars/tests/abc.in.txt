@@ -7,3 +7,6 @@ aaac
 bbc
 bc
 x
+abcc
+abbc
+aabc

@@ -29,14 +29,27 @@
 #include <cstdlib>
 %}
 
-sum : int = prod : i { psVal = i; } (
-            '+' prod : i { psVal += i; }
-            | '-' prod : i { psVal -= i; } )*
-prod : int = elem : i { psVal = i; } (
-             '*' elem : i { psVal *= i; }
-             | '/' elem : i { psVal /= i; } )*
-elem : int = '(' sum : i ')' { psVal = i; }
-              | < [0-9]+ > { psVal = atoi(psCapture.c_str()); }
+expr : int = _ sum : psVal !.
+
+sum : int = prod : psVal (
+            PLUS prod : i { psVal += i; }
+            | MINUS prod : i { psVal -= i; } )*
+prod : int = elem : psVal (
+             TIMES elem : i { psVal *= i; }
+             | DIVIDE elem : i { psVal /= i; } )*
+elem : int = OPEN sum : psVal CLOSE
+             | num : psVal
+
+num : int = < [0-9]+ > : s { psVal = atoi(s.c_str()); } _
+
+PLUS = '+' _
+MINUS = '-' _
+TIMES = '*' _
+DIVIDE = '/' _
+OPEN = '(' _
+CLOSE = ')' _
+
+_ = (' ' | '\t')*
 
 {%
 #include <iostream>
@@ -53,9 +66,21 @@ int main(int argc, char** argv) {
 	while ( getline(cin, s) ) {
 		stringstream ss(s);
 		parse::state ps(ss);
-		parse::result<int> res = calc::sum(ps);
-		if ( res ) cout << *res << endl;
-		else cout << "PARSE FAILURE `" << s << "'" << endl;
+		int x;
+		
+		if ( calc::expr(ps, x) ) {
+			cout << x << endl;
+		} else {
+			const parser::error& err = ps.error();
+			
+			cout << "SYNTAX ERROR @" << err.pos.col() << endl;
+			for (auto msg : err.messages) {
+				cout << "\t" << msg << endl;
+			}
+			for (auto exp : err.expected) {
+				cout << "\tExpected " << exp << endl;
+			}
+		}
 	}
 }
 %}

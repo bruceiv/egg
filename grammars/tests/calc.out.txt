@@ -4,3 +4,11 @@
 48
 3
 3
+3
+SYNTAX ERROR @4
+	Expected ' '
+	Expected '('
+	Expected '\t'
+	Expected character in '0'-'9'
+	Expected elem
+	Expected num

@@ -6,3 +6,6 @@ abbcc
 aabcc
 aabbc
 x
+abcc
+abbc
+aabc
