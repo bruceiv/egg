@@ -56,6 +56,10 @@ namespace visitor {
 			}
 			
 			out << "]";
+			
+			if ( ! m.var.empty() ) {
+				out << " : " << m.var;
+			}
 		}
 		
 		void visit(ast::rule_matcher& m) {
@@ -67,6 +71,10 @@ namespace visitor {
 
 		void visit(ast::any_matcher& m) {
 			out << ".";
+			
+			if ( ! m.var.empty() ) {
+				out << " : " << m.var;
+			}
 		}
 
 		void visit(ast::empty_matcher& m) {
@@ -137,7 +145,7 @@ namespace visitor {
 		void visit(ast::capt_matcher& m) {
 			out << "< ";
 			m.m->accept(this);
-			out << " >";
+			out << " > : " << m.var;
 		}
 
 		void print(ast::grammar_rule& r) {

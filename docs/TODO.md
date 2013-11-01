@@ -21,3 +21,4 @@
 - Modify makefile to remake `egg` from `egg.egg` or `egg-back.hpp` as appropriate
 - Maybe add flag to make "#pragma once" optional in generated files
 - Rewrite `parser::state.matches(string)` to use the deque iterators instead of generating a second string object
+- Maybe make Egg-based argument parsing grammar (might be more work to make input stream that inputs (argc, argv) than it's worth)

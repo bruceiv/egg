@@ -25,13 +25,13 @@
 #include <string>
 
 #include "egg.hpp"
-#include "parse.hpp"
+#include "parser.hpp"
 #include "visitors/compiler.hpp"
 #include "visitors/normalizer.hpp"
 #include "visitors/printer.hpp"
 
 /** Egg version */
-static const char* VERSION = "0.1.0";
+static const char* VERSION = "0.2.0";
 
 /** Egg usage string */
 static const char* USAGE = 
@@ -118,7 +118,7 @@ private:
 
 	void parse_input(char* s) {
 		in = new std::ifstream(s);
-		if ( !nameFlag && out == 0 ) {
+		if ( !nameFlag && out == nullptr ) {
 			pName = id_prefix(s);
 		}
 	}
@@ -137,8 +137,10 @@ private:
 
 public:
 	args(int argc, char** argv) {
-		in = (std::ifstream*)0;
-		out = (std::ofstream*)0;
+		//in = (std::ifstream*)0;
+		//out = (std::ofstream*)0;
+		in = nullptr;
+		out = nullptr;
 		pName = std::string("");
 		nameFlag = false;
 		normFlag = true;
@@ -237,11 +239,11 @@ int main(int argc, char** argv) {
 	default: break;
 	}
 
-	parse::state ps(a.input());
+	parser::state ps(a.input());
 	ast::grammar_ptr g;
 	
-	if ( egg::grammar(ps)(g) ) {
-		//std::cout << "DONE PARSING" << std::endl;
+	if ( egg::grammar(ps, g) ) {
+		std::cout << "DONE PARSING" << std::endl;
 		if ( a.norm() ) {
 			visitor::normalizer n;
 			n.normalize(*g);
@@ -256,12 +258,19 @@ int main(int argc, char** argv) {
 			visitor::compiler c(a.name(), a.output());
 			c.compile(*g);
 			break;
-		}
-		default: break;
+		} default: break;
 		}
 		
 	} else {
-		std::cerr << "PARSE FAILURE" << std::endl;
+		const parser::error& err = ps.error();
+			
+		std::cerr << "PARSE FAILURE @" << err.pos.line() << ":" << err.pos.col() << std::endl;
+		for (auto msg : err.messages) {
+			std::cerr << "\t" << msg << std::endl;
+		}
+		for (auto exp : err.expected) {
+			std::cerr << "\tExpected " << exp << std::endl;
+		}
 	}
 
 	return 0;

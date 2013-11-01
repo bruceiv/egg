@@ -49,7 +49,11 @@ namespace visitor {
 		
 		void visit(ast::str_matcher& m) {}
 
-		void visit(ast::range_matcher& m) {}
+		void visit(ast::range_matcher& m) {
+			if ( ! m.var.empty() ) {
+				vars.insert(std::make_pair(m.var, "char"));
+			}
+		}
 
 		void visit(ast::rule_matcher& m) {
 			if ( ! m.var.empty() ) {
@@ -57,8 +61,14 @@ namespace visitor {
 			}
 		}
 
-		void visit(ast::any_matcher& m) {}
+		void visit(ast::any_matcher& m) {
+			if ( ! m.var.empty() ) {
+				vars.insert(std::make_pair(m.var, "char"));
+			}
+		}
+		
 		void visit(ast::empty_matcher& m) {}
+		
 		void visit(ast::action_matcher& m) {}
 		
 		void visit(ast::opt_matcher& m) {
@@ -94,9 +104,7 @@ namespace visitor {
 		}
 
 		void visit(ast::capt_matcher& m) {
-			vars.insert(std::make_pair("psCatch", "parse::ind"));
-			vars.insert(std::make_pair("psCatchLen", "parse::ind"));
-			vars.insert(std::make_pair("psCapture", "std::string"));
+			vars.insert(std::make_pair(m.var, "std::string"));
 			m.m->accept(this);
 		}
 
@@ -130,63 +138,48 @@ namespace visitor {
 		}
 
 		void visit(ast::str_matcher& m) {
-			std::string indent(++tabs, '\t');
-			
-			//setup lambda to match string
-			out << "[&ps]() {" << std::endl
-				<< indent << "parse::ind psStart = ps.pos;" << std::endl
-				<< std::endl
-				<< indent << "if ( "
-				;
-
-			//match each character in the string
-			if ( m.s.empty() ) {
-				out << "true";
+			out << "parse::matches(\"" << strings::escape(m.s) << "\", ps)";
+		}
+		
+		void visit(ast::char_range& r) {
+			if ( r.single() ) {
+				out << "parse::matches<\'" << strings::escape(r.to) << "\'>(ps)";
 			} else {
-				auto it = m.s.begin();
-				out << "\'" << strings::escape(*it) << "\' == ps[ps.pos++]";
-				while ( ++it != m.s.end() ) {
-					out << std::endl 
-						<< indent << "&& \'" << strings::escape(*it) << "\' == ps[ps.pos++]"
-						;
-				}
+				out << "parse::in_range<\'" << strings::escape(r.from) 
+				    << "\',\'" << strings::escape(r.to) << "\'>(ps)";
+			}
+		}
+		
+		void visit(ast::range_matcher& m) {
+			if ( m.rs.empty() ) {
+				out << "parse::matches<\'\\0\'>(ps)";
+				if ( ! m.var.empty() ) out << "(" << m.var << ")";
+				return;
 			}
 			
-			//close lambda
-			out << " ) { return true; }" << std::endl
-				<< indent << "else { ps.pos= psStart; return false; }" << std::endl
-				<< indent << "}()";
-
-			--tabs;
-		}
-
-		void visit(ast::range_matcher& m) {
+			if ( m.rs.size() == 1 ) {
+				visit(m.rs.front());
+				if ( ! m.var.empty() ) out << "(" << m.var << ")";
+				return;
+			}
+			
 			std::string indent(++tabs, '\t');
 
 			//chain matcher ranges
 			out << "( ";
-			if ( m.rs.empty() ) {
-				out << "true";
-			} else {
-				auto it = m.rs.begin();
-				if ( it->single() ) {
-					out << "parse::matches<\'" << strings::escape(it->to) << "\'>(ps)";
-				} else {
-					out << "parse::in_range<\'" << strings::escape(it->from)
-							<< "\',\'" << strings::escape(it->to) << "\'>(ps)";
-				}
-				while ( ++it != m.rs.end() ) {
-					out << std::endl
-						<< indent << "|| "
-						;
-					if ( it->single() ) {
-						out << "parse::matches<\'" << strings::escape(it->to) << "\'>(ps)";
-					} else {
-						out << "parse::in_range<\'" << strings::escape(it->from)
-								<< "\',\'" << strings::escape(it->to) << "\'>(ps)";
-					}
-				}
+			
+			auto it = m.rs.begin();
+			visit(*it);
+			if ( ! m.var.empty() ) out << "(" << m.var << ")";
+			
+			while ( ++it != m.rs.end() ) {
+				out << std::endl
+					<< indent << "|| "
+					;
+				visit(*it);
+				if ( ! m.var.empty() ) out << "(" << m.var << ")";
 			}
+			
 			out << " )";
 			
 			--tabs;
@@ -199,6 +192,7 @@ namespace visitor {
 
 		void visit(ast::any_matcher& m) {
 			out << "parse::any(ps)";
+			if ( ! m.var.empty() ) out << "(" << m.var << ")";
 		}
 
 		void visit(ast::empty_matcher& m) {
@@ -260,7 +254,7 @@ namespace visitor {
 
 			//bind all variables but psStart
 			out << "[&]() { " << std::endl
-				<< indent << "parse::ind psStart = ps.pos;" << std::endl
+				<< indent << "parse::posn psStart = ps;" << std::endl
 				<< indent << "if ( ";
 
 			//test that all matchers match
@@ -276,7 +270,7 @@ namespace visitor {
 
 			//match if so, reset otherwise
 			out << " ) { return true; }" << std::endl
-				<< indent << "else { ps.pos = psStart; return false; } }()";
+				<< indent << "else { ps = psStart; return false; } }()";
 
 			--tabs;
 		}
@@ -312,12 +306,12 @@ namespace visitor {
 
 			//bind all variables but psStart
 			out << "[&]() {" << std::endl
-				<< indent << "parse::ind psStart = ps.pos;" << std::endl
+				<< indent << "parse::posn psStart = ps;" << std::endl
 				<< indent << "if ( ";
 			//match iff contained matcher matches, always reset
 			m.m->accept(this);
-			out << " ) { ps.pos = psStart; return true; }" << std::endl
-				<< indent << "else { ps.pos = psStart; return false; } }()";
+			out << " ) { ps = psStart; return true; }" << std::endl
+				<< indent << "else { ps = psStart; return false; } }()";
 
 			--tabs;
 		}
@@ -327,12 +321,12 @@ namespace visitor {
 
 			//bind all variables but psStart
 			out << "[&]() {" << std::endl
-				<< indent << "parse::ind psStart = ps.pos;" << std::endl
+				<< indent << "parse::posn psStart = ps;" << std::endl
 				<< indent << "if ( ";
 			//match iff contained matcher fails, always reset
 			m.m->accept(this);
-			out << " ) { ps.pos = psStart; return false; }" << std::endl
-				<< indent << "else { ps.pos = psStart; return true; } }()";
+			out << " ) { ps = psStart; return false; }" << std::endl
+				<< indent << "else { ps = psStart; return true; } }()";
 
 			--tabs;
 		}
@@ -342,19 +336,14 @@ namespace visitor {
 
 			//bind all variables
 			out << "[&]() {" << std::endl
-				<< indent << "psCatch = ps.pos;" << std::endl
+				<< indent << "parse::posn psStart = ps;" << std::endl
 				<< indent << "if ( ";
 			//match iff contained matcher matches
 			m.m->accept(this);
 			out << " ) {" << std::endl
-				<< indent << "\tpsCatchLen = ps.pos - psCatch;" << std::endl
-				<< indent << "\tpsCapture = ps.string(psCatch, psCatchLen);" << std::endl
+				<< indent << "\t" << m.var << " = ps.string(psStart, ps - psStart);" << std::endl
 				<< indent << "\treturn true;" << std::endl
-				<< indent << "} else {" << std::endl
-				<< indent << "\tpsCatchLen = 0;" << std::endl
-				<< indent << "\tpsCapture = std::string(\"\");" << std::endl
-				<< indent << "\treturn false;" << std::endl
-				<< indent << "} }()";
+				<< indent << "} else { return false; } }()";
 
 			--tabs;
 		}
@@ -365,7 +354,7 @@ namespace visitor {
 			//print prototype
 			out << "\tparse::result<" << r.type << "> " << r.name << "(parse::state& ps) {" << std::endl
 			//setup return point
-				<< "\t\tparse::ind psStart = ps.pos;" << std::endl
+				<< "\t\tparse::posn psStart = ps;" << std::endl
 				;
 			//setup return variable
 			if ( typed ) out << "\t\t" << r.type << " psVal;" << std::endl;
@@ -374,6 +363,10 @@ namespace visitor {
 			//setup bound variables
 			std::map<std::string, std::string> vs = vars.list(r);
 			for (auto it = vs.begin(); it != vs.end(); ++it) {
+				// skip uses of already bound variables
+				if ( it->first == "psStart" ) continue;
+				if ( typed && it->first == "psVal" ) continue;
+				// add variable binding
 				out << "\t\t" << it->second << " " << it->first << ";" << std::endl;
 			}
 			out << std::endl;
