@@ -49,7 +49,7 @@ namespace ast {
 		char_range(const char_range& o) : from(o.from), to(o.to) {}
 		char_range() : from('\0'), to('\0') {}
 
-		bool single() { return from == to; }
+		bool single() const { return from == to; }
 
 		char from;	/**< The first character in the range */
 		char to;	/**< The last character in the range. If this is the same 
@@ -154,14 +154,17 @@ namespace ast {
 	/** Matches a character range. */
 	class range_matcher : public matcher {
 	public:
-		range_matcher() {}
+		range_matcher(string var) : var(var) {}
+		range_matcher() : var("") {}
 
 		void accept(visitor* v) { v->visit(*this); }
 		matcher_type type() { return range_type; }
 
 		range_matcher& operator += (char_range r) { rs.push_back(r); return *this; }
 
-		vector<char_range> rs; /**< contained character ranges */
+		vector<char_range> rs;  /**< contained character ranges */
+		string var;             /**< variable to bind to the captured character.
+		                         *   Empty if unset. */
 	}; /* class range_matcher */
 	typedef shared_ptr<range_matcher> range_matcher_ptr;
 
@@ -184,10 +187,14 @@ namespace ast {
 	/** Matches any character. */
 	class any_matcher : public matcher {
 	public:
-		any_matcher() {}
+		any_matcher(string var) : var(var) {}
+		any_matcher() : var("") {}
 
 		void accept(visitor* v) { v->visit(*this); }
 		matcher_type type() { return any_type; }
+		
+		string var;  /**< variable to bind to the captured character.
+		              *   Empty if unset. */
 	}; /* class any_matcher */
 	typedef shared_ptr<any_matcher> any_matcher_ptr;
 
@@ -310,13 +317,15 @@ namespace ast {
 	/** String-capturing matcher. */
 	class capt_matcher : public matcher {
 	public:
-		capt_matcher(shared_ptr<matcher> m) : m(m) {}
+		capt_matcher(shared_ptr<matcher> m, string var) : m(m), var(var) {}
 		capt_matcher() {}
 
 		void accept(visitor* v) { v->visit(*this); }
 		matcher_type type() { return capt_type; }
 
 		shared_ptr<matcher> m; /**< Captured matcher */
+		string var;            /**< Variable to bind to the captured string.
+		                        *   Empty if unset. */
 	}; /* class capt_matcher */
 	typedef shared_ptr<capt_matcher> capt_matcher_ptr;
 
@@ -358,7 +367,7 @@ namespace ast {
 	}; /* class grammar_rule */
 	typedef shared_ptr<grammar_rule> grammar_rule_ptr;
 
-	/** Represents a Leg grammar. 
+	/** Represents a Egg grammar. 
 	 *  Deletes the contained grammar rules on destruction. */
 	class grammar {
 	public:

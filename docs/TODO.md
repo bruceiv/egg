@@ -2,10 +2,12 @@
 - add &{ /\* actions \*/ } to the language
 - Packrat parser state
 - Look at adding cut syntax
+- Rewrite compiler to have a code generator again, rather than just using the combinators (investigate performance)
 - Unicode string support
   - Include Unicode escapes for character literals
 - Add interpreter visitor (this may be non-trivial)
 - Add doxygen-generated docs to the docs folder
+- Install to system path
 
 ## Bugs ##
 - Cannot include ']' in a character class - should include an escape.
@@ -18,3 +20,4 @@
   - This may have licencing ramifications - consider a Bison-style exception
 - Modify makefile to remake `egg` from `egg.egg` or `egg-back.hpp` as appropriate
 - Maybe add flag to make "#pragma once" optional in generated files
+- Rewrite `parser::state.matches(string)` to use the deque iterators instead of generating a second string object

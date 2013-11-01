@@ -5,10 +5,14 @@ Developers who wish to contribute to the project should read the Readme and the 
 
 ## Project Overview ##
 
-Any Egg-generated parser (including the parser for Egg itself) uses the contents of the `parse` namespace from `parse.hpp` to provide a common interface and encapsulate input state. 
-Egg grammars compile to headers which depend on `parse.hpp`; these headers define a namespace for the grammar (generally named the same as the grammar) which contains a function for each grammar rule. 
-These functions take a `parse::state` reference encapsulating the input state as a parameter, and returns a `parse::result` - the `parse::result` contains a value (which may optionally be given any default constructable C++ type), or evaluates to false if the rule did not match. 
+Any Egg-generated parser (including the parser for Egg itself) uses the contents of the `parser` namespace from `parser.hpp` to provide a common interface and encapsulate input state. 
+Egg grammars compile to headers which depend on `parser.hpp`; these generated headers define a namespace for the grammar (generally named the same as the grammar) which contains a function for each grammar rule. 
+These functions take a `parser::state` reference encapsulating the input state as a parameter, and return a boolean. 
+Rules which define a return value of type `T` have a `T&` named `psVal` passed in as their second parameter. 
 The Readme file and `parse.hpp` both have further information on these classes. 
+
+The current implementation uses parser combinators of type `parser::combinator`, an alias for `std::function<bool(parser::state&)>`; there are a variety of combinators defined in `parser.hpp`. 
+The parser combinator style is used for ease of implementation and iteration velocity; this approach likely has performance issues, but there is a TODO item to re-implement a direct code generator to fix these.
 
 The Egg grammar for Egg (defined in `egg.egg` and compiled to `egg.hpp`) builds an abstract syntax tree for the Egg grammar file it parses. 
 The AST classes are all in the `ast` namespace defined in `ast.hpp`, and use the visitor pattern. 

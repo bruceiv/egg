@@ -38,7 +38,7 @@ grammar: ast::grammar_ptr =
 			(out_action : s { psVal->post = s; } )? end_of_file
 
 out_action: std::string =
-		OUT_BEGIN < ( !OUT_END . )* > OUT_END _ { psVal = psCapture; }
+		OUT_BEGIN < ( !OUT_END . )* > : psVal OUT_END _
 
 rule: ast::grammar_rule_ptr =
 		identifier : s { psVal = ast::make_ptr<ast::grammar_rule>(s); } 
@@ -46,11 +46,11 @@ rule: ast::grammar_rule_ptr =
 			EQUAL choice : m { psVal->m = m; }
 
 identifier: std::string =
-		< [A-Za-z_][A-Za-z_0-9]* > _ { psVal = psCapture; }
+		< [A-Za-z_][A-Za-z_0-9]* > : psVal _
 
 type_id: std::string =
 		< identifier ( "::" _ type_id )* 
-			( '<' _ type_id ( ',' _ type_id )* '>' _ )? > { psVal = psCapture; }
+			( '<' _ type_id ( ',' _ type_id )* '>' _ )? > : psVal
 
 choice: ast::alt_matcher_ptr =
 		sequence : m { psVal = ast::make_ptr<ast::alt_matcher>(); *psVal += m; } 
@@ -77,21 +77,26 @@ primary: ast::matcher_ptr =
 		| char_literal : cm { psVal = cm; }
 		| str_literal : sm { psVal = sm; }
 		| char_class : rm { psVal = rm; }
+		    ( BIND identifier : t 
+		        { ast::as_ptr<ast::range_matcher>(psVal)->var = t; } )?
 		| ANY { psVal = ast::make_ptr<ast::any_matcher>(); }
+		    ( BIND identifier : t 
+		        { ast::as_ptr<ast::any_matcher>(psVal)->var = t; } )?
 		| EMPTY { psVal = ast::make_ptr<ast::empty_matcher>(); }
-		| BEGIN sequence : bm END { psVal = ast::make_ptr<ast::capt_matcher>(bm); }
+		| BEGIN sequence : bm END BIND identifier : t 
+		    { psVal = ast::make_ptr<ast::capt_matcher>(bm, t); }
 
 action: ast::action_matcher_ptr =
-		!OUT_BEGIN '{' < ( action | !'}' . )* > '}' _ 
-			{ psVal = ast::make_ptr<ast::action_matcher>(psCapture); }
+		!OUT_BEGIN '{' < ( action | !'}' . )* > : s '}' _ 
+			{ psVal = ast::make_ptr<ast::action_matcher>(s); }
 
 char_literal: ast::char_matcher_ptr =
 		'\'' character : c '\'' _
 			{ psVal = ast::make_ptr<ast::char_matcher>(c); }
 
 str_literal: ast::str_matcher_ptr =
-		'\"' < character* > '\"' _
-			{ psVal = ast::make_ptr<ast::str_matcher>(strings::unescape(psCapture)); }
+		'\"' < character* > : s '\"' _
+			{ psVal = ast::make_ptr<ast::str_matcher>(strings::unescape(s)); }
 
 char_class: ast::range_matcher_ptr =
 		'[' { psVal = ast::make_ptr<ast::range_matcher>(); } 
