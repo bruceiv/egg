@@ -23,7 +23,10 @@
  */
 
 #include <deque>
+#include <functional>
+#include <initializer_list>
 #include <istream>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -34,7 +37,7 @@
  *  @author Aaron Moss
  */
 
-namespace parse {
+namespace parser {
 	
 	typedef unsigned long ind;  /**< unsigned index type */
 	
@@ -70,13 +73,46 @@ namespace parse {
 		/** @return the line in the file */
 		ind line() const { return ln; }
 		/** @return the column in the file */
-		ind column() const { return cl; }
+		ind col() const { return cl; }
 		
 	private:
 		ind i;   /**< input index */
 		ind ln;  /**< line number */
 		ind cl;  /**< column number */
 	};
+	
+	/** Represents a parsing error.
+	 *  Provides details about position and error. 
+	 */
+	struct error {
+		error(const posn& p) : pos(p) {}
+		error() : pos() {}
+		
+		/** Merges two errors.
+		 *  Uses Bryan Ford's heuristic of "furthest forward error information".
+		 */
+		error& operator |= (const error& o) {
+			if ( pos > o.pos || o.empty() ) return *this;
+			if ( pos < o.pos || empty() ) return *this = o;
+			
+			expected.insert(o.expected.begin(), o.expected.end());
+			messages.insert(o.messages.begin(), o.messages.end());
+			return *this;
+		}
+		
+		/** Adds an "expected" message */
+		inline error& expect(const std::string& s) { expected.emplace(s); return *this; }
+		
+		/** Adds a programmer-defined error message */
+		inline error& message(const std::string& s) { messages.emplace(s); return *this; }
+		
+		/** Tests both sets of messages for emptiness */
+		inline bool empty() const { return expected.empty() && messages.empty(); }
+		
+		posn pos;                        /**< The position of the error */
+		std::set<std::string> expected;  /**< Constructs expected here */
+		std::set<std::string> messages;  /**< Error messages */
+	}; // struct error
 	
 	/** Error thrown when a parser is asked for state it has forgotten. */
 	struct forgotten_state_error : public std::range_error {
@@ -93,8 +129,8 @@ namespace parse {
 		const char* what() const throw() {
 			try {
 				std::stringstream ss("Forgotten state error");
-				ss << ": requested " << req.line() << ":" << req.column() 
-				   << " < " << avail.line() << ":" << avail.column();
+				ss << ": requested " << req.line() << ":" << req.col() 
+				   << " < " << avail.line() << ":" << avail.col();
 				return ss.str().c_str();
 			} catch (std::exception const& e) {
 				return "Forgotten state error";
@@ -159,8 +195,11 @@ namespace parse {
 		 *  Initializes state at beginning of input stream.
 		 *  @param in		The input stream to read from
 		 */
-		state(stream_type& in) : pos(), off(), str(), lines(), in(in) {
+		state(stream_type& in) : pos(), off(), str(), lines(), err(), in(in) {
+			// first line starts at 0
 			lines.push_back(0);
+			// read first character
+			read();
 		}
 		
 		/** Reads at the cursor.
@@ -187,23 +226,31 @@ namespace parse {
 		}
 		
 		/** @return the current position */
-		operator posn () const { return pos; }
+		operator struct posn () const { return pos; }
+		struct posn posn() const { return pos; }
 		
 		/** @return the current offset in the stream */
-		posn offset() const { return off; }
+		struct posn offset() const { return off; }
 		
 		/** Sets the cursor.
 		 *  @param p    The position to set (should have previously been seen)
 		 *  @throws forgotten_state_error on p < off (that is, moving to 
 		 *  		position previously discarded)
 		 */
-		state& operator = (const posn& p) {
+		state& operator = (const struct posn& p) {
 			// Fail on forgotten index
 			if ( p < off ) throw forgotten_state_error(p, off);
 			
 			pos = p;
 			
 			return *this;
+		}
+		
+		void set_posn(const struct posn& p) {
+			// Fail on forgotten index
+			if ( p < off ) throw forgotten_state_error(p, off);
+			
+			pos = p;
 		}
 		
 		/** Advances position one step. 
@@ -263,7 +310,7 @@ namespace parse {
 		}
 		
 		/** Overload to make this act more like a posn object. */
-		ind operator - (const posn& p) { return posn(*this) - p; }
+		ind operator - (const struct posn& p) { return pos - p; }
 		
 		/** Range operator.
 		 *  Returns a pair of iterators, begin and end, containing up to the 
@@ -275,7 +322,7 @@ namespace parse {
 		 *  @throws forgotten_state_error on p < off (that is, asking for input 
 		 *  		previously discarded)
 		 */
-		range_type range(const posn& p, ind n) {
+		range_type range(const struct posn& p, ind n) {
 			// Fail on forgotten index
 			if ( p < off ) throw forgotten_state_error(p, off);
 			
@@ -314,158 +361,277 @@ namespace parse {
 		 *  @throws forgotten_state_error on i < off (that is, asking for input 
 		 *  		previously discarded)
 		 */
-		string_type string(const posn& p, ind n) {
+		string_type string(const struct posn& p, ind n) {
 			range_type iters = range(p, n);
 			return string_type(iters.first, iters.second);
 		}	
+		
+		/** Get the parser's internal error object */
+		const struct error& error() const { return err; }
+		
+		/** Adds an "expected" message at the current position */
+		void expect(const std::string& s) {
+			struct error e; e.pos = pos; e.expect(s);
+			err |= e;
+		}
+		
+		/** Adds a programmer-defined error message at the current position */
+		void message(const std::string& s) {
+			struct error e; e.pos = pos; e.message(s);
+			err |= e;
+		}
+		
+		private:
+			/** Returns a string representing the given character with all special 
+			 *  characters '\n', '\r', '\t', '\\', '\'', and '\"' backslash-escaped. */
+			std::string escape(const char c) {
+				switch ( c ) {
+				case '\n': return "\\n";
+				case '\r': return "\\r";
+				case '\t': return "\\t";
+				case '\\': return "\\\\";
+				case '\'': return "\\\'";
+				case '\"': return "\\\"";
+				default:   return std::string(1, c);
+				}
+			}
 
+			/** Returns a string representing the given string with all special 
+			 *  characters '\n', '\r', '\t', '\\', '\'', and '\"' backslash-escaped. */
+			std::string escape(const std::string& s) {
+				std::stringstream ss;
+				for (auto iter = s.begin(); iter != s.end(); ++iter) {
+					ss << escape(*iter);
+				}
+				return ss.str();
+			}
+		
+		public:
+		/** Attempts to match a character at the current position */
+		bool matches(value_type c) {
+			if ( (*this)() != c ) {
+				expect("\'" + escape(c) + "\'");
+				return false;
+			}
+			++(*this);
+			return true;
+		}
+		
+		/** Attempts to match a string at the current position */
+		bool matches(const string_type& s) {
+			if ( string(pos, s.size()) != s ) {
+				expect("\"" + escape(s) + "\"");
+				return false;
+			}
+			(*this) += s.size();
+			return true;
+		}
+		
+		/** Attempts to match any character at the current position
+		 *  @param psVal    The character matched, if any
+		 */
+		bool matches_any(value_type& psVal) {
+			value_type c = (*this)();
+			if ( c == '\0' ) {
+				expect("any character");
+				return false;
+			}
+			psVal = c;
+			++(*this);
+			return true;
+		}
+		
+		/** Attempts to match any character at the current position */
+		bool matches_any() {
+			if ( (*this)() == '\0' ) {
+				expect("any character");
+				return false;
+			}
+			++(*this);
+			return true;
+		}
+		
+		/** Attempts to match a character in the given range at the current 
+		 *  position.
+		 *  @param s        The start of the range
+		 *  @param e        The end of the range
+		 *  @param psVal    The character matched, if any
+		 */
+		bool matches_in(value_type s, value_type e, value_type& psVal) {
+			value_type c = (*this)();
+			if ( c < s || c > e ) {
+				expect("character in \'" + escape(s) + "\'-\'" + escape(e) + "\'");
+				return false;
+			}
+			psVal = c;
+			++(*this);
+			return true;
+		}
+		
+		/** Attempts to match a character in the given range at the current 
+		 *  position.
+		 *  @param s        The start of the range
+		 *  @param e        The end of the range
+		 */
+		bool matches_in(value_type s, value_type e) {
+			value_type c = (*this)();
+			if ( c < s || c > e ) {
+				expect("character in \'" + escape(s) + "\'-\'" + escape(e) + "\'");
+				return false;
+			}
+			++(*this);
+			return true;
+		}
 	private:
 		/** Current parsing location */
-		posn pos;
+		struct posn pos;
 		/** Offset of start of str from the beginning of the stream */
-		posn off;
+		struct posn off;
 		/** Characters currently in use by the parser */
 		std::deque<value_type> str;
 		/** Beginning indices of each line, starting from off.line */
 		std::deque<ind> lines;
+		/** Set of most recent parsing errors */
+		struct error err;
 		/** Input stream to read characters from */
 		stream_type& in;
 	}; /* class state */
-
-	/** A generic parse result. */
-	struct value {
-		value() {}
-		value(int) {}
-	};
-
-	/** A generic unsuccessful parse result. */
-	struct failure {
-		failure() {}
-		failure(int) {}
-	};
-
-	/** A value instance */
-	const value val = 0;
 	
-	/** A failure instance */
-	const failure fails = 0;
+	/** Parser combinator type */
+	using combinator = std::function<bool(state&)>;
+	/** List of parser combinators */
+	using combinator_list = std::initializer_list<combinator>;
+	/** Typed nonterminal type */
+	template <typename T>
+	using nonterminal = bool (*)(state&,T&);
 	
-	/** Represents a parsing error.
-	 *  Provides details about position and error. */
-	struct error {
-		error(const posn& p) : pos(p) {}
-		error() : pos() {}
-		
-		posn pos;  /**< The position of the error */
-	};
-
-	/** Wraps a parsing result.
-	 *  Returns either the wrapped result or false.
-	 *  @param T The wrapped result; should be default constructable. */
-	template<typename T = value> 
-	class result {
-	public:
-		result(const T& v) : val(v), success(true), err() {}
-		result(const failure& f) : val(), success(false), err() {}
-		result() : val(), success(false), err() {}
-
-		/** Sets the result to a success containing v */
-		result<T>& operator = (const T& v) { 
-			val = v; success = true; return *this;
-		}
-
-		/** Sets the result to a failure */
-		result<T>& operator = (const failure& f) { 
-			success = false; return *this;
-		}
-
-		/** Copies a result */
-		result<T>& operator = (const result<T>& o) {
-			if ( o.success ) { success = true; val = o.val; }
-			else { success = false; }
-			err = o.err;
-			return *this;
-		}
-
-		/** Gets result value out */
-		operator T () { return val; }
-
-		/** Gets the success value out */
-		operator bool () { return success; }
-
-		/** Gets result value out (explicit operator) */
-		T operator * () { return val; }
-
-		/** Binds the result (if successful) to a value */
-		result<T>& operator () (T& bind) {
-			if ( success ) { bind = val; }
-			return *this;
-		}
-		
-		/** Sets error information. */
-		result<T>& with(const error& e) { err = e; return *this; }
-		
-		error err;     /**< Error information for this parse. */
-	private:
-		T val;         /**< The wrapped value. */
-		bool success;  /**< The success of the parse. */
-	}; /* class result<T> */
-
-	/** Builds a positive result from a value.
-	 *  @param T	The type of the wrapped result	
-	 *  @param v	The value to wrap. */
-	template<typename T>
-	result<T> match(const T& v) { return result<T>(v); }
-
-	/** Builds a failure result.
-	 *  @param T	The type of the failure result. */
-	template<typename T>
-	result<T> fail() { return result<T>(fails); }
-	
-	/** Matcher for any character */
-	result<state::value_type> any(state& ps) {
-		state::value_type c = ps();
-		if ( c == '\0' ) {
-			return fail<state::value_type>().with(error(ps));
-		}
-		++ps;
-		return match(c);
+	/** Character literal parser */
+	combinator literal(state::value_type c) {
+		return [c](state& ps) { return ps.matches(c); };
 	}
 	
-	/** Matcher for a given character */
-	template<state::value_type c>
-	result<state::value_type> matches(parse::state& ps) {
-		if ( ps() != c ) {
-			return fail<state::value_type>().with(error(ps));
-		}
-		++ps;
-		return match(c);
-	}
-
-	/** Matcher for a character range */
-	template<state::value_type s, state::value_type e>
-	result<state::value_type> in_range(parse::state& ps) {
-		state::value_type c = ps();
-		if ( c < s || c > e ) {
-			return fail<state::value_type>().with(error(ps));
-		}
-		
-		++ps;
-		return match(c);
+	/** String literal parser */
+	combinator literal(const state::string_type& s) {
+		return [&](state& ps) { return ps.matches(s); };
 	}
 	
-	/** Matcher for a literal string */
-	result<state::string_type> matches(const char* s, parse::state& ps) {
-		ind n = std::char_traits<state::value_type>::length(s);
-		state::string_type t = ps.string(posn(ps), n);
-		
-		if ( t.compare(s) != 0 ) {
-			return fail<state::string_type>().with(error(ps));
-		}
-		
-		ps += n;
-		return match(t);
+	/** Any character parser */
+	combinator any() {
+		return [](state& ps) { return ps.matches_any(); };
 	}
 	
-} /* namespace parse */
+	/** Any character parser
+	 *  @param psVal    Will be bound to the character matched
+	 */
+	combinator any(state::value_type& psVal) {
+		return [&psVal](state& ps) { return ps.matches_any(psVal); };
+	}
+	
+	/** Any character parser */
+	combinator between(state::value_type s, state::value_type e) {
+		return [s,e](state& ps) { return ps.matches_in(s, e); };
+	}
+	
+	/** Any character parser
+	 *  @param psVal    Will be bound to the character matched
+	 */
+	combinator between(state::value_type s, state::value_type e, state::value_type& psVal) {
+		return [s,e,&psVal](state& ps) { return ps.matches_in(s, e, psVal); };
+	}
+	
+	/** Matches all or none of a sequence of parsers */
+	combinator sequence(combinator_list fs) {
+		return [&fs](state& ps) {
+			posn psStart = ps;
+			for (auto f : fs) {
+				if ( ! f(ps) ) { ps = psStart; return false; }
+			}
+			return true;
+		};
+	}
+	
+	/** Matches one of a set of alternate parsers */
+	combinator choice(combinator_list fs) {
+		return [&fs](state& ps) {
+			for (auto f : fs) {
+				if ( f(ps) ) return true;
+			}
+			return false;
+		};
+	}
+	
+	/** Matches a parser any number of times */
+	combinator many(const combinator& f) {
+		return [&f](state& ps) {
+			while ( f(ps) )
+				;
+			return true;
+		};
+	}
+	
+	/** Matches a parser some positive number of times */
+	combinator some(const combinator& f) {
+		return [&f](state& ps) {
+			if ( ! f(ps) ) return false;
+			while ( f(ps) )
+				;
+			return true;
+		};
+	}
+	
+	/** Looks ahead to match a parser without consuming input */
+	combinator look(const combinator& f) {
+		return [&f](state& ps) {
+			posn psStart = ps;
+			if ( f(ps) ) { ps = psStart; return true; }
+			return false;
+		};
+	}
+	
+	/** Looks ahead to not match a parser without consuming input */
+	combinator look_not(const combinator& f) {
+		return [&f](state& ps) {
+			posn psStart = ps;
+			if ( f(ps) ) { ps = psStart; return false; }
+			return true;
+		};
+	}
+	
+	/** Binds a variable to a non-terminal */
+	template <typename T>
+	combinator bind(T& psVal, nonterminal<T> f) {
+		return [&psVal,&f](state& ps) { return f(ps, psVal); };
+	}
+	
+	/** Captures a string */
+	combinator capture(std::string& s, const combinator& f) {
+		return [&s,&f](state& ps) {
+			posn psStart = ps;
+			if ( ! f(ps) ) return false;
+			s = ps.string(psStart, ps - psStart);
+			return true;
+		};
+	}
+	
+	/** Empty parser; always matches */
+	combinator empty() {
+		return [](state&) { return true; };
+	}
+	
+	/** Failure parser; inserts message */
+	combinator fail(const std::string& s) {
+		return [&s](state& ps) { ps.message(s); return false; };
+	}
+	
+	/** Names a parser for better error messages */
+	combinator named(const std::string& s, const combinator& f) {
+		return [&s,&f](state& ps) {
+			if ( f(ps) ) return true;
+			
+			ps.expect(s);
+			return false;
+		};
+	}
+	
+} /* namespace parser */
 
