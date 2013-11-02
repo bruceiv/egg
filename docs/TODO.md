@@ -8,10 +8,13 @@
 - Add interpreter visitor (this may be non-trivial)
 - Add doxygen-generated docs to the docs folder
 - Install to system path
+- Better escaping for character classes; also perhaps support for semantic tests, e.g. whitespace
 
 ## Bugs ##
 - Cannot include ']' in a character class - should include an escape.
 - Non-syntactic '{' and '}' characters in actions (e.g. those in comments or string literals) may break the parser if unmatched.
+- Combinator-based parsers may not compile correctly at less than -O2 (clang++ 3.3)
+- Parens in grammar pretty-printer are not entirely correct
 
 ## Code Cleanup ##
 - Maybe move to `unique_ptr` from `shared_ptr`
@@ -22,3 +25,4 @@
 - Maybe add flag to make "#pragma once" optional in generated files
 - Rewrite `parser::state.matches(string)` to use the deque iterators instead of generating a second string object
 - Maybe make Egg-based argument parsing grammar (might be more work to make input stream that inputs (argc, argv) than it's worth)
+- 1-index line numbers

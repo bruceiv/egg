@@ -68,101 +68,79 @@ namespace egg {
 	bool end_of_line(parser::state&);
 	bool end_of_file(parser::state&);
 	
-	bool grammar(parser::state& ps) {
-		ast::grammar_ptr _;
-		return egg::grammar(ps, _);
-	}
-	
-	bool out_action(parser::state& ps) {
-		std::string _;
-		return egg::out_action(ps, _);
-	}
-	
-	bool rule(parser::state& ps) {
-		ast::grammar_rule_ptr _;
-		return egg::rule(ps, _);
-	}
-	
-	bool identifier(parser::state& ps) {
-		std::string _;
-		return egg::identifier(ps, _);
-	}
-	
-	bool type_id(parser::state& ps) {
-		std::string _;
-		return egg::type_id(ps, _);
-	}
-	
-	bool choice(parser::state& ps) {
-		ast::alt_matcher_ptr _;
-		return egg::choice(ps, _);
-	}
-	
-	bool sequence(parser::state& ps) {
-		ast::seq_matcher_ptr _;
-		return egg::sequence(ps, _);
-	}
-	
-	bool expression(parser::state& ps) {
-		ast::matcher_ptr _;
-		return egg::expression(ps, _);
-	}
-	
-	bool primary(parser::state& ps) {
-		ast::matcher_ptr _;
-		return egg::primary(ps, _);
-	}
-	
-	bool action(parser::state& ps) {
-		ast::action_matcher_ptr _;
-		return egg::action(ps, _);
-	}
-	
-	bool char_literal(parser::state& ps) {
-		ast::char_matcher_ptr _;
-		return egg::char_literal(ps, _);
-	}
-	
-	bool str_literal(parser::state& ps) {
-		ast::str_matcher_ptr _;
-		return egg::str_literal(ps, _);
-	}
-	
-	bool char_class(parser::state& ps) {
-		ast::range_matcher_ptr _;
-		return egg::char_class(ps, _);
-	}
-	
-	bool characters(parser::state& ps) {
-		ast::char_range _;
-		return egg::characters(ps, _);
-	}
-	
-	bool character(parser::state& ps) {
-		char _;
-		return egg::character(ps, _);
-	}
-
 	bool grammar(parser::state& ps, ast::grammar_ptr& psVal) {
 		ast::grammar_rule_ptr  r;
 		std::string  s;
 		
-		return parser::fail("grammar not yet implemented")(ps);
+		return 
+		parser::named("grammar",
+			parser::sequence({
+				[&](parser::state& ps) { psVal = ast::make_ptr<ast::grammar>(); return true; },
+				_,
+				parser::option(
+					parser::sequence({
+						parser::bind(s, out_action),
+						[&](parser::state& ps) { psVal->pre = s; return true; }})),
+				parser::some(
+					parser::sequence({
+						parser::bind(r, rule),
+						[&](parser::state& ps) { *psVal += r; return true; }})),
+				parser::option(
+					parser::sequence({
+						parser::bind(s, out_action),
+						[&](parser::state& ps) { psVal->post = s; return true; }})),
+				end_of_file}))(ps);
 	}
 
 	bool out_action(parser::state& ps, std::string& psVal) {
-		return parser::fail("out_action not yet implemented")(ps);
+		return 
+		parser::named("out_action",
+			parser::sequence({
+				OUT_BEGIN,
+				parser::capture(psVal, 
+					parser::many(
+						parser::sequence({
+							parser::look_not(OUT_END),
+							parser::any()}))),
+				OUT_END,
+				_}))(ps);
 	}
 
 	bool rule(parser::state& ps, ast::grammar_rule_ptr& psVal) {
 		ast::alt_matcher_ptr  m;
 		std::string  s;
 
-		return parser::fail("rule not yet implemented")(ps);
+		return 
+		parser::named("rule", 
+			parser::sequence({
+				parser::bind(s, identifier),
+				[&](parser::state& ps) { psVal = ast::make_ptr<ast::grammar_rule>(s); return true; },
+				parser::option(
+					parser::sequence({
+						BIND,
+						parser::bind(s, type_id),
+						[&](parser::state& ps) { psVal->type = s; return true; }})),
+				EQUAL,
+				parser::bind(m, choice),
+				[&](parser::state& ps) { psVal->m = m; return true; }}))(ps);
 	}
 
 	bool identifier(parser::state& ps, std::string& psVal) {
-		return parser::fail("identifier not yet implemented")(ps);
+		return parser::named("identifier", 
+			parser::sequence({
+				parser::capture(psVal,
+					parser::sequence({
+						parser::choice({
+							parser::between('A', 'Z'),
+							parser::between('a', 'z'),
+							parser::literal('_')}),
+						parser::many(
+							parser::choice({
+								parser::between('A', 'Z'),
+								parser::between('a', 'z'),
+								parser::literal('_'),
+								parser::between('0', '9')}))})),
+				_}))(ps);
 	}
 
 	bool type_id(parser::state& ps, std::string& psVal) {
@@ -172,20 +150,61 @@ namespace egg {
 	bool choice(parser::state& ps, ast::alt_matcher_ptr& psVal) {
 		ast::seq_matcher_ptr  m;
 
-		return parser::fail("choice not yet implemented")(ps);
+		return parser::named("choice",
+			parser::sequence({
+				parser::bind(m, sequence),
+				[&](parser::state& ps) { psVal = ast::make_ptr<ast::alt_matcher>(); *psVal += m; return true; },
+				parser::many(
+					parser::sequence({
+						PIPE,
+						parser::bind(m, sequence),
+						[&](parser::state& ps) { *psVal += m; return true; }}))}))(ps);
 	}
 
 	bool sequence(parser::state& ps, ast::seq_matcher_ptr& psVal) {
 		ast::action_matcher_ptr  a;
 		ast::matcher_ptr  e;
 
-		return parser::fail("sequence not yet implemented")(ps);
+		return parser::named("sequence", 
+			parser::sequence({
+				[&](parser::state& ps) { psVal = ast::make_ptr<ast::seq_matcher>(); return true; },
+				parser::some(
+					parser::choice({
+						parser::sequence({
+							parser::bind(e, expression),
+							[&](parser::state& ps) { *psVal += e; return true; }}),
+						parser::sequence({
+							parser::bind(a, action),
+							[&](parser::state& ps) { *psVal += a; return true; }})}))}))(ps);
 	}
 
 	bool expression(parser::state& ps, ast::matcher_ptr& psVal) {
 		ast::matcher_ptr  m;
 
-		return parser::fail("expression not yet implemented")(ps);
+		return parser::named("expression",
+			parser::choice({
+				parser::sequence({
+					AND,
+					parser::bind(m, primary),
+					[&](parser::state& ps) { psVal = ast::make_ptr<ast::look_matcher>(m); return true; }}),
+				parser::sequence({
+					NOT,
+					parser::bind(m, primary),
+					[&](parser::state& ps) { psVal = ast::make_ptr<ast::not_matcher>(m); return true; }}),
+				parser::sequence({
+					parser::bind(m, primary),
+					[&](parser::state& ps) { psVal = m; return true; },
+					parser::option(
+						parser::choice({
+							parser::sequence({
+								OPT,
+								[&](parser::state& ps) { psVal = ast::make_ptr<ast::opt_matcher>(m); return true; }}),
+							parser::sequence({
+								STAR,
+								[&](parser::state& ps) { psVal = ast::make_ptr<ast::many_matcher>(m); return true; }}),
+							parser::sequence({
+								PLUS,
+								[&](parser::state& ps) { psVal = ast::make_ptr<ast::some_matcher>(m); return true; }})}))})}))(ps);
 	}
 
 	bool primary(parser::state& ps, ast::matcher_ptr& psVal) {
@@ -197,7 +216,60 @@ namespace egg {
 		ast::str_matcher_ptr  sm;
 		std::string  t;
 
-		return parser::fail("primary not yet implemented")(ps);
+		return parser::named("primary", 
+			parser::choice({
+				parser::sequence({
+					parser::bind(s, identifier),
+					parser::look_not(
+						parser::sequence({
+							parser::option(
+								parser::sequence({
+									BIND,
+									parser::unbind(type_id)})),
+							EQUAL})),
+					[&](parser::state& ps) { psVal = ast::make_ptr<ast::rule_matcher>(s); return true; },
+					parser::option(
+						parser::sequence({
+							BIND,
+							parser::bind(s, identifier),
+							[&](parser::state& ps) { ast::as_ptr<ast::rule_matcher>(psVal)->var = s; return true; }}))}),
+				parser::sequence({
+					OPEN,
+					parser::bind(am, choice),
+					CLOSE,
+					[&](parser::state& ps) { psVal = am; return true; }}),
+				parser::sequence({
+					parser::bind(cm, char_literal),
+					[&](parser::state& ps) { psVal = cm; return true; }}),
+				parser::sequence({
+					parser::bind(sm, str_literal),
+					[&](parser::state& ps) { psVal = sm; return true; }}),
+				parser::sequence({
+					parser::bind(rm, char_class),
+					[&](parser::state& ps) { psVal = rm; return true; },
+					parser::option(
+						parser::sequence({
+							BIND,
+							parser::bind(t, identifier),
+							[&](parser::state& ps) { ast::as_ptr<ast::range_matcher>(psVal)->var = t; return true; }}))}),
+				parser::sequence({
+					ANY,
+					[&](parser::state& ps) { psVal = ast::make_ptr<ast::any_matcher>(); return true; },
+					parser::option(
+						parser::sequence({
+							BIND,
+							parser::bind(t, identifier), 
+							[&](parser::state& ps) { ast::as_ptr<ast::any_matcher>(psVal)->var = t; return true; }}))}),
+				parser::sequence({
+					EMPTY,
+					[&](parser::state& ps) { psVal = ast::make_ptr<ast::empty_matcher>(); return true; }}),
+				parser::sequence({
+					BEGIN,
+					parser::bind(bm, sequence),
+					END,
+					BIND,
+					parser::bind(t, identifier),
+					[&](parser::state& ps) { psVal = ast::make_ptr<ast::capt_matcher>(bm, t); return true; }})}))(ps);
 	}
 
 	bool action(parser::state& ps, ast::action_matcher_ptr& psVal) {
@@ -209,13 +281,26 @@ namespace egg {
 	bool char_literal(parser::state& ps, ast::char_matcher_ptr& psVal) {
 		char  c;
 
-		return parser::fail("char_literal not yet implemented")(ps);
+		return parser::named("char_literal",
+			parser::sequence({
+				parser::literal('\''),
+				parser::bind(c, character),
+				parser::literal('\''),
+				_,
+				[&](parser::state& ps) { psVal = ast::make_ptr<ast::char_matcher>(c); return true; }}))(ps);
 	}
 
 	bool str_literal(parser::state& ps, ast::str_matcher_ptr& psVal) {
 		std::string s;
 
-		return parser::fail("str_literal not yet implemented")(ps);
+		return parser::named("str_literal", 
+			parser::sequence({
+				parser::literal('\"'),
+				parser::capture(s, 
+					parser::many(parser::unbind(character))),
+				parser::literal('\"'),
+				_,
+				[&](parser::state& ps) { psVal = ast::make_ptr<ast::str_matcher>(strings::unescape(s)); return true; }}))(ps);
 	}
 
 	bool char_class(parser::state& ps, ast::range_matcher_ptr& psVal) {
@@ -233,91 +318,169 @@ namespace egg {
 	}
 
 	bool character(parser::state& ps, char& psVal) {
-		return parser::fail("character not yet implemented")(ps);
+		return 
+			parser::choice({
+				parser::sequence({
+					parser::literal('\\'),
+					parser::choice({
+						parser::literal('n', psVal),
+						parser::literal('r', psVal),
+						parser::literal('t', psVal),
+						parser::literal('\'', psVal),
+						parser::literal('\"', psVal),
+						parser::literal('\\', psVal)})}),
+				parser::sequence({
+					parser::look_not(
+						parser::choice({
+							parser::literal('\''),
+							parser::literal('\"'),
+							parser::literal('\\')})),
+					parser::any(psVal)})})(ps);
 	}
 
 	bool OUT_BEGIN(parser::state& ps) {
-		return parser::fail("OUT_BEGIN not yet implemented")(ps);
+		return parser::literal("{%")(ps);
 	}
 
 	bool OUT_END(parser::state& ps) {
-		return parser::fail("OUT_END not yet implemented")(ps);
+		return parser::literal("%}")(ps);
 	}
 
 	bool BIND(parser::state& ps) {
-		return parser::fail("BIND not yet implemented")(ps);
+		return 
+			parser::sequence({
+				parser::literal(':'),
+				_})(ps);
 	}
 
 	bool EQUAL(parser::state& ps) {
-		return parser::fail("EQUAL not yet implemented")(ps);
+		return 
+			parser::sequence({
+				parser::literal('='),
+				_})(ps);
 	}
 
 	bool PIPE(parser::state& ps) {
-		return parser::fail("PIPE not yet implemented")(ps);
+		return 
+			parser::sequence({
+				parser::literal('|'),
+				_})(ps);
 	}
 
 	bool AND(parser::state& ps) {
-		return parser::fail("AND not yet implemented")(ps);
+		return 
+			parser::sequence({
+				parser::literal('&'),
+				_})(ps);
 	}
 
 	bool NOT(parser::state& ps) {
-		return parser::fail("NOT not yet implemented")(ps);
+		return 
+			parser::sequence({
+				parser::literal('!'),
+				_})(ps);
 	}
 
 	bool OPT(parser::state& ps) {
-		return parser::fail("OPT not yet implemented")(ps);
+		return 
+			parser::sequence({
+				parser::literal('?'),
+				_})(ps);
 	}
 
 	bool STAR(parser::state& ps) {
-		return parser::fail("STAR not yet implemented")(ps);
+		return 
+			parser::sequence({
+				parser::literal('*'),
+				_})(ps);
 	}
 
 	bool PLUS(parser::state& ps) {
-		return parser::fail("PLUS not yet implemented")(ps);
+		return 
+			parser::sequence({
+				parser::literal('+'),
+				_})(ps);
 	}
 
 	bool OPEN(parser::state& ps) {
-		return parser::fail("OPEN not yet implemented")(ps);
+		return 
+			parser::sequence({
+				parser::literal('('),
+				_})(ps);
 	}
 
 	bool CLOSE(parser::state& ps) {
-		return parser::fail("CLOSE not yet implemented")(ps);
+		return 
+			parser::sequence({
+				parser::literal(')'),
+				_})(ps);
 	}
 
 	bool ANY(parser::state& ps) {
-		return parser::fail("ANY not yet implemented")(ps);
+		return 
+			parser::sequence({
+				parser::literal('.'),
+				_})(ps);
 	}
 
 	bool EMPTY(parser::state& ps) {
-		return parser::fail("EMPTY not yet implemented")(ps);
+		return 
+			parser::sequence({
+				parser::literal(';'),
+				_})(ps);
 	}
 
 	bool BEGIN(parser::state& ps) {
-		return parser::fail("BEGIN not yet implemented")(ps);
+		return 
+			parser::sequence({
+				parser::literal('<'),
+				_})(ps);
 	}
 
 	bool END(parser::state& ps) {
-		return parser::fail("END not yet implemented")(ps);
+		return 
+			parser::sequence({
+				parser::literal('>'),
+				_})(ps);
 	}
 
 	bool _(parser::state& ps) {
-		return parser::fail("_ not yet implemented")(ps);
+		return 
+		parser::many(
+			parser::choice({
+				space,
+				comment}))(ps);
 	}
 
 	bool space(parser::state& ps) {
-		return parser::fail("space not yet implemented")(ps);
+		return 
+		parser::choice({
+			parser::literal(' '),
+			parser::literal('\t'),
+			end_of_line})(ps);
 	}
 
 	bool comment(parser::state& ps) {
-		return parser::fail("comment not yet implemented")(ps);
+		return 
+		parser::sequence({
+			parser::literal('#'),
+			parser::many(
+				parser::sequence({
+					parser::look_not(end_of_line),
+					parser::any()})),
+			end_of_line})(ps);
 	}
 
 	bool end_of_line(parser::state& ps) {
-		return parser::fail("end_of_line not yet implemented")(ps);
+		return 
+		parser::choice({
+			parser::literal("\r\n"),
+			parser::literal('\n'),
+			parser::literal('\r')})(ps);
 	}
 
 	bool end_of_file(parser::state& ps) {
-		return parser::fail("end_of_file not yet implemented")(ps);
+		return parser::look_not(parser::any())(ps);
 	}
 
 } /* namespace egg */

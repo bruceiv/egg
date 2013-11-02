@@ -510,9 +510,19 @@ namespace parser {
 		return [c](state& ps) { return ps.matches(c); };
 	}
 	
+	/** Character literal parser 
+	 *  @param psVal    Will be bound to character matched
+	 */
+	combinator literal(state::value_type c, state::value_type& psVal) {
+		return [c,&psVal](state& ps) {
+			if ( ps.matches(c) ) { psVal = c; return true; }
+			else return false;
+		};
+	}
+	
 	/** String literal parser */
 	combinator literal(const state::string_type& s) {
-		return [&](state& ps) { return ps.matches(s); };
+		return [&s](state& ps) { return ps.matches(s); };
 	}
 	
 	/** Any character parser */
@@ -527,12 +537,12 @@ namespace parser {
 		return [&psVal](state& ps) { return ps.matches_any(psVal); };
 	}
 	
-	/** Any character parser */
+	/** Character range parser parser */
 	combinator between(state::value_type s, state::value_type e) {
 		return [s,e](state& ps) { return ps.matches_in(s, e); };
 	}
 	
-	/** Any character parser
+	/** Character range parser
 	 *  @param psVal    Will be bound to the character matched
 	 */
 	combinator between(state::value_type s, state::value_type e, state::value_type& psVal) {
@@ -579,6 +589,14 @@ namespace parser {
 		};
 	}
 	
+	/** Optionally matches a parser */
+	combinator option(const combinator& f) {
+		return [&f](state& ps) {
+			f(ps);
+			return true;
+		};
+	}
+	
 	/** Looks ahead to match a parser without consuming input */
 	combinator look(const combinator& f) {
 		return [&f](state& ps) {
@@ -601,6 +619,12 @@ namespace parser {
 	template <typename T>
 	combinator bind(T& psVal, nonterminal<T> f) {
 		return [&psVal,&f](state& ps) { return f(ps, psVal); };
+	}
+	
+	/** Binds a throwaway variable to a non-terminal */
+	template <typename T>
+	combinator unbind(nonterminal<T> f) {
+		return [&f](state& ps) { T _; return f(ps, _); };
 	}
 	
 	/** Captures a string */
