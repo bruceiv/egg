@@ -144,7 +144,27 @@ namespace egg {
 	}
 
 	bool type_id(parser::state& ps, std::string& psVal) {
-		return parser::fail("type_id not yet implemented")(ps);
+		return parser::named("type_id", 
+			parser::capture(psVal, 
+				parser::sequence({
+					parser::unbind(identifier),
+					parser::many(
+						parser::sequence({
+							parser::literal("::"),
+							_,
+							parser::unbind(type_id)})),
+					parser::option(
+						parser::sequence({
+							parser::literal('<'),
+							_,
+							parser::unbind(type_id),
+							parser::many(
+								parser::sequence({
+									parser::literal(','),
+									_,
+									parser::unbind(type_id)})),
+							parser::literal('>'),
+							_}))})))(ps);
 	}
 
 	bool choice(parser::state& ps, ast::alt_matcher_ptr& psVal) {
@@ -274,8 +294,21 @@ namespace egg {
 
 	bool action(parser::state& ps, ast::action_matcher_ptr& psVal) {
 		std::string s;
-
-		return parser::fail("action not yet implemented")(ps);
+		
+		return parser::named("action",
+			parser::sequence({
+				parser::look_not(OUT_BEGIN),
+				parser::literal('{'),
+				parser::capture(s,
+					parser::many(
+						parser::choice({
+							parser::unbind(action),
+							parser::sequence({
+								parser::look_not(parser::literal('}')),
+								parser::any()})}))),
+				parser::literal('}'),
+				_,
+				[&](parser::state& ps) { psVal = ast::make_ptr<ast::action_matcher>(s); return true; }}))(ps);
 	}
 
 	bool char_literal(parser::state& ps, ast::char_matcher_ptr& psVal) {
@@ -306,7 +339,17 @@ namespace egg {
 	bool char_class(parser::state& ps, ast::range_matcher_ptr& psVal) {
 		ast::char_range  r;
 
-		return parser::fail("char_class not yet implemented")(ps);
+		return parser::named("char_class",
+			parser::sequence({
+				parser::literal('['),
+				[&](parser::state& ps) { psVal = ast::make_ptr<ast::range_matcher>(); return true; },
+				parser::many(
+					parser::sequence({
+						parser::look_not(parser::literal(']')),
+						parser::bind(r, characters),
+						[&](parser::state& ps) { *psVal += r; return true; }})),
+				parser::literal(']'),
+				_}))(ps);
 	}
 
 	bool characters(parser::state& ps, ast::char_range& psVal) {
@@ -314,7 +357,15 @@ namespace egg {
 		char  f;
 		char  t;
 
-		return parser::fail("characters not yet implemented")(ps);
+		return parser::choice({
+			parser::sequence({
+				parser::bind(f, character),
+				parser::literal('-'),
+				parser::bind(t, character),
+				[&](parser::state& ps) { psVal = ast::char_range(f, t); return true; }}),
+			parser::sequence({
+				parser::bind(c, character),
+				[&](parser::state& ps) { psVal = ast::char_range(c); return true; }})})(ps);
 	}
 
 	bool character(parser::state& ps, char& psVal) {
