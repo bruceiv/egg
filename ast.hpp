@@ -355,15 +355,18 @@ namespace ast {
 	 *  will be deleted on destruction. */
 	class grammar_rule {
 	public:
-		grammar_rule(string name) : name(name), type("") {}
-		grammar_rule(string name, shared_ptr<matcher> m) : name(name), type(""), m(m) {}
+		grammar_rule(string name) : name(name) {}
+		grammar_rule(string name, shared_ptr<matcher> m) : name(name), m(m) {}
 		grammar_rule(string name, string type, shared_ptr<matcher> m)
 			: name(name), type(type), m(m) {}
+		grammar_rule(string name, string type, string error, shared_ptr<matcher> m) 
+			: name(name), type(type), error(error), m(m) {}
 		grammar_rule() {}
 		
-		string name;	/**< Name of the grammar rule */
-		string type;	/**< Type of the grammar rule's return (empty for none) */
-		shared_ptr<matcher> m;	/**< Grammar matching rule */
+		string name;            /**< Name of the grammar rule */
+		string type;            /**< Type of the grammar rule's return (empty for none) */
+		string error;           /**< "Expected" error if the rule doesn't match */
+		shared_ptr<matcher> m;  /**< Grammar matching rule */
 	}; /* class grammar_rule */
 	typedef shared_ptr<grammar_rule> grammar_rule_ptr;
 

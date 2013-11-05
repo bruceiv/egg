@@ -31,29 +31,34 @@
 #include "utils/strings.hpp"
 %}
 
-grammar: ast::grammar_ptr =
+grammar: ast::grammar_ptr `` =
 		{ psVal = ast::make_ptr<ast::grammar>(); }
 			_ (out_action : s { psVal->pre = s; })? 
 			(rule : r { *psVal += r; })+ 
 			(out_action : s { psVal->post = s; } )? end_of_file
 
-out_action: std::string =
+out_action: std::string `out action` =
 		OUT_BEGIN < ( !OUT_END . )* > : psVal OUT_END _
 
-rule: ast::grammar_rule_ptr =
+rule: ast::grammar_rule_ptr `` =
 		rule_lhs : psVal choice : m { psVal->m = m; }
 
 rule_lhs: ast::grammar_rule_ptr = 
 		identifier : s { psVal = ast::make_ptr<ast::grammar_rule>(s); } 
-			( BIND type_id : s { psVal->type = s; } )? 
+			( BIND type_id : t { psVal->type = t; } )? 
+			( err_string : t { psVal->error = t.empty() ? s : t; } )?
 			EQUAL
 
-identifier: std::string =
+identifier: std::string `` =
 		< [A-Za-z_][A-Za-z_0-9]* > : psVal _
 
-type_id: std::string =
+type_id: std::string `type ID` =
 		< identifier ( "::" _ type_id )* 
 			( '<' _ type_id ( ',' _ type_id )* '>' _ )? > : psVal
+
+err_string: std::string `error string` = 
+		'`' < ( "\\\\" | "\\`" | ![`\t\n\r] . )* > : s '`' _
+			{ psVal = strings::unescape_error(s); }
 
 choice: ast::alt_matcher_ptr =
 		sequence : m { psVal = ast::make_ptr<ast::alt_matcher>(); *psVal += m; } 
@@ -63,7 +68,7 @@ sequence: ast::seq_matcher_ptr =
 		{ psVal = ast::make_ptr<ast::seq_matcher>(); }
 			( expression : e { *psVal += e; } | action : a { *psVal += a; } )+
 
-expression: ast::matcher_ptr =
+expression: ast::matcher_ptr `` =
 		AND primary : m { psVal = ast::make_ptr<ast::look_matcher>(m); }
 		| NOT primary : m { psVal = ast::make_ptr<ast::not_matcher>(m); }
 		| primary : m { psVal = m; } ( 
@@ -89,19 +94,19 @@ primary: ast::matcher_ptr =
 		| BEGIN sequence : bm END BIND identifier : t 
 		    { psVal = ast::make_ptr<ast::capt_matcher>(bm, t); }
 
-action: ast::action_matcher_ptr =
+action: ast::action_matcher_ptr `` =
 		!OUT_BEGIN '{' < ( action | !'}' . )* > : s '}' _ 
 			{ psVal = ast::make_ptr<ast::action_matcher>(s); }
 
-char_literal: ast::char_matcher_ptr =
+char_literal: ast::char_matcher_ptr `character literal` =
 		'\'' character : c '\'' _
 			{ psVal = ast::make_ptr<ast::char_matcher>(c); }
 
-str_literal: ast::str_matcher_ptr =
+str_literal: ast::str_matcher_ptr `string literal` =
 		'\"' < character* > : s '\"' _
 			{ psVal = ast::make_ptr<ast::str_matcher>(strings::unescape(s)); }
 
-char_class: ast::range_matcher_ptr =
+char_class: ast::range_matcher_ptr `character class` =
 		'[' { psVal = ast::make_ptr<ast::range_matcher>(); } 
 			( !']' characters : r { *psVal += r; } )* ']' _
 
@@ -134,5 +139,5 @@ _ =		 		( space | comment )*
 space =			' ' | '\t' | end_of_line
 comment =		'#' ( !end_of_line . )* end_of_line
 end_of_line = 	"\r\n" | '\n' | '\r'
-end_of_file = 	!.
+end_of_file `end of input` = !.
 

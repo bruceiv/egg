@@ -50,6 +50,13 @@ A sequence of matching rules can also be surrounded by angle brackets `<` and `>
 
 Finally, comments can be started with a `#`, they end at end-of-line.
 
+## Error Handling ##
+
+Rules can be given a name for error reporting by placing an _error string_ after the rule name (and type). 
+An error string begins and ends with `` ` `` characters, and may contain any character except tabs and newlines (`` ` `` and `\` must be escaped as `` \` `` and `\\`, respectively). 
+If a rule that is so annotated fails to match it will add its error string to the list of "expected" messages in the parser's error object at the current position. 
+As a convenience, if you specify an empty error string, the name of the rule will be used. 
+
 ## Semantic Actions ##
 
 Egg grammars may include semantic actions in a sequence of matching rules. 
@@ -81,16 +88,18 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
 
     grammar =		_ out_action? rule+ out_action? end_of_file
 
-    out_action =	OUT_BEGIN < ( !OUT_END . )* > OUT_END _
+    out_action =	OUT_BEGIN ( !OUT_END . )* OUT_END _
     
     rule =			rule_lhs choice
     
-    rule_lhs =		identifier ( BIND type_id )? EQUAL
+    rule_lhs =		identifier ( BIND type_id )? err_string? EQUAL
     
-    identifier =	< [A-Za-z_][A-Za-z_0-9]* > _
+    identifier =	[A-Za-z_][A-Za-z_0-9]* _
 
-    type_id =		< identifier ( "::" _ type_id )* 
-    					( '<' _ type_id ( ',' _ type_id )* '>' _ )? >
+    type_id =		identifier ( "::" _ type_id )* 
+    					( '<' _ type_id ( ',' _ type_id )* '>' _ )?
+    
+    err_string =	'`' ( "\\\\" | "\\`" | ![`\t\n\r] . )* '`' _
     
     choice =		sequence ( PIPE sequence )*
     
@@ -110,13 +119,13 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     				| EMPTY
     				| BEGIN sequence END BIND identifier
     
-    action =		!OUT_BEGIN '{' < ( action | !'}' . )* > '}' _
+    action =		!OUT_BEGIN '{' ( action | !'}' . )* '}' _
     
-    char_literal =	'\'' < character > '\'' _
+    char_literal =	'\'' character '\'' _
     
-    str_literal =	'\"' < character* > '\"' _
+    str_literal =	'\"' character* '\"' _
     
-    char_class =	'[' < ( !']' char_range )* > ']' _
+    char_class =	'[' ( !']' char_range )* ']' _
     
     char_range =	character '-' character 
     				| character

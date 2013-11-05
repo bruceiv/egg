@@ -333,6 +333,7 @@ namespace visitor {
 
 		void compile(ast::grammar_rule& r) {
 			bool typed = ! r.type.empty();
+			bool has_error = ! r.error.empty();
 
 			//print prototype
 			out << "\tbool " << r.name << "(parser::state& ps";
@@ -352,7 +353,11 @@ namespace visitor {
 
 			//apply matcher
 			out << "\t\treturn ";
+			if ( has_error ) {
+				out << "parser::named(\"" << strings::escape(r.error) << "\", ";
+			}
 			r.m->accept(this);
+			if ( has_error) { out << ")"; }
 			out << "(ps);";
 
 			//close out method

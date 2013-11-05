@@ -45,6 +45,7 @@ namespace egg {
 	bool rule_lhs(parser::state&, ast::grammar_rule_ptr &);
 	bool identifier(parser::state&, std::string &);
 	bool type_id(parser::state&, std::string &);
+	bool err_string(parser::state&, std::string &);
 	bool choice(parser::state&, ast::alt_matcher_ptr &);
 	bool sequence(parser::state&, ast::seq_matcher_ptr &);
 	bool expression(parser::state&, ast::matcher_ptr &);
@@ -81,7 +82,7 @@ namespace egg {
 		ast::grammar_rule_ptr  r;
 		std::string  s;
 
-		return 
+		return parser::named("grammar", 
 			parser::sequence({
 				[&](parser::state& ps) { psVal = ast::make_ptr<ast::grammar>();  return true; },
 				_,
@@ -97,11 +98,11 @@ namespace egg {
 					parser::sequence({
 						parser::bind(s, out_action),
 						[&](parser::state& ps) { psVal->post = s;  return true; }})),
-				end_of_file})(ps);
+				end_of_file}))(ps);
 	}
 
 	bool out_action(parser::state& ps, std::string & psVal) {
-		return 
+		return parser::named("out action", 
 			parser::sequence({
 				OUT_BEGIN,
 				parser::capture(psVal, parser::many(
@@ -109,21 +110,22 @@ namespace egg {
 						parser::look_not(OUT_END),
 						parser::any()}))),
 				OUT_END,
-				_})(ps);
+				_}))(ps);
 	}
 
 	bool rule(parser::state& ps, ast::grammar_rule_ptr & psVal) {
 		ast::alt_matcher_ptr  m;
 
-		return 
+		return parser::named("rule", 
 			parser::sequence({
 				parser::bind(psVal, rule_lhs),
 				parser::bind(m, choice),
-				[&](parser::state& ps) { psVal->m = m;  return true; }})(ps);
+				[&](parser::state& ps) { psVal->m = m;  return true; }}))(ps);
 	}
 
 	bool rule_lhs(parser::state& ps, ast::grammar_rule_ptr & psVal) {
 		std::string  s;
+		std::string  t;
 
 		return 
 			parser::sequence({
@@ -132,13 +134,17 @@ namespace egg {
 				parser::option(
 					parser::sequence({
 						BIND,
-						parser::bind(s, type_id),
-						[&](parser::state& ps) { psVal->type = s;  return true; }})),
+						parser::bind(t, type_id),
+						[&](parser::state& ps) { psVal->type = t;  return true; }})),
+				parser::option(
+					parser::sequence({
+						parser::bind(t, err_string),
+						[&](parser::state& ps) { psVal->error = t.empty() ? s : t;  return true; }})),
 				EQUAL})(ps);
 	}
 
 	bool identifier(parser::state& ps, std::string & psVal) {
-		return 
+		return parser::named("identifier", 
 			parser::sequence({
 				parser::capture(psVal, 
 					parser::sequence({
@@ -153,11 +159,11 @@ namespace egg {
 								parser::between('a', 'z'),
 								parser::literal('_'),
 								parser::between('0', '9')}))})),
-				_})(ps);
+				_}))(ps);
 	}
 
 	bool type_id(parser::state& ps, std::string & psVal) {
-		return parser::capture(psVal, 
+		return parser::named("type ID", parser::capture(psVal, 
 			parser::sequence({
 				parser::unbind(identifier),
 				parser::many(
@@ -176,7 +182,31 @@ namespace egg {
 								_,
 								parser::unbind(type_id)})),
 						parser::literal('>'),
-						_}))}))(ps);
+						_}))})))(ps);
+	}
+
+	bool err_string(parser::state& ps, std::string & psVal) {
+		std::string s;
+
+		return parser::named("error string", 
+			parser::sequence({
+				parser::literal('`'),
+				parser::capture(s, parser::many(
+					parser::choice({
+						parser::literal("\\\\"),
+						parser::literal("\\`"),
+						
+							parser::sequence({
+								parser::look_not(
+									parser::choice({
+										parser::literal('`'),
+										parser::literal('\t'),
+										parser::literal('\n'),
+										parser::literal('\r')})),
+								parser::any()})}))),
+				parser::literal('`'),
+				_,
+				[&](parser::state& ps) { psVal = strings::unescape_error(s);  return true; }}))(ps);
 	}
 
 	bool choice(parser::state& ps, ast::alt_matcher_ptr & psVal) {
@@ -215,7 +245,7 @@ namespace egg {
 	bool expression(parser::state& ps, ast::matcher_ptr & psVal) {
 		ast::matcher_ptr  m;
 
-		return 
+		return parser::named("expression", 
 			parser::choice({
 				
 					parser::sequence({
@@ -244,7 +274,7 @@ namespace egg {
 								
 									parser::sequence({
 										PLUS,
-										[&](parser::state& ps) { psVal = ast::make_ptr<ast::some_matcher>(m);  return true; }})}))})})(ps);
+										[&](parser::state& ps) { psVal = ast::make_ptr<ast::some_matcher>(m);  return true; }})}))})}))(ps);
 	}
 
 	bool primary(parser::state& ps, ast::matcher_ptr & psVal) {
@@ -317,7 +347,7 @@ namespace egg {
 	bool action(parser::state& ps, ast::action_matcher_ptr & psVal) {
 		std::string s;
 
-		return 
+		return parser::named("action", 
 			parser::sequence({
 				parser::look_not(OUT_BEGIN),
 				parser::literal('{'),
@@ -330,37 +360,37 @@ namespace egg {
 								parser::any()})}))),
 				parser::literal('}'),
 				_,
-				[&](parser::state& ps) { psVal = ast::make_ptr<ast::action_matcher>(s);  return true; }})(ps);
+				[&](parser::state& ps) { psVal = ast::make_ptr<ast::action_matcher>(s);  return true; }}))(ps);
 	}
 
 	bool char_literal(parser::state& ps, ast::char_matcher_ptr & psVal) {
 		char  c;
 
-		return 
+		return parser::named("character literal", 
 			parser::sequence({
 				parser::literal('\''),
 				parser::bind(c, character),
 				parser::literal('\''),
 				_,
-				[&](parser::state& ps) { psVal = ast::make_ptr<ast::char_matcher>(c);  return true; }})(ps);
+				[&](parser::state& ps) { psVal = ast::make_ptr<ast::char_matcher>(c);  return true; }}))(ps);
 	}
 
 	bool str_literal(parser::state& ps, ast::str_matcher_ptr & psVal) {
 		std::string s;
 
-		return 
+		return parser::named("string literal", 
 			parser::sequence({
 				parser::literal('\"'),
 				parser::capture(s, parser::many(parser::unbind(character))),
 				parser::literal('\"'),
 				_,
-				[&](parser::state& ps) { psVal = ast::make_ptr<ast::str_matcher>(strings::unescape(s));  return true; }})(ps);
+				[&](parser::state& ps) { psVal = ast::make_ptr<ast::str_matcher>(strings::unescape(s));  return true; }}))(ps);
 	}
 
 	bool char_class(parser::state& ps, ast::range_matcher_ptr & psVal) {
 		ast::char_range  r;
 
-		return 
+		return parser::named("character class", 
 			parser::sequence({
 				parser::literal('['),
 				[&](parser::state& ps) { psVal = ast::make_ptr<ast::range_matcher>();  return true; },
@@ -370,7 +400,7 @@ namespace egg {
 						parser::bind(r, characters),
 						[&](parser::state& ps) { *psVal += r;  return true; }})),
 				parser::literal(']'),
-				_})(ps);
+				_}))(ps);
 	}
 
 	bool characters(parser::state& ps, ast::char_range & psVal) {
@@ -560,7 +590,7 @@ namespace egg {
 	}
 
 	bool end_of_file(parser::state& ps) {
-		return parser::look_not(parser::any())(ps);
+		return parser::named("end of input", parser::look_not(parser::any()))(ps);
 	}
 
 } // namespace egg

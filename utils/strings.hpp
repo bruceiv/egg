@@ -64,6 +64,7 @@ namespace strings {
 		}
 	}
 
+	/** Converts escape sequences in a string to their character values. */
 	string unescape(const string& s) {
 		stringstream ss;
 		for (auto it = s.begin(); it != s.end(); ++it) {
@@ -73,6 +74,22 @@ namespace strings {
 				if ( it == s.end() ) break;
 				c = *it;
 				ss << unescaped_char(c);
+			} else {
+				ss << c;
+			}
+		}
+		return ss.str();
+	}
+	
+	/** Converts escape sequences in an Egg error string to their character values. */
+	string unescape_error(const string& s) {
+		stringstream ss;
+		for (auto it = s.begin(); it != s.end(); ++it) {
+			char c = *it;
+			if ( c == '\\' ) {
+				++it;
+				if ( it == s.end() ) break;
+				ss << *it;
 			} else {
 				ss << c;
 			}
