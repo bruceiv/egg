@@ -42,6 +42,7 @@ namespace egg {
 	bool grammar(parser::state&, ast::grammar_ptr &);
 	bool out_action(parser::state&, std::string &);
 	bool rule(parser::state&, ast::grammar_rule_ptr &);
+	bool rule_lhs(parser::state&, ast::grammar_rule_ptr &);
 	bool identifier(parser::state&, std::string &);
 	bool type_id(parser::state&, std::string &);
 	bool choice(parser::state&, ast::alt_matcher_ptr &);
@@ -113,6 +114,15 @@ namespace egg {
 
 	bool rule(parser::state& ps, ast::grammar_rule_ptr & psVal) {
 		ast::alt_matcher_ptr  m;
+
+		return 
+			parser::sequence({
+				parser::bind(psVal, rule_lhs),
+				parser::bind(m, choice),
+				[&](parser::state& ps) { psVal->m = m;  return true; }})(ps);
+	}
+
+	bool rule_lhs(parser::state& ps, ast::grammar_rule_ptr & psVal) {
 		std::string  s;
 
 		return 
@@ -124,9 +134,7 @@ namespace egg {
 						BIND,
 						parser::bind(s, type_id),
 						[&](parser::state& ps) { psVal->type = s;  return true; }})),
-				EQUAL,
-				parser::bind(m, choice),
-				[&](parser::state& ps) { psVal->m = m;  return true; }})(ps);
+				EQUAL})(ps);
 	}
 
 	bool identifier(parser::state& ps, std::string & psVal) {
@@ -252,14 +260,8 @@ namespace egg {
 			parser::choice({
 				
 					parser::sequence({
+						parser::look_not(parser::unbind(rule_lhs)),
 						parser::bind(s, identifier),
-						parser::look_not(
-							parser::sequence({
-								parser::option(
-									parser::sequence({
-										BIND,
-										parser::unbind(type_id)})),
-								EQUAL})),
 						[&](parser::state& ps) { psVal = ast::make_ptr<ast::rule_matcher>(s);  return true; },
 						parser::option(
 							parser::sequence({

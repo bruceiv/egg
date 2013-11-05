@@ -83,7 +83,9 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
 
     out_action =	OUT_BEGIN < ( !OUT_END . )* > OUT_END _
     
-    rule =			identifier ( BIND type_id )? EQUAL choice
+    rule =			rule_lhs choice
+    
+    rule_lhs =		identifier ( BIND type_id )? EQUAL
     
     identifier =	< [A-Za-z_][A-Za-z_0-9]* > _
 
@@ -98,7 +100,7 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     				| NOT primary 
     				| primary ( OPT | STAR | PLUS )? 
     
-    primary =		identifier !( ( BIND type_id )? EQUAL ) ( BIND identifier )?
+    primary =		!rule_lhs identifier ( BIND identifier )?
     					# above rule avoids parsing rule def'n as invocation
     				| OPEN choice CLOSE
     				| char_literal
