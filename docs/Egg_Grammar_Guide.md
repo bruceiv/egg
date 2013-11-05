@@ -57,6 +57,8 @@ An error string begins and ends with `` ` `` characters, and may contain any cha
 If a rule that is so annotated fails to match it will add its error string to the list of "expected" messages in the parser's error object at the current position. 
 As a convenience, if you specify an empty error string, the name of the rule will be used. 
 
+Parsing expressions may also be followed by `@` < _error string_ >
+
 ## Semantic Actions ##
 
 Egg grammars may include semantic actions in a sequence of matching rules. 
@@ -107,7 +109,7 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     
     expression =	AND primary
     				| NOT primary 
-    				| primary ( OPT | STAR | PLUS )? 
+    				| primary ( OPT | STAR | PLUS | ERR err_string )? 
     
     primary =		!rule_lhs identifier ( BIND identifier )?
     					# above rule avoids parsing rule def'n as invocation
@@ -135,6 +137,7 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     
 	OUT_BEGIN =		"{%"
     OUT_END =		"%}"
+    ERR =           '@'
     BIND =			':' _
     EQUAL =			'=' _
     PIPE =			'|' _

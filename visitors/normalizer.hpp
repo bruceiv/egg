@@ -143,6 +143,13 @@ namespace visitor {
 			rVal = ast::as_ptr<ast::matcher>(
 					ast::make_ptr<ast::capt_matcher>(m));
 		}
+		
+		void visit(ast::named_matcher& m) {
+			m.m->accept(this);
+			m.m = rVal;
+			rVal = ast::as_ptr<ast::matcher>(
+					ast::make_ptr<ast::named_matcher>(m));
+		}
 
 		ast::grammar_rule& normalize(ast::grammar_rule& r) {
 			r.m->accept(this);

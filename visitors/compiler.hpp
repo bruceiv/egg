@@ -107,6 +107,10 @@ namespace visitor {
 			vars.insert(std::make_pair(m.var, "std::string"));
 			m.m->accept(this);
 		}
+		
+		void visit(ast::named_matcher& m) {
+			m.m->accept(this);
+		}
 
 		std::map<std::string, std::string> list(ast::matcher_ptr& m) {
 			vars.clear();
@@ -327,6 +331,12 @@ namespace visitor {
 
 		void visit(ast::capt_matcher& m) {
 			out << "parser::capture(" << m.var << ", ";
+			m.m->accept(this);
+			out << ")";
+		}
+		
+		void visit(ast::named_matcher& m) {
+			out << "parser::named(\"" << strings::unescape_error(m.error) << "\", ";
 			m.m->accept(this);
 			out << ")";
 		}

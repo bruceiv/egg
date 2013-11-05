@@ -74,25 +74,26 @@ expression: ast::matcher_ptr `` =
 		| primary : m { psVal = m; } ( 
 			OPT { psVal = ast::make_ptr<ast::opt_matcher>(m); }
 			| STAR { psVal = ast::make_ptr<ast::many_matcher>(m); }
-			| PLUS { psVal = ast::make_ptr<ast::some_matcher>(m); } )?
+			| PLUS { psVal = ast::make_ptr<ast::some_matcher>(m); }
+			| ERR err_string : s { psVal = ast::make_ptr<ast::named_matcher>(m, s); } )?
 
 primary: ast::matcher_ptr =
-		!rule_lhs identifier : s  # Make sure to not match next rule definition
+		( !rule_lhs identifier : s  # Make sure to not match next rule definition
 			{ psVal = ast::make_ptr<ast::rule_matcher>(s); } 
 			( BIND identifier : s 
-				{ ast::as_ptr<ast::rule_matcher>(psVal)->var = s; } )?
-		| OPEN choice : am CLOSE { psVal = am; }
+				{ ast::as_ptr<ast::rule_matcher>(psVal)->var = s; } )? )@`nonterminal expression`
+		| ( OPEN choice : am CLOSE { psVal = am; } )@`parenthesized subexpression`
 		| char_literal : cm { psVal = cm; }
 		| str_literal : sm { psVal = sm; }
 		| char_class : rm { psVal = rm; }
 		    ( BIND identifier : t 
 		        { ast::as_ptr<ast::range_matcher>(psVal)->var = t; } )?
-		| ANY { psVal = ast::make_ptr<ast::any_matcher>(); }
+		| ANY@`any-character expression` { psVal = ast::make_ptr<ast::any_matcher>(); }
 		    ( BIND identifier : t 
 		        { ast::as_ptr<ast::any_matcher>(psVal)->var = t; } )?
-		| EMPTY { psVal = ast::make_ptr<ast::empty_matcher>(); }
-		| BEGIN sequence : bm END BIND identifier : t 
-		    { psVal = ast::make_ptr<ast::capt_matcher>(bm, t); }
+		| EMPTY@`empty expression` { psVal = ast::make_ptr<ast::empty_matcher>(); }
+		| ( BEGIN sequence : bm END BIND identifier : t 
+		    { psVal = ast::make_ptr<ast::capt_matcher>(bm, t); } )@`capturing expression`
 
 action: ast::action_matcher_ptr `` =
 		!OUT_BEGIN '{' < ( action | !'}' . )* > : s '}' _ 
@@ -120,6 +121,7 @@ character: char =
 
 OUT_BEGIN =		"{%"
 OUT_END =		"%}"
+ERR =			'@'
 BIND =			':' _
 EQUAL =			'=' _
 PIPE =			'|' _
@@ -139,5 +141,6 @@ _ =		 		( space | comment )*
 space =			' ' | '\t' | end_of_line
 comment =		'#' ( !end_of_line . )* end_of_line
 end_of_line = 	"\r\n" | '\n' | '\r'
+
 end_of_file `end of input` = !.
 

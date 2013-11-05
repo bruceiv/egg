@@ -73,6 +73,7 @@ namespace ast {
 	class look_matcher;
 	class not_matcher;
 	class capt_matcher;
+	class named_matcher;
 
 	/** Type of AST node. */
 	enum matcher_type {
@@ -90,7 +91,8 @@ namespace ast {
 		alt_type,
 		look_type,
 		not_type,
-		capt_type
+		capt_type,
+		named_type
 	}; /* enum matcher_type */
 	
 	/** Abstract base class of all matcher visitors.
@@ -112,6 +114,7 @@ namespace ast {
 		virtual void visit(look_matcher&) = 0;
 		virtual void visit(not_matcher&) = 0;
 		virtual void visit(capt_matcher&) = 0;
+		virtual void visit(named_matcher&) = 0;
 	}; /* class visitor */
 	
 	/** Abstract base class of all matchers.
@@ -328,6 +331,20 @@ namespace ast {
 		                        *   Empty if unset. */
 	}; /* class capt_matcher */
 	typedef shared_ptr<capt_matcher> capt_matcher_ptr;
+	
+	/** Named-error matcher. */
+	class named_matcher : public matcher {
+	public:
+		named_matcher(shared_ptr<matcher> m, string error) : m(m), error(error) {}
+		named_matcher() {}
+		
+		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return named_type; }
+		
+		shared_ptr<matcher> m;  /**< Matcher to name on failure */
+		string error;           /**< Name of matcher in case of error */
+	}; /* class named_matcher */
+	typedef shared_ptr<named_matcher> named_matcher_ptr;
 
 	/** Empty visitor class; provides a default implementation of each of the 
 	 *  methods. */
@@ -348,6 +365,7 @@ namespace ast {
 		void visit(look_matcher& m) {}
 		void visit(not_matcher& m) {}
 		void visit(capt_matcher& m) {}
+		void visit(named_matcher& m) {}
 	}; /* class default_visitor */
 
 	/** Represents a grammar rule.

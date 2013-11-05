@@ -147,6 +147,11 @@ namespace visitor {
 			m.m->accept(this);
 			out << " > : " << m.var;
 		}
+		
+		void visit(ast::named_matcher& m) {
+			m.m->accept(this);
+			out << "@`" << strings::unescape_error(m.error) << "`";
+		}
 
 		void print(ast::grammar_rule& r) {
 			out << r.name;
