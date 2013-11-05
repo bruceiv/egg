@@ -209,9 +209,7 @@ namespace visitor {
 		}
 
 		void visit(ast::any_matcher& m) {
-			out << "parser::any(";
-			if ( ! m.var.empty() ) out << m.var;
-			out << ")";
+			out << "parser::any(" << m.var << ")";
 		}
 
 		void visit(ast::empty_matcher& m) {
@@ -343,10 +341,10 @@ namespace visitor {
 			
 			//setup bound variables
 			std::map<std::string, std::string> vs = vars.list(r);
+			//skip parser variables
+			vs.erase("ps");
+			vs.erase("psVal");
 			for (auto it = vs.begin(); it != vs.end(); ++it) {
-				// skip uses of already bound variables
-				if ( it->first == "ps" ) continue;
-				if ( typed && it->first == "psVal" ) continue;
 				// add variable binding
 				out << "\t\t" << it->second << " " << it->first << ";" << std::endl;
 			}

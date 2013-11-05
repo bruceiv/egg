@@ -50,7 +50,7 @@ namespace visitor {
 		}
 
 		void visit(ast::any_matcher& m) {
-			rVal = ast::make_ptr<ast::any_matcher>();
+			rVal = ast::make_ptr<ast::any_matcher>(m);
 		}
 		
 		void visit(ast::empty_matcher& m) {

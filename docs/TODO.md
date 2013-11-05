@@ -20,7 +20,9 @@
 - Replace `ast::make_ptr()` and `ast::as_ptr()` with standard library equivalents
 - Inline parse.hpp in generated grammars
   - This may have licencing ramifications - consider a Bison-style exception
-- Modify makefile to remake `egg` from `egg.egg` or `egg-back.hpp` as appropriate
+- Modify makefile to remake `egg` from `egg.egg` or `egg-bak.hpp` as appropriate
+- Move redundant checks from compiler to normalizer
+- Rewrite normalizer to flatten nested sequences/choices
 - Maybe add flag to make "#pragma once" optional in generated files
 - Rewrite `parser::state.matches(string)` to use the deque iterators instead of generating a second string object
 - Maybe make Egg-based argument parsing grammar (might be more work to make input stream that inputs (argc, argv) than it's worth)
