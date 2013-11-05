@@ -13,7 +13,6 @@
 ## Bugs ##
 - Cannot include ']' in a character class - should include an escape.
 - Non-syntactic '{' and '}' characters in actions (e.g. those in comments or string literals) may break the parser if unmatched.
-- Combinator-based parsers may not compile correctly at less than -O2 (clang++ 3.3)
 - Parens in grammar pretty-printer are not entirely correct
 
 ## Code Cleanup ##
