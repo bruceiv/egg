@@ -57,7 +57,9 @@ An error string begins and ends with `` ` `` characters, and may contain any cha
 If a rule that is so annotated fails to match it will add its error string to the list of "expected" messages in the parser's error object at the current position. 
 As a convenience, if you specify an empty error string, the name of the rule will be used. 
 
-Parsing expressions may also be followed by `@` < _error string_ >
+Parsing expressions may also be followed by `@` < _error string_ >, and if the rule fails then the error string will be reported in the list of "expected" messages. 
+For instance, `` ( !. . ) @`contradiction` `` would add "contradiction" to the list of expected errors when it was parsed.
+As a shorthand, a character or string literal can be prefixed with `@`; this syntax sets the error string to the escaped form of the literal.
 
 ## Semantic Actions ##
 
@@ -109,7 +111,7 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     
     expression =	AND primary
     				| NOT primary 
-    				| primary ( OPT | STAR | PLUS | ERR err_string )? 
+    				| primary ( OPT | STAR | PLUS | ERR_NAME err_string )? 
     
     primary =		!rule_lhs identifier ( BIND identifier )?
     					# above rule avoids parsing rule def'n as invocation
@@ -120,6 +122,7 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     				| ANY ( BIND identifier )?
     				| EMPTY
     				| BEGIN sequence END BIND identifier
+    				| ERR_NAME ( char_literal | str_literal )
     
     action =		!OUT_BEGIN '{' ( action | !'}' . )* '}' _
     
@@ -137,7 +140,7 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     
 	OUT_BEGIN =		"{%"
     OUT_END =		"%}"
-    ERR =           '@'
+    ERR_NAME =      '@'
     BIND =			':' _
     EQUAL =			'=' _
     PIPE =			'|' _

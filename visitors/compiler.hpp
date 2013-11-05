@@ -336,7 +336,7 @@ namespace visitor {
 		}
 		
 		void visit(ast::named_matcher& m) {
-			out << "parser::named(\"" << strings::unescape_error(m.error) << "\", ";
+			out << "parser::named(\"" << strings::escape(m.error) << "\", ";
 			m.m->accept(this);
 			out << ")";
 		}

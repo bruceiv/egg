@@ -58,7 +58,7 @@ namespace egg {
 	bool character(parser::state&, char &);
 	bool OUT_BEGIN(parser::state&);
 	bool OUT_END(parser::state&);
-	bool ERR(parser::state&);
+	bool ERR_NAME(parser::state&);
 	bool BIND(parser::state&);
 	bool EQUAL(parser::state&);
 	bool PIPE(parser::state&);
@@ -279,7 +279,7 @@ namespace egg {
 										[&](parser::state& ps) { psVal = ast::make_ptr<ast::some_matcher>(m);  return true; }}),
 								
 									parser::sequence({
-										ERR,
+										ERR_NAME,
 										parser::bind(s, err_string),
 										[&](parser::state& ps) { psVal = ast::make_ptr<ast::named_matcher>(m, s);  return true; }})}))})}))(ps);
 	}
@@ -330,7 +330,7 @@ namespace egg {
 								[&](parser::state& ps) { ast::as_ptr<ast::range_matcher>(psVal)->var = t;  return true; }}))}),
 				
 					parser::sequence({
-						parser::named("any-character expression", ANY),
+						ANY,
 						[&](parser::state& ps) { psVal = ast::make_ptr<ast::any_matcher>();  return true; },
 						parser::option(
 							parser::sequence({
@@ -339,7 +339,7 @@ namespace egg {
 								[&](parser::state& ps) { ast::as_ptr<ast::any_matcher>(psVal)->var = t;  return true; }}))}),
 				
 					parser::sequence({
-						parser::named("empty expression", EMPTY),
+						EMPTY,
 						[&](parser::state& ps) { psVal = ast::make_ptr<ast::empty_matcher>();  return true; }}),
 				parser::named("capturing expression", 
 					parser::sequence({
@@ -348,7 +348,20 @@ namespace egg {
 						END,
 						BIND,
 						parser::bind(t, identifier),
-						[&](parser::state& ps) { psVal = ast::make_ptr<ast::capt_matcher>(bm, t);  return true; }}))})(ps);
+						[&](parser::state& ps) { psVal = ast::make_ptr<ast::capt_matcher>(bm, t);  return true; }})),
+				
+					parser::sequence({
+						ERR_NAME,
+						
+							parser::choice({
+								
+									parser::sequence({
+										parser::bind(cm, char_literal),
+										[&](parser::state& ps) { psVal = ast::make_ptr<ast::named_matcher>(cm, strings::quoted_escape(cm->c));  return true; }}),
+								
+									parser::sequence({
+										parser::bind(sm, str_literal),
+										[&](parser::state& ps) { psVal = ast::make_ptr<ast::named_matcher>(sm, strings::quoted_escape(sm->s));  return true; }})})})})(ps);
 	}
 
 	bool action(parser::state& ps, ast::action_matcher_ptr & psVal) {
@@ -457,112 +470,112 @@ namespace egg {
 	}
 
 	bool OUT_BEGIN(parser::state& ps) {
-		return parser::literal("{%")(ps);
+		return parser::named("\"{%\"", parser::literal("{%"))(ps);
 	}
 
 	bool OUT_END(parser::state& ps) {
-		return parser::literal("%}")(ps);
+		return parser::named("\"%}\"", parser::literal("%}"))(ps);
 	}
 
-	bool ERR(parser::state& ps) {
-		return parser::literal('@')(ps);
+	bool ERR_NAME(parser::state& ps) {
+		return parser::named("\'@\'", parser::literal('@'))(ps);
 	}
 
 	bool BIND(parser::state& ps) {
 		return 
 			parser::sequence({
-				parser::literal(':'),
+				parser::named("\':\'", parser::literal(':')),
 				_})(ps);
 	}
 
 	bool EQUAL(parser::state& ps) {
 		return 
 			parser::sequence({
-				parser::literal('='),
+				parser::named("\'=\'", parser::literal('=')),
 				_})(ps);
 	}
 
 	bool PIPE(parser::state& ps) {
 		return 
 			parser::sequence({
-				parser::literal('|'),
+				parser::named("\'|\'", parser::literal('|')),
 				_})(ps);
 	}
 
 	bool AND(parser::state& ps) {
 		return 
 			parser::sequence({
-				parser::literal('&'),
+				parser::named("\'&\'", parser::literal('&')),
 				_})(ps);
 	}
 
 	bool NOT(parser::state& ps) {
 		return 
 			parser::sequence({
-				parser::literal('!'),
+				parser::named("\'!\'", parser::literal('!')),
 				_})(ps);
 	}
 
 	bool OPT(parser::state& ps) {
 		return 
 			parser::sequence({
-				parser::literal('?'),
+				parser::named("\'?\'", parser::literal('?')),
 				_})(ps);
 	}
 
 	bool STAR(parser::state& ps) {
 		return 
 			parser::sequence({
-				parser::literal('*'),
+				parser::named("\'*\'", parser::literal('*')),
 				_})(ps);
 	}
 
 	bool PLUS(parser::state& ps) {
 		return 
 			parser::sequence({
-				parser::literal('+'),
+				parser::named("\'+\'", parser::literal('+')),
 				_})(ps);
 	}
 
 	bool OPEN(parser::state& ps) {
 		return 
 			parser::sequence({
-				parser::literal('('),
+				parser::named("\'(\'", parser::literal('(')),
 				_})(ps);
 	}
 
 	bool CLOSE(parser::state& ps) {
 		return 
 			parser::sequence({
-				parser::literal(')'),
+				parser::named("\')\'", parser::literal(')')),
 				_})(ps);
 	}
 
 	bool ANY(parser::state& ps) {
 		return 
 			parser::sequence({
-				parser::literal('.'),
+				parser::named("\'.\'", parser::literal('.')),
 				_})(ps);
 	}
 
 	bool EMPTY(parser::state& ps) {
 		return 
 			parser::sequence({
-				parser::literal(';'),
+				parser::named("\';\'", parser::literal(';')),
 				_})(ps);
 	}
 
 	bool BEGIN(parser::state& ps) {
 		return 
 			parser::sequence({
-				parser::literal('<'),
+				parser::named("\'<\'", parser::literal('<')),
 				_})(ps);
 	}
 
 	bool END(parser::state& ps) {
 		return 
 			parser::sequence({
-				parser::literal('>'),
+				parser::named("\'>\'", parser::literal('>')),
 				_})(ps);
 	}
 

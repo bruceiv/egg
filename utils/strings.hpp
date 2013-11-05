@@ -42,6 +42,11 @@ namespace strings {
 		default:   return string(1, c);
 		}
 	}
+	
+	/** Returns escape(c) surrounded by single quotes */
+	string quoted_escape(const char c) {
+		return "\'" + escape(c) + "\'";
+	}
 
 	/** Returns a string representing the given string with all special 
 	 *  characters '\n', '\r', '\t', '\\', '\'', and '\"' backslash-escaped. */
@@ -51,6 +56,11 @@ namespace strings {
 			ss << escape(*iter);
 		}
 		return ss.str();
+	}
+	
+	/** Returns escape(c) surrounded by double quotes */
+	string quoted_escape(const string& s) {
+		return "\"" + escape(s) + "\"";
 	}
 
 	/** Converts one of the characters 'n', 'r', 't' to the escaped character 

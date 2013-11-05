@@ -75,7 +75,7 @@ expression: ast::matcher_ptr `` =
 			OPT { psVal = ast::make_ptr<ast::opt_matcher>(m); }
 			| STAR { psVal = ast::make_ptr<ast::many_matcher>(m); }
 			| PLUS { psVal = ast::make_ptr<ast::some_matcher>(m); }
-			| ERR err_string : s { psVal = ast::make_ptr<ast::named_matcher>(m, s); } )?
+			| ERR_NAME err_string : s { psVal = ast::make_ptr<ast::named_matcher>(m, s); } )?
 
 primary: ast::matcher_ptr =
 		( !rule_lhs identifier : s  # Make sure to not match next rule definition
@@ -88,12 +88,17 @@ primary: ast::matcher_ptr =
 		| char_class : rm { psVal = rm; }
 		    ( BIND identifier : t 
 		        { ast::as_ptr<ast::range_matcher>(psVal)->var = t; } )?
-		| ANY@`any-character expression` { psVal = ast::make_ptr<ast::any_matcher>(); }
+		| ANY { psVal = ast::make_ptr<ast::any_matcher>(); }
 		    ( BIND identifier : t 
 		        { ast::as_ptr<ast::any_matcher>(psVal)->var = t; } )?
-		| EMPTY@`empty expression` { psVal = ast::make_ptr<ast::empty_matcher>(); }
+		| EMPTY { psVal = ast::make_ptr<ast::empty_matcher>(); }
 		| ( BEGIN sequence : bm END BIND identifier : t 
 		    { psVal = ast::make_ptr<ast::capt_matcher>(bm, t); } )@`capturing expression`
+		| ERR_NAME ( 
+		    char_literal : cm 
+		        { psVal = ast::make_ptr<ast::named_matcher>(cm, strings::quoted_escape(cm->c)); }
+		    | str_literal : sm 
+		        { psVal = ast::make_ptr<ast::named_matcher>(sm, strings::quoted_escape(sm->s)); } )
 
 action: ast::action_matcher_ptr `` =
 		!OUT_BEGIN '{' < ( action | !'}' . )* > : s '}' _ 
@@ -119,23 +124,23 @@ character: char =
 		'\\' [nrt\'\"\\] : c { psVal = strings::unescaped_char(c); }
 		| ![\'\"\\] . : psVal
 
-OUT_BEGIN =		"{%"
-OUT_END =		"%}"
-ERR =			'@'
-BIND =			':' _
-EQUAL =			'=' _
-PIPE =			'|' _
-AND =			'&' _
-NOT =			'!' _
-OPT =			'?' _
-STAR =			'*' _
-PLUS =			'+' _
-OPEN =			'(' _
-CLOSE =			')' _
-ANY =			'.' _
-EMPTY =			';' _
-BEGIN =			'<' _
-END =			'>' _
+OUT_BEGIN =		@"{%"
+OUT_END =		@"%}"
+ERR_NAME =		@'@'
+BIND =			@':' _
+EQUAL =			@'=' _
+PIPE =			@'|' _
+AND =			@'&' _
+NOT =			@'!' _
+OPT =			@'?' _
+STAR =			@'*' _
+PLUS =			@'+' _
+OPEN =			@'(' _
+CLOSE =			@')' _
+ANY =			@'.' _
+EMPTY =			@';' _
+BEGIN =			@'<' _
+END =			@'>' _
 
 _ =		 		( space | comment )*
 space =			' ' | '\t' | end_of_line
