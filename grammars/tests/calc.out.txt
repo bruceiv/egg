@@ -10,5 +10,3 @@ SYNTAX ERROR @4
 	Expected '('
 	Expected '\t'
 	Expected character in '0'-'9'
-	Expected elem
-	Expected num

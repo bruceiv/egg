@@ -369,17 +369,20 @@ namespace egg {
 	}
 
 	bool character(parser::state& ps, char& psVal) {
+		char c;
+		
 		return 
 			parser::choice({
 				parser::sequence({
 					parser::literal('\\'),
 					parser::choice({
-						parser::literal('n', psVal),
-						parser::literal('r', psVal),
-						parser::literal('t', psVal),
-						parser::literal('\'', psVal),
-						parser::literal('\"', psVal),
-						parser::literal('\\', psVal)})}),
+						parser::literal('n', c),
+						parser::literal('r', c),
+						parser::literal('t', c),
+						parser::literal('\'', c),
+						parser::literal('\"', c),
+						parser::literal('\\', c)}),
+					[&](parser::state& ps) { psVal = strings::unescaped_char(c); return true; }}),
 				parser::sequence({
 					parser::look_not(
 						parser::choice({

@@ -386,6 +386,7 @@ namespace egg {
 		ast::range_matcher_ptr  rm;
 		std::string  s;
 		ast::str_matcher_ptr  sm;
+		std::string t;
 
 		if ( ( [&]() { 
 				parse::posn psStart = ps;
@@ -430,12 +431,24 @@ namespace egg {
 			|| [&]() { 
 				parse::posn psStart = ps;
 				if ( char_class(ps)(rm)
-					&& [&]() { psVal = rm;  return true; }() ) { return true; }
+					&& [&]() { psVal = rm;  return true; }()
+					&& [&]() {
+						parse::posn psStart = ps;
+						if ( BIND(ps)
+						     && identifier(ps)(t)
+						     && [&]() { ast::as_ptr<ast::range_matcher>(psVal)->var = t; return true; }() ) return true;
+						else { ps = psStart; return true; } }() ) { return true; }
 				else { ps = psStart; return false; } }()
 			|| [&]() { 
 				parse::posn psStart = ps;
 				if ( ANY(ps)
-					&& [&]() { psVal = ast::make_ptr<ast::any_matcher>();  return true; }() ) { return true; }
+					&& [&]() { psVal = ast::make_ptr<ast::any_matcher>();  return true; }()
+					&& [&]() {
+						parse::posn psStart = ps;
+						if ( BIND(ps)
+						     && identifier(ps)(t)
+						     && [&]() { ast::as_ptr<ast::any_matcher>(psVal)->var = t; return true; }() ) return true;
+						else { ps = psStart; return true; } }() ) { return true; }
 				else { ps = psStart; return false; } }()
 			|| [&]() { 
 				parse::posn psStart = ps;
@@ -447,7 +460,9 @@ namespace egg {
 				if ( BEGIN(ps)
 					&& sequence(ps)(bm)
 					&& END(ps)
-					&& [&]() { psVal = ast::make_ptr<ast::capt_matcher>(bm);  return true; }() ) { return true; }
+					&& BIND(ps)
+					&& identifier(ps)(t)
+					&& [&]() { psVal = ast::make_ptr<ast::capt_matcher>(bm, t);  return true; }() ) { return true; }
 				else { ps = psStart; return false; } }() ) ) { return parse::match(psVal); }
 		else { return parse::fail<ast::matcher_ptr >(); }
 

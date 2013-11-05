@@ -120,6 +120,10 @@ namespace visitor {
 			return vars;
 		}
 		
+		bool is_typed(const std::string& rule) const {
+			return types.count(rule) ? !types.at(rule).empty() : false;
+		}
+		
 	private:
 		/** map of grammar rule names to types */
 		std::unordered_map<std::string, std::string> types;
@@ -134,255 +138,228 @@ namespace visitor {
 			: name(name), out(out), tabs(2) {}
 
 		void visit(ast::char_matcher& m) {
-			out << "parse::matches<\'" << strings::escape(m.c) << "\'>(ps)";
+			out << "parser::literal(\'" << strings::escape(m.c) << "\')";
 		}
 
 		void visit(ast::str_matcher& m) {
-			out << "parse::matches(\"" << strings::escape(m.s) << "\", ps)";
+			out << "parser::literal(\"" << strings::escape(m.s) << "\")";
 		}
 		
-		void visit(ast::char_range& r) {
+		void visit(ast::char_range& r, const std::string& var) {
 			if ( r.single() ) {
-				out << "parse::matches<\'" << strings::escape(r.to) << "\'>(ps)";
+				out << "parser::literal(\'" << strings::escape(r.to) << "\'";
 			} else {
-				out << "parse::in_range<\'" << strings::escape(r.from) 
-				    << "\',\'" << strings::escape(r.to) << "\'>(ps)";
+				out << "parser::between(\'" << strings::escape(r.from) 
+				    << "\', \'" << strings::escape(r.to) << "\'";
 			}
+			
+			if ( ! var.empty() ) {
+				out << ", " << var;
+			}
+			
+			out << ")";
 		}
 		
 		void visit(ast::range_matcher& m) {
 			if ( m.rs.empty() ) {
-				out << "parse::matches<\'\\0\'>(ps)";
-				if ( ! m.var.empty() ) out << "(" << m.var << ")";
-				return;
+				out << "parser::empty()";
 			}
 			
 			if ( m.rs.size() == 1 ) {
-				visit(m.rs.front());
-				if ( ! m.var.empty() ) out << "(" << m.var << ")";
+				visit(m.rs.front(), m.var);
 				return;
 			}
 			
 			std::string indent(++tabs, '\t');
 
 			//chain matcher ranges
-			out << "( ";
+			out << std::endl 
+				<< indent << "parser::choice({\n"
+				<< indent << "\t"
+				;
+				
+			indent += '\t';
+			++tabs;
 			
 			auto it = m.rs.begin();
-			visit(*it);
-			if ( ! m.var.empty() ) out << "(" << m.var << ")";
+			visit(*it, m.var);
 			
 			while ( ++it != m.rs.end() ) {
-				out << std::endl
-					<< indent << "|| "
+				out << "," << std::endl
+					<< indent 
 					;
-				visit(*it);
-				if ( ! m.var.empty() ) out << "(" << m.var << ")";
+				visit(*it, m.var);
 			}
 			
-			out << " )";
+			out << "})";
 			
-			--tabs;
+			tabs -= 2;
 		}
 
 		void visit(ast::rule_matcher& m) {
-			out << m.rule << "(ps)";
-			if ( ! m.var.empty() ) { out << "(" << m.var << ")"; }
+			if ( vars.is_typed(m.rule) ) {  // syntactic rule
+				if ( m.var.empty() ) {  // unbound
+					out << "parser::unbind(" << m.rule << ")";
+				} else {  // bound
+					out << "parser::bind(" << m.var << ", " << m.rule << ")";
+				}
+			} else {  // lexical rule
+				out << m.rule;
+			}
 		}
 
 		void visit(ast::any_matcher& m) {
-			out << "parse::any(ps)";
-			if ( ! m.var.empty() ) out << "(" << m.var << ")";
+			out << "parser::any(";
+			if ( ! m.var.empty() ) out << m.var;
+			out << ")";
 		}
 
 		void visit(ast::empty_matcher& m) {
-			out << "true";
+			out << "parser::empty()";
 		}
 
 		void visit(ast::action_matcher& m) {
 			//runs action code with all variables bound, then returns true
-			out << "[&]() {" << m.a << " return true; }()";
+			out << "[&](parser::state& ps) {" << m.a << " return true; }";
 		}
 
 		void visit(ast::opt_matcher& m) {
-			//runs matcher, returns true regardless
-			out << "[&]() { ";
+			out << "parser::option(";
 			m.m->accept(this);
-			out << "; return true; }()";
+			out << ")";
 		}
 
 		void visit(ast::many_matcher& m) {
-			std::string indent(tabs, '\t');
-			++tabs;
-
-			//runs matcher as many times as it will match
-			out << "[&]() { while ( ";
+			out << "parser::many(";
 			m.m->accept(this);
-			out << " )" << std::endl 
-			    << indent << "\t;" << std::endl
-			    << indent << "return true; }()";
-			
-			--tabs;
+			out << ")";
 		}
 
 		void visit(ast::some_matcher& m) {
-			std::string indent(tabs, '\t');
-			++tabs;
-			
-			//runs matcher at least once, then ast many times as it will match
-			out << "[&]() { if ( ";
+			out << "parser::some(";
 			m.m->accept(this);
-			out << " ) {" << std::endl
-				<< indent << "\twhile ( ";
-			m.m->accept(this);
-			out << " )" << std::endl
-				<< indent << "\t\t;" << std::endl
-				<< indent << "\treturn true;" << std::endl
-				<< indent << "} else { return false; } }()";
-
-			--tabs;
+			out << ")";
 		}
 		
 		void visit(ast::seq_matcher& m) {
-			//empty sequence bad form, but always matches
+			// empty sequence bad form, but always matches
 			if ( m.ms.empty() ) {
-				out << "true";
+				out << "parser::empty()";
+				return;
+			}
+			
+			// singleton sequence also bad form, equivalent to the single matcher
+			if ( m.ms.size() == 1 ) {
+				m.ms.front()->accept(this);
 				return;
 			}
 
 			std::string indent(++tabs, '\t');
+			
+			out << std::endl
+				<< indent << "parser::sequence({\n"
+				<< indent << "\t"
+				;
+			
+			indent += '\t';
+			++tabs;
 
-			//bind all variables but psStart
-			out << "[&]() { " << std::endl
-				<< indent << "parse::posn psStart = ps;" << std::endl
-				<< indent << "if ( ";
-
-			//test that all matchers match
 			auto it = m.ms.begin();
 			(*it)->accept(this);
-			++it;
-			while ( it != m.ms.end() ) {
-				out << std::endl
-					<< indent << "\t&& ";
+			while ( ++it != m.ms.end() ) {
+				out << "," << std::endl
+					<< indent 
+					;
 				(*it)->accept(this);
-				++it;
 			}
 
-			//match if so, reset otherwise
-			out << " ) { return true; }" << std::endl
-				<< indent << "else { ps = psStart; return false; } }()";
+			out << "})";
 
-			--tabs;
+			tabs -= 2;
 		}
 		
 		void visit(ast::alt_matcher& m) {
-			//empty alternation bad form, but always matches
+			// empty alternation bad form, but always matches
 			if ( m.ms.empty() ) {
-				out << "true";
+				out << "parser::empty()";
+				return;
+			}
+			
+			// singleton alternation also bad form, equivalent to the single matcher
+			if ( m.ms.size() == 1 ) {
+				m.ms.front()->accept(this);
 				return;
 			}
 
 			std::string indent(++tabs, '\t');
+			
+			out << std::endl
+				<< indent << "parser::choice({\n"
+				<< indent << "\t"
+				;
+			
+			indent += '\t';
+			++tabs;
 
-			//match any of the contained matchers
-			//-contained matchers will all reset pos, so no need to do it here
-			out << "( ";
 			auto it = m.ms.begin();
 			(*it)->accept(this);
-			++it;
-			while ( it != m.ms.end() ) {
-				out << std::endl
-					<< indent << "|| ";
+			while ( ++it != m.ms.end() ) {
+				out << "," << std::endl
+					<< indent 
+					;
 				(*it)->accept(this);
-				++it;
 			}
-			out << " )";
-			
-			--tabs;
+
+			out << "})";
+
+			tabs -= 2;
 		}
 
 		void visit(ast::look_matcher& m) {
-			std::string indent(++tabs, '\t');
-
-			//bind all variables but psStart
-			out << "[&]() {" << std::endl
-				<< indent << "parse::posn psStart = ps;" << std::endl
-				<< indent << "if ( ";
-			//match iff contained matcher matches, always reset
+			out << "parser::look(";
 			m.m->accept(this);
-			out << " ) { ps = psStart; return true; }" << std::endl
-				<< indent << "else { ps = psStart; return false; } }()";
-
-			--tabs;
+			out << ")";
 		}
 
 		void visit(ast::not_matcher& m) {
-			std::string indent(++tabs, '\t');
-
-			//bind all variables but psStart
-			out << "[&]() {" << std::endl
-				<< indent << "parse::posn psStart = ps;" << std::endl
-				<< indent << "if ( ";
-			//match iff contained matcher fails, always reset
+			out << "parser::look_not(";
 			m.m->accept(this);
-			out << " ) { ps = psStart; return false; }" << std::endl
-				<< indent << "else { ps = psStart; return true; } }()";
-
-			--tabs;
+			out << ")";
 		}
 
 		void visit(ast::capt_matcher& m) {
-			std::string indent(++tabs, '\t');
-
-			//bind all variables
-			out << "[&]() {" << std::endl
-				<< indent << "parse::posn psStart = ps;" << std::endl
-				<< indent << "if ( ";
-			//match iff contained matcher matches
+			out << "parser::capture(" << m.var << ", ";
 			m.m->accept(this);
-			out << " ) {" << std::endl
-				<< indent << "\t" << m.var << " = ps.string(psStart, ps - psStart);" << std::endl
-				<< indent << "\treturn true;" << std::endl
-				<< indent << "} else { return false; } }()";
-
-			--tabs;
+			out << ")";
 		}
 
 		void compile(ast::grammar_rule& r) {
 			bool typed = ! r.type.empty();
 
 			//print prototype
-			out << "\tparse::result<" << r.type << "> " << r.name << "(parse::state& ps) {" << std::endl
-			//setup return point
-				<< "\t\tparse::posn psStart = ps;" << std::endl
-				;
-			//setup return variable
-			if ( typed ) out << "\t\t" << r.type << " psVal;" << std::endl;
-			out << std::endl;
-
+			out << "\tbool " << r.name << "(parser::state& ps";
+			if ( typed ) out << ", " << r.type << "& psVal";
+			out << ") {" << std::endl;
+			
 			//setup bound variables
 			std::map<std::string, std::string> vs = vars.list(r);
 			for (auto it = vs.begin(); it != vs.end(); ++it) {
 				// skip uses of already bound variables
-				if ( it->first == "psStart" ) continue;
+				if ( it->first == "ps" ) continue;
 				if ( typed && it->first == "psVal" ) continue;
 				// add variable binding
 				out << "\t\t" << it->second << " " << it->first << ";" << std::endl;
 			}
-			out << std::endl;
+			if ( ! vs.empty() ) out << std::endl;
 
 			//apply matcher
-			out << "\t\tif ( ";
+			out << "\t\treturn ";
 			r.m->accept(this);
-			out << " ) { return parse::match(" 
-					<< (typed? "psVal" : "parse::val") << "); }" << std::endl
-				<< "\t\telse { return parse::fail<"
-					<< (typed? r.type : "parse::value") << ">(); }" << std::endl
-				<< std::endl
-				;
+			out << "(ps);";
 
 			//close out method
-			out << "\t}" << std::endl
+			out << "\n"
+				<< "\t}" << std::endl
 				<< std::endl
 				;
 		}
@@ -408,7 +385,7 @@ namespace visitor {
 
 			//get needed includes
 			out << "#include <string>" << std::endl
-				<< "#include \"parse.hpp\"" << std::endl
+				<< "#include \"parser.hpp\"" << std::endl
 				<< std::endl
 				;
 
@@ -420,7 +397,11 @@ namespace visitor {
 			//pre-declare matchers
 			for (auto it = g.rs.begin(); it != g.rs.end(); ++it) {
 				ast::grammar_rule& r = **it;
-				out << "\tparse::result<" << r.type << "> " << r.name << "(parse::state&);" << std::endl;
+				out << "\tbool " << r.name << "(parser::state&";
+				if ( ! r.type.empty() ) {
+					out << ", " << r.type << "&";
+				}
+				out << ");" << std::endl;
 			}
 			out << std::endl;
 
@@ -432,7 +413,7 @@ namespace visitor {
 			}
 
 			//close parser namespace
-			out << "} /* namespace " << name << " */" << std::endl
+			out << "} // namespace " << name << std::endl
 				<< std::endl
 				;
 			

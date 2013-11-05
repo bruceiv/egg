@@ -1,8 +1,6 @@
 `' DOESN'T MATCH  @0
 	Expected "ab"
 	Expected 'a'
-	Expected A
-	Expected G
 `abc' MATCHES
 `aabbcc' MATCHES
 `aaabbbccc' MATCHES
@@ -15,12 +13,9 @@
 `x' DOESN'T MATCH  @0
 	Expected "ab"
 	Expected 'a'
-	Expected A
-	Expected G
 `abcc' DOESN'T MATCH  @2
 	Expected "bc"
 	Expected 'b'
-	Expected B
 `abbc' DOESN'T MATCH  @2
 	Expected 'c'
 `aabc' DOESN'T MATCH  @3
