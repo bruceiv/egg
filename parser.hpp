@@ -551,7 +551,7 @@ namespace parser {
 	
 	/** Matches all or none of a sequence of parsers */
 	combinator sequence(combinator_list fs) {
-		return [&fs](state& ps) {
+		return [fs](state& ps) {
 			posn psStart = ps;
 			for (auto f : fs) {
 				if ( ! f(ps) ) { ps = psStart; return false; }
@@ -562,7 +562,7 @@ namespace parser {
 	
 	/** Matches one of a set of alternate parsers */
 	combinator choice(combinator_list fs) {
-		return [&fs](state& ps) {
+		return [fs](state& ps) {
 			for (auto f : fs) {
 				if ( f(ps) ) return true;
 			}
@@ -618,13 +618,13 @@ namespace parser {
 	/** Binds a variable to a non-terminal */
 	template <typename T>
 	combinator bind(T& psVal, nonterminal<T> f) {
-		return [&psVal,&f](state& ps) { return f(ps, psVal); };
+		return [&psVal,f](state& ps) { return f(ps, psVal); };
 	}
 	
 	/** Binds a throwaway variable to a non-terminal */
 	template <typename T>
 	combinator unbind(nonterminal<T> f) {
-		return [&f](state& ps) { T _; return f(ps, _); };
+		return [f](state& ps) { T _; return f(ps, _); };
 	}
 	
 	/** Captures a string */
