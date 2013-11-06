@@ -61,6 +61,9 @@ Parsing expressions may also be followed by `@` < _error string_ >, and if the r
 For instance, `` ( !. . ) @`contradiction` `` would add "contradiction" to the list of expected errors when it was parsed.
 As a shorthand, a character or string literal can be prefixed with `@`; this syntax sets the error string to the escaped form of the literal.
 
+You may also insert error messages at the current position with a _failure expression_. 
+A failure expression takes the form `` ~`...` ``, and produces a matcher which never matches, instead inserting the given string into the parser state's error object.
+
 ## Semantic Actions ##
 
 Egg grammars may include semantic actions in a sequence of matching rules. 
@@ -111,7 +114,7 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     
     expression =	AND primary
     				| NOT primary 
-    				| primary ( OPT | STAR | PLUS | ERR_NAME err_string )? 
+    				| primary ( OPT | STAR | PLUS | EXPECT err_string )? 
     
     primary =		!rule_lhs identifier ( BIND identifier )?
     					# above rule avoids parsing rule def'n as invocation
@@ -122,7 +125,8 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     				| ANY ( BIND identifier )?
     				| EMPTY
     				| BEGIN sequence END BIND identifier
-    				| ERR_NAME ( char_literal | str_literal )
+    				| EXPECT ( char_literal | str_literal )
+    				| FAIL err_string
     
     action =		!OUT_BEGIN '{' ( action | !'}' . )* '}' _
     
@@ -140,7 +144,6 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     
 	OUT_BEGIN =		"{%"
     OUT_END =		"%}"
-    ERR_NAME =      '@'
     BIND =			':' _
     EQUAL =			'=' _
     PIPE =			'|' _
@@ -155,6 +158,8 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     EMPTY =			';' _
     BEGIN =			'<' _
     END =			'>' _
+    EXPECT =        '@' _
+    FAIL =          '~' _
     
     _ =		 		( space | comment )*
     space =			' ' | '\t' | end_of_line

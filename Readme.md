@@ -29,9 +29,10 @@ Supported flags are
 A more complete grammar may be found in the Grammar Guide, and some simple example grammars may be found in the `grammars` directory. 
 
 - A grammar is a sequence of rules
-- Rules are of the form `name (":" type)? "=" matcher`. 
+- Rules are of the form ``name (":" type)? ("`" error "`")? "=" matcher``. 
   `name` may be used in other rules (or even recursively in the matcher) to match the rule; if a type is given for the rule, `name ":" id` is a matcher that will bind `id` to a variable of type `type` returned by the rule.
   Rule names are composed of alphanumeric characters and underscores, where the first character may not be a digit.
+  If an `error` string is provided, the rule will set an "expected" message with the error string if it fails; as a shorthand, an empty error string is interpreted as the name of the rule. 
 - Matchers can be combined in sequence simply by writing them in sequence, `matcher_1 matcher_2`
 - Choice between matchers is represented as `choice_1 "|" choice_2`; this choice is _ordered_, that is, if `choice_1` matches, no attempt will be made to match `choice_2`.
 - Matchers can be grouped into a larger matcher by surrounding them with parentheses, `"(" matcher_1 matcher_2 ... ")"`
@@ -49,6 +50,7 @@ A more complete grammar may be found in the Grammar Guide, and some simple examp
   Any variables bound from rule matchers are available in this code, as well as `psVal`, the return value for typed rules, and `ps`, the current parser state (`ps.posn()` is the current index, `ps.string(p,n)` is the `n` characters starting at position `p`, other public functions can be found in the Grammar Guide).
 - An matcher can be surrounded with angle brackets `< >` to capture the string which is matched. 
   This capture matcher must be bound to a string using `:`
+- 
 - One-line comments start with a `#`
 - Whitespace is not significant except to delimit tokens
 

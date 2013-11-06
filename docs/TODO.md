@@ -1,5 +1,6 @@
 ## Feature Wishlist ##
-- add &{ /\* actions \*/ } to the language
+- add &{ ... } semantic predicates to the language
+- add ~{ ... } failure actions to the language
 - Packrat parser state
 - Look at adding cut syntax
 - Rewrite compiler to have a code generator again, rather than just using the combinators (investigate performance)

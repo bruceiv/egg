@@ -111,6 +111,8 @@ namespace visitor {
 		void visit(ast::named_matcher& m) {
 			m.m->accept(this);
 		}
+		
+		void visit(ast::fail_matcher& m) {}
 
 		std::map<std::string, std::string> list(ast::matcher_ptr& m) {
 			vars.clear();
@@ -339,6 +341,10 @@ namespace visitor {
 			out << "parser::named(\"" << strings::escape(m.error) << "\", ";
 			m.m->accept(this);
 			out << ")";
+		}
+		
+		void visit(ast::fail_matcher& m) {
+			out << "parser::fail(\"" << strings::escape(m.error) << "\")";
 		}
 
 		void compile(ast::grammar_rule& r) {
