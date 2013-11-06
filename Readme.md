@@ -50,7 +50,8 @@ A more complete grammar may be found in the Grammar Guide, and some simple examp
   Any variables bound from rule matchers are available in this code, as well as `psVal`, the return value for typed rules, and `ps`, the current parser state (`ps.posn()` is the current index, `ps.string(p,n)` is the `n` characters starting at position `p`, other public functions can be found in the Grammar Guide).
 - An matcher can be surrounded with angle brackets `< >` to capture the string which is matched. 
   This capture matcher must be bound to a string using `:`
-- 
+- An expression can be given a name to be reported as "expected" if it fails by appending `` "@" "`" name "`" ``; character and string literals may have `@` prepended to set the error name to a representation of the literal.
+- A failure matcher takes the form `` "~" "`" message "`" ``, and always fails, reporting the given message.
 - One-line comments start with a `#`
 - Whitespace is not significant except to delimit tokens
 
