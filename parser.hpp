@@ -31,6 +31,7 @@
 #include <stdexcept>
 #include <string>
 #include <typeinfo>
+#include <unordered_map>
 #include <utility>
 
 /** Implements parser state for an Egg parser.
@@ -144,6 +145,97 @@ namespace parser {
 		posn avail;
 	}; /* struct forgotten_range_error */
 	
+	/** Memoization table entry */
+	struct memo {
+		/** Typesafe dynamic type */
+		class any {
+		private:
+			/** Untyped container class */
+			struct dyn {
+				virtual ~dyn() {}
+	
+				/** Gets the type of the held object */
+				virtual const std::type_info& type() const = 0;
+	
+				/** Copies the held object */
+				virtual dyn* clone() const = 0;
+			};  // struct dyn
+
+			/** Typed container class */
+			template <typename T>
+			struct of : public dyn {
+				/** Value constructor */
+				of (const T& v) : v(v) {}
+	
+				/** Gets the type of the held object */
+				virtual const std::type_info& type() const { return typeid(T); }
+	
+				/** Returns a copy of the held object */
+				virtual dyn* clone() const { return new of<T>(v); }
+	
+				/** The held value */	
+				const T v;
+			};  // struct of<T>
+		
+		public:
+			/** Empty constructor */
+			any() : p(nullptr) {}
+
+			/** Typed constructor */
+			template <typename T>
+			any(const T& t) : p(new of<T>(t)) {}
+
+			/** Copy constructor */
+			any(const any& o) : p(o.p->clone()) {}
+
+			/** Assignment operator */
+			any& operator = (const any& o) {
+				if ( &o != this ) {
+					delete p;
+					p = o.p->clone();
+				}
+				return *this;
+			}
+
+			/** Typed assignment operator */
+			template <typename T>
+			any& operator = (const T& v) {
+				delete p;
+				p = new of<T>(v);
+				return *this;
+			}
+
+			/** Contained type */
+			const std::type_info& type() const {
+				return p ? p->type() : typeid(void);
+			}
+
+			/** Bind value */
+			template <typename T>
+			void bind(T& v) {
+				if ( type() == typeid(T) ) {
+					v = static_cast<of<T>*>(p)->v;
+				}
+			}
+
+			~any() { delete p; }
+
+		private:
+			dyn* p;
+		};  // class memo::any
+		
+		/** Default constructor - sets up a failed match */
+		memo() : success(false) {}
+	
+		/** Success constructor */
+		template <typename T>
+		memo(const posn& end, const T& result) : success(true), end(end), result(result) {}
+	
+		bool success;  ///< Did the parser match?
+		posn end;      ///< Endpoint in case of a match
+		any result;    ///< Result object (if any)
+	};
+	
 	/** Parser state */
 	class state {
 	public:
@@ -196,7 +288,7 @@ namespace parser {
 		 *  Initializes state at beginning of input stream.
 		 *  @param in		The input stream to read from
 		 */
-		state(stream_type& in) : pos(), off(), str(), lines(), err(), in(in) {
+		state(stream_type& in) : pos(), off(), str(), lines(), memo_table(), err(), in(in) {
 			// first line starts at 0
 			lines.push_back(0);
 			// read first character
@@ -352,7 +444,41 @@ namespace parser {
 		string_type string(const struct posn& p, ind n) {
 			range_type iters = range(p, n);
 			return string_type(iters.first, iters.second);
-		}	
+		}
+		
+		/** Gets memoization table entry at the current position.
+		 *  @param id    ID of the type to get the memoization entry for
+		 *  @param m     Output parameter for memoization entry, if found
+		 *  @return Was there a memoization entry?
+		 */
+		bool memo(ind id, struct memo& m) {
+			// Get table iterator
+			auto& tab = memo_table[pos.i - off.i];
+			auto it = tab.find(id);
+			
+			// Break if nothing set
+			if ( it == tab.end() ) return false;
+			
+			// Set output parameter
+			m = it->second;
+			return true;
+		}
+		
+		/** Sets memoization table entry.
+		 *  @param p     Position to set the memo table entry for; will silently ignore if position 
+		 *               has been forgotten
+		 *  @param id    ID of the type to set the memoization entry for
+		 *  @param m     Memoization entry to set
+		 *  @return Was a memoization table entry set?
+		 */
+		bool set_memo(const struct posn& p, ind id, const struct memo& m) {
+			// ignore forgotten position
+			if ( p < off ) return false;
+			
+			// set table entry
+			memo_table[p.i - off.i][id] = m;
+			return true;
+		}
 		
 		/** Get the parser's internal error object */
 		const struct error& error() const { return err; }
@@ -435,6 +561,8 @@ namespace parser {
 		std::deque<value_type> str;
 		/** Beginning indices of each line, starting from off.line */
 		std::deque<ind> lines;
+		/** Memoization tables for each stored input index */
+		std::deque<std::unordered_map<ind, struct memo>> memo_table;
 		/** Set of most recent parsing errors */
 		struct error err;
 		/** Input stream to read characters from */
@@ -569,6 +697,38 @@ namespace parser {
 	template <typename T>
 	combinator unbind(nonterminal<T> f) {
 		return [f](state& ps) { T _; return f(ps, _); };
+	}
+	
+	/** Memoizes a combinator with the given memoization ID */
+	combinator memoize(ind id, const combinator& f) {
+		return [id,&f](state& ps) {
+			memo m;
+			if ( ! ps.memo(id, m) ) {
+				posn psStart = ps.posn();
+				m.success = f(ps);
+				m.end = ps.posn();
+				ps.set_memo(psStart, id, m);
+			}
+			return m.success;
+		};
+	}
+	
+	/** Memoizes a non-terminal with the given memoization ID */
+	template <typename T>
+	combinator memoize(ind id, T& psVal, nonterminal<T> f) {
+		return [id,&psVal,f](state& ps) {
+			memo m;
+			if ( ! ps.memo(id, m) ) {
+				posn psStart = ps.posn();
+				m.success = f(ps, psVal);
+				m.end = ps.posn();
+				if ( m.success ) m.result = psVal;
+				ps.set_memo(psStart, id, m);
+			} else {
+				m.result.bind(psVal);
+			}
+			return m.success;
+		};
 	}
 	
 	/** Captures a string */
