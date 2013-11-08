@@ -30,6 +30,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <typeinfo>
 #include <utility>
 
 /** Implements parser state for an Egg parser.
@@ -226,7 +227,6 @@ namespace parser {
 		}
 		
 		/** @return the current position */
-		operator struct posn () const { return pos; }
 		struct posn posn() const { return pos; }
 		
 		/** @return the current offset in the stream */
@@ -237,15 +237,6 @@ namespace parser {
 		 *  @throws forgotten_state_error on p < off (that is, moving to 
 		 *  		position previously discarded)
 		 */
-		state& operator = (const struct posn& p) {
-			// Fail on forgotten index
-			if ( p < off ) throw forgotten_state_error(p, off);
-			
-			pos = p;
-			
-			return *this;
-		}
-		
 		void set_posn(const struct posn& p) {
 			// Fail on forgotten index
 			if ( p < off ) throw forgotten_state_error(p, off);
@@ -308,10 +299,7 @@ namespace parser {
 			
 			return *this;
 		}
-		
-		/** Overload to make this act more like a posn object. */
-		ind operator - (const struct posn& p) { return pos - p; }
-		
+				
 		/** Range operator.
 		 *  Returns a pair of iterators, begin and end, containing up to the 
 		 *  given number of elements, starting at the given position. Returned 
@@ -381,48 +369,16 @@ namespace parser {
 			err |= e;
 		}
 		
-		private:
-			/** Returns a string representing the given character with all special 
-			 *  characters '\n', '\r', '\t', '\\', '\'', and '\"' backslash-escaped. */
-			std::string escape(const char c) {
-				switch ( c ) {
-				case '\n': return "\\n";
-				case '\r': return "\\r";
-				case '\t': return "\\t";
-				case '\\': return "\\\\";
-				case '\'': return "\\\'";
-				case '\"': return "\\\"";
-				default:   return std::string(1, c);
-				}
-			}
-
-			/** Returns a string representing the given string with all special 
-			 *  characters '\n', '\r', '\t', '\\', '\'', and '\"' backslash-escaped. */
-			std::string escape(const std::string& s) {
-				std::stringstream ss;
-				for (auto iter = s.begin(); iter != s.end(); ++iter) {
-					ss << escape(*iter);
-				}
-				return ss.str();
-			}
-		
-		public:
 		/** Attempts to match a character at the current position */
 		bool matches(value_type c) {
-			if ( (*this)() != c ) {
-				expect("\'" + escape(c) + "\'");
-				return false;
-			}
+			if ( (*this)() != c ) return false;
 			++(*this);
 			return true;
 		}
 		
 		/** Attempts to match a string at the current position */
 		bool matches(const string_type& s) {
-			if ( string(pos, s.size()) != s ) {
-				expect("\"" + escape(s) + "\"");
-				return false;
-			}
+			if ( string(pos, s.size()) != s ) return false;
 			(*this) += s.size();
 			return true;
 		}
@@ -432,10 +388,7 @@ namespace parser {
 		 */
 		bool matches_any(value_type& psVal) {
 			value_type c = (*this)();
-			if ( c == '\0' ) {
-				expect("any character");
-				return false;
-			}
+			if ( c == '\0' ) return false;
 			psVal = c;
 			++(*this);
 			return true;
@@ -443,10 +396,7 @@ namespace parser {
 		
 		/** Attempts to match any character at the current position */
 		bool matches_any() {
-			if ( (*this)() == '\0' ) {
-				expect("any character");
-				return false;
-			}
+			if ( (*this)() == '\0' ) return false;
 			++(*this);
 			return true;
 		}
@@ -459,10 +409,7 @@ namespace parser {
 		 */
 		bool matches_in(value_type s, value_type e, value_type& psVal) {
 			value_type c = (*this)();
-			if ( c < s || c > e ) {
-				expect("character in \'" + escape(s) + "\'-\'" + escape(e) + "\'");
-				return false;
-			}
+			if ( c < s || c > e ) return false;
 			psVal = c;
 			++(*this);
 			return true;
@@ -475,10 +422,7 @@ namespace parser {
 		 */
 		bool matches_in(value_type s, value_type e) {
 			value_type c = (*this)();
-			if ( c < s || c > e ) {
-				expect("character in \'" + escape(s) + "\'-\'" + escape(e) + "\'");
-				return false;
-			}
+			if ( c < s || c > e ) return false;
 			++(*this);
 			return true;
 		}
@@ -552,9 +496,9 @@ namespace parser {
 	/** Matches all or none of a sequence of parsers */
 	combinator sequence(combinator_list fs) {
 		return [fs](state& ps) {
-			posn psStart = ps;
+			posn psStart = ps.posn();
 			for (auto f : fs) {
-				if ( ! f(ps) ) { ps = psStart; return false; }
+				if ( ! f(ps) ) { ps.set_posn(psStart); return false; }
 			}
 			return true;
 		};
@@ -600,8 +544,8 @@ namespace parser {
 	/** Looks ahead to match a parser without consuming input */
 	combinator look(const combinator& f) {
 		return [&f](state& ps) {
-			posn psStart = ps;
-			if ( f(ps) ) { ps = psStart; return true; }
+			posn psStart = ps.posn();
+			if ( f(ps) ) { ps.set_posn(psStart); return true; }
 			return false;
 		};
 	}
@@ -609,8 +553,8 @@ namespace parser {
 	/** Looks ahead to not match a parser without consuming input */
 	combinator look_not(const combinator& f) {
 		return [&f](state& ps) {
-			posn psStart = ps;
-			if ( f(ps) ) { ps = psStart; return false; }
+			posn psStart = ps.posn();
+			if ( f(ps) ) { ps.set_posn(psStart); return false; }
 			return true;
 		};
 	}
@@ -630,9 +574,9 @@ namespace parser {
 	/** Captures a string */
 	combinator capture(std::string& s, const combinator& f) {
 		return [&s,&f](state& ps) {
-			posn psStart = ps;
+			posn psStart = ps.posn();
 			if ( ! f(ps) ) return false;
-			s = ps.string(psStart, ps - psStart);
+			s = ps.string(psStart, ps.posn() - psStart);
 			return true;
 		};
 	}
