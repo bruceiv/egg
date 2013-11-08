@@ -31,22 +31,23 @@
 #include "utils/strings.hpp"
 %}
 
-grammar: ast::grammar_ptr `` =
+grammar: ast::grammar_ptr `` %no-memo =
 		{ psVal = ast::make_ptr<ast::grammar>(); }
 			_ (out_action : s { psVal->pre = s; })? 
 			(rule : r { *psVal += r; })+ 
 			(out_action : s { psVal->post = s; } )? end_of_file
 
-out_action: std::string `out action` =
+out_action: std::string `out action` %no-memo =
 		OUT_BEGIN < ( !OUT_END . )* > : psVal OUT_END _
 
-rule: ast::grammar_rule_ptr `` =
+rule: ast::grammar_rule_ptr `` %no-memo =
 		rule_lhs : psVal choice : m { psVal->m = m; }
 
 rule_lhs: ast::grammar_rule_ptr = 
 		identifier : s { psVal = ast::make_ptr<ast::grammar_rule>(s); } 
 			( BIND type_id : t { psVal->type = t; } )? 
 			( err_string : t { psVal->error = t.empty() ? s : t; } )?
+			( @"%no-memo" _ { psVal->memo = false; } )?
 			EQUAL
 
 identifier: std::string `` =

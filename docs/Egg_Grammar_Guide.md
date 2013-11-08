@@ -99,7 +99,7 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     
     rule =			rule_lhs choice
     
-    rule_lhs =		identifier ( BIND type_id )? err_string? EQUAL
+    rule_lhs =		identifier ( BIND type_id )? err_string? "%no-memo"? EQUAL
     
     identifier =	[A-Za-z_][A-Za-z_0-9]* _
 

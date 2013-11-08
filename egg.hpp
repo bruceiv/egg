@@ -142,6 +142,11 @@ namespace egg {
 					parser::sequence({
 						parser::bind(t, err_string),
 						[&](parser::state& ps) { psVal->error = t.empty() ? s : t;  return true; }})),
+				parser::option(
+					parser::sequence({
+						parser::named("\"%no-memo\"", parser::literal("%no-memo")),
+						_,
+						[&](parser::state& ps) { psVal->memo = false;  return true; }})),
 				EQUAL})(ps);
 	}
 
