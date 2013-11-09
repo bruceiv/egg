@@ -141,7 +141,10 @@ namespace visitor {
 	class compiler : ast::visitor {
 	public:
 		compiler(std::string name, std::ostream& out = std::cout) 
-			: name(name), out(out), tabs(2) {}
+			: name(name), out(out), tabs(2), do_memo(true), max_memo_id(0) {}
+		
+		compiler& memo(bool b = true) { do_memo = b; return *this; }
+		compiler& no_memo() { do_memo = false; return *this; }
 
 		void visit(ast::char_matcher& m) {
 			out << "parser::literal(\'" << strings::escape(m.c) << "\')";
@@ -350,6 +353,7 @@ namespace visitor {
 		void compile(ast::grammar_rule& r) {
 			bool typed = ! r.type.empty();
 			bool has_error = ! r.error.empty();
+			bool memoized = do_memo && r.memo;
 
 			//print prototype
 			out << "\tbool " << r.name << "(parser::state& ps";
@@ -369,11 +373,16 @@ namespace visitor {
 
 			//apply matcher
 			out << "\t\treturn ";
+			if ( memoized ) {
+				out << "parser::memoize(" << ++max_memo_id << ", ";
+				if ( typed ) out << "psVal, ";
+			}
 			if ( has_error ) {
 				out << "parser::named(\"" << strings::escape(r.error) << "\", ";
 			}
 			r.m->accept(this);
-			if ( has_error) { out << ")"; }
+			if ( has_error ) { out << ")"; }
+			if ( memoized ) { out << ")"; }
 			out << "(ps);";
 
 			//close out method
@@ -424,8 +433,10 @@ namespace visitor {
 			}
 			out << std::endl;
 
-			//generate matching functions
+			//set up lists of variable types and memoization IDs
 			vars = variable_list(g);
+			
+			//generate matching functions
 			for (auto it = g.rs.begin(); it != g.rs.end(); ++it) {
 				ast::grammar_rule& r = **it;
 				compile(r);
@@ -447,10 +458,13 @@ namespace visitor {
 		}
 		
 	private:
-		std::string name;	/** Name of the grammar */
-		std::ostream& out;	/** Output stream to print to */
-		variable_list vars;	/** Holds grammar rule types */
-		int tabs;			/** Number of tabs for printer */
+		std::string name;	          ///< Name of the grammar
+		std::ostream& out;	          ///< Output stream to print to
+		variable_list vars;	          ///< Holds grammar rule types
+		bool do_memo;                 /**< if true, memoize if grammar says, otherwise no 
+		                               *   memoization [default true] */
+		unsigned long max_memo_id;    ///< Largest currently used memoization ID
+		int tabs;			          ///< Number of tabs for printer
 	}; /* class compiler */
 	
 } /* namespace visitor */

@@ -23,7 +23,7 @@ All AST nodes inherit from `ast::matcher`, which defines a `void accept(ast::vis
 Various visitors for the Egg AST are defined in the `visitors` directory. 
 `printer.hpp` contains `visitor::printer`, a pretty-printer for Egg grammars, `normalizer.hpp` contains `visitor::normalizer`, which performs some basic simplifications on an Egg AST, and `compiler.hpp` contains `visitor::compiler` and some related classes, which together form a code generator for compiling Egg grammars. 
 The Parsing Expression Grammar model that Egg uses is a formalization of recursive descent parsing, so the generated code follows this pattern. 
-Egg uses anonymous C++11 lambdas to implement parenthesized subexpressions and some other constructs, so as not to pollute the grammar namespace unneccesarily. 
+Grammar rules are memoized by default, in an approach based on Ford's packrat parsing algorithm, an approach which trades space for execution time.
 
 The Egg executable itself is defined in `main.cpp` in the root directory; this file is mostly concerned with command line argument parsing, and provides an executable interface to either pretty-print or compile an Egg grammar.
 

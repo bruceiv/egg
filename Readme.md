@@ -23,16 +23,18 @@ Supported flags are
 - `-c --command`	command - either compile or print (default compile)
 - `-n --name`		grammar name - if none given, takes the longest prefix of the input or output file name (output preferred) which is a valid Egg identifier (default empty)
 - `--no-norm`       turns off grammar normalization
+- `--no-memo`       turns off memoization in the generated parser
 
 ### Grammar Summary ###
 
 A more complete grammar may be found in the Grammar Guide, and some simple example grammars may be found in the `grammars` directory. 
 
 - A grammar is a sequence of rules
-- Rules are of the form ``name (":" type)? ("`" error "`")? "=" matcher``. 
+- Rules are of the form ``name (":" type)? ("`" error "`")? "%no-memo"? "=" matcher``. 
   `name` may be used in other rules (or even recursively in the matcher) to match the rule; if a type is given for the rule, `name ":" id` is a matcher that will bind `id` to a variable of type `type` returned by the rule.
   Rule names are composed of alphanumeric characters and underscores, where the first character may not be a digit.
   If an `error` string is provided, the rule will set an "expected" message with the error string if it fails; as a shorthand, an empty error string is interpreted as the name of the rule. 
+  If the `%no-memo` annotation is provided, the rule will not be memoized. 
 - Matchers can be combined in sequence simply by writing them in sequence, `matcher_1 matcher_2`
 - Choice between matchers is represented as `choice_1 "|" choice_2`; this choice is _ordered_, that is, if `choice_1` matches, no attempt will be made to match `choice_2`.
 - Matchers can be grouped into a larger matcher by surrounding them with parentheses, `"(" matcher_1 matcher_2 ... ")"`
@@ -61,7 +63,7 @@ Egg generates C++ headers implementing the input grammar; the generated code is 
 These headers depend on the Egg header `parser.hpp`, which defines the `parser` namespace, and must be located in the same folder. 
 (At some point this header may be inlined, but I need to determine how to address the licencing considerations of this first.) 
 Each grammar rule generates a function with the same name; this function takes a `parser::state` reference as a parameter, and returns a boolean. 
-If the rule is typed, there is a second `T&` parameter `psVal`, which is the return value of the rule.
+If the rule is typed, there is a second `T&` parameter `psVal`, which is the return value of the rule. 
 
 A `parser::state` object encapsulates the current parser state. 
 Its constructor takes a `std::istream` reference as a parameter, which it will read from. 

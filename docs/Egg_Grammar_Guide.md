@@ -3,7 +3,7 @@
 Egg is a parser generator for parsing expression grammars (PEGs). 
 Its grammar is based on the grammar of Ian Piumarta's [`leg`](http://piumarta.com/software/peg/). 
 Parsing expression grammars are a formalization of recursive top-down parsers; they are similar to context free grammars, with the primary difference being that alternation in a PEG is ordered, while it is unordered in context free grammars. 
-Due to this quality, a PEG-based parser generator such as Egg does not need a separate lexer, and can do parsing in one pass.
+Due to this property, a PEG-based parser generator such as Egg does not need a separate lexer, and can do parsing in one pass.
 
 ## Matching Rules ##
 
@@ -77,7 +77,7 @@ A subset of the interface for the parser state variables is below:
     - `p.col()` - the input column of position `p`
     - `p.index()` - the character index of position `p`
   - `ps.err` - The error information at the current point in the parse
-    - `e.pos` - The position of the error
+    - `e.pos` - The position of the error `e`
     - `e.expected` - A set of things expected at the error position
     - `e.messages` - A set of error messages at the error position
   - `ps()` - the character at the current position
@@ -88,6 +88,14 @@ A subset of the interface for the parser state variables is below:
 
 You may also include a special semantic action before and after the grammar rules; these rules are delimited with `{$` and `$}` and will be placed before and after the generated rules. 
 The usual `ps` variables are not defined in these actions.
+
+## Optimizations ##
+
+Egg-generated parsers use a hybrid recursive-descent/packrat parsing algorithm. 
+By default each rule corresponds to a memoized function which will be evaluated at most once for each position in the input, with the result of that parsing attempt stored for later attempts. 
+This behaviour can be suppressed on a rule-by-rule basis by adding a `%no-memo` annotation to the rule definition before the `=`, or for the entire parser by calling egg with the `--no-memo` command line flag. 
+You may wish to suppress memoization on rules that will never be retried at a given position, or for rules with large return types to avoid storing a possibly linear number of copies. 
+Due to the inclusion of semantic actions and arbitrary rule types, Egg-generated parsers cannot guarantee the linear time or space bounds of packrat parsers, but careful grammar design and use of `%no-memo` should address these issues in practice.
 
 ## Egg Grammar ##
 

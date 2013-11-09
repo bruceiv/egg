@@ -31,11 +31,12 @@
 #include "visitors/printer.hpp"
 
 /** Egg version */
-static const char* VERSION = "0.2.1";
+static const char* VERSION = "0.3.0";
 
 /** Egg usage string */
 static const char* USAGE = 
-"[-c print|compile] [-i input_file] [-o output_file] [--no-norm] [--help] [--version] [--usage]";
+"[-c print|compile] [-i input_file] [-o output_file] [--no-norm] [--no-memo]\n\
+ [--help] [--version] [--usage]";
 
 /** Full Egg help string */
 static const char* HELP = 
@@ -50,6 +51,7 @@ Supported flags are\n\
                the input or output file name (output preferred) which is a\n\
                valid Egg identifier (default empty)\n\
  --no-norm     turns off grammar normalization\n\
+ --no-memo     turns of grammar memoization\n\
  --usage       print usage message\n\
  --help        print full help message\n\
  --version     print version string\n";
@@ -144,6 +146,7 @@ public:
 		pName = std::string("");
 		nameFlag = false;
 		normFlag = true;
+		memoFlag = true;
 		eMode = COMPILE_MODE;
 
 		i = 1;
@@ -168,6 +171,8 @@ public:
 				parse_name(argv[++i]);
 			} else if ( eq("--no-norm", argv[i]) ) {
 				normFlag = false;
+			} else if ( eq("--no-memo", argv[i]) ) {
+				memoFlag = false;
 			} else if ( eq("--usage", argv[i]) ) {
 				eMode = USAGE_MODE;
 			} else if ( eq("--help", argv[i]) ) {
@@ -194,16 +199,18 @@ public:
 	std::ostream& output() { if ( out ) return *out; else return std::cout; }
 	std::string name() { return pName; }
 	bool norm() { return normFlag; }
+	bool memo() { return memoFlag; }
 	egg_mode mode() { return eMode; }
 
 private:
-	int i;				/**< next unparsed value */
-	std::ifstream* in;	/**< pointer to input stream (0 for stdin) */
-	std::ofstream* out;	/**< pointer to output stream (0 for stdout) */
-	std::string pName;	/**< the name of the parser (empty if none) */
-	bool nameFlag;		/**< has the parser name been explicitly set? */
-	bool normFlag;      /**< should egg do grammar normalization? */
-	egg_mode eMode;		/**< compiler mode to use */
+	int i;				 /**< next unparsed value */
+	std::ifstream* in;	 /**< pointer to input stream (0 for stdin) */
+	std::ofstream* out;	 /**< pointer to output stream (0 for stdout) */
+	std::string pName;	 /**< the name of the parser (empty if none) */
+	bool nameFlag;		 /**< has the parser name been explicitly set? */
+	bool normFlag;       /**< should egg do grammar normalization? */
+	bool memoFlag;       /**< should the generated grammar do memoization? */
+	egg_mode eMode;		 /**< compiler mode to use */
 };
 
 /** Command line interface
@@ -256,6 +263,7 @@ int main(int argc, char** argv) {
 			break;
 		} case COMPILE_MODE: {
 			visitor::compiler c(a.name(), a.output());
+			c.memo(a.memo());
 			c.compile(*g);
 			break;
 		} default: break;

@@ -1,5 +1,10 @@
 # Changelog #
 
+## v0.3.0 ##
+
+- Added grammar rule memoization
+- Added "--no-memo" argument to egg and `%no-memo` rule annotation to supress memoization
+
 ## v0.2.1 ##
 
 - Added `@` and `~` error message inserters to Egg grammar.

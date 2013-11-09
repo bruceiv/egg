@@ -186,13 +186,13 @@ namespace parser {
 			any(const T& t) : p(new of<T>(t)) {}
 
 			/** Copy constructor */
-			any(const any& o) : p(o.p->clone()) {}
+			any(const any& o) : p(o.p ? o.p->clone() : nullptr) {}
 
 			/** Assignment operator */
 			any& operator = (const any& o) {
 				if ( &o != this ) {
 					delete p;
-					p = o.p->clone();
+					p = o.p ? o.p->clone() : nullptr;
 				}
 				return *this;
 			}
@@ -453,7 +453,9 @@ namespace parser {
 		 */
 		bool memo(ind id, struct memo& m) {
 			// Get table iterator
-			auto& tab = memo_table[pos.i - off.i];
+			ind i = pos.i - off.i;
+			if ( i >= memo_table.size() ) return false;
+			auto& tab = memo_table[i];
 			auto it = tab.find(id);
 			
 			// Break if nothing set
@@ -475,8 +477,12 @@ namespace parser {
 			// ignore forgotten position
 			if ( p < off ) return false;
 			
+			// ensure table initialized
+			ind i = p.i - off.i;
+			for (ind ii = memo_table.size(); ii <= i; ++ii) memo_table.emplace_back();
+			
 			// set table entry
-			memo_table[p.i - off.i][id] = m;
+			memo_table[i][id] = m;
 			return true;
 		}
 		
@@ -715,9 +721,9 @@ namespace parser {
 		};
 	}
 	
-	/** Memoizes a non-terminal with the given memoization ID */
+	/** Memoizes and binds a combinator with the given memoization ID */
 	template <typename T>
-	combinator memoize(ind id, T& psVal, nonterminal<T> f) {
+	combinator memoize(ind id, T& psVal, const combinator& f) {
 		return [id,&psVal,f](state& ps) {
 			memo m;
 			if ( ps.memo(id, m) ) {
@@ -727,7 +733,7 @@ namespace parser {
 				}
 			} else {
 				posn psStart = ps.posn();
-				m.success = f(ps, psVal);
+				m.success = f(ps);
 				m.end = ps.posn();
 				if ( m.success ) m.result = psVal;
 				ps.set_memo(psStart, id, m);
