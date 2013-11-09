@@ -703,7 +703,9 @@ namespace parser {
 	combinator memoize(ind id, const combinator& f) {
 		return [id,&f](state& ps) {
 			memo m;
-			if ( ! ps.memo(id, m) ) {
+			if ( ps.memo(id, m) ) {
+				if ( m.success ) ps.set_posn(m.end);
+			} else {
 				posn psStart = ps.posn();
 				m.success = f(ps);
 				m.end = ps.posn();
@@ -718,14 +720,17 @@ namespace parser {
 	combinator memoize(ind id, T& psVal, nonterminal<T> f) {
 		return [id,&psVal,f](state& ps) {
 			memo m;
-			if ( ! ps.memo(id, m) ) {
+			if ( ps.memo(id, m) ) {
+				if ( m.success ) {
+					m.result.bind(psVal);
+					ps.set_posn(m.end);
+				}
+			} else {
 				posn psStart = ps.posn();
 				m.success = f(ps, psVal);
 				m.end = ps.posn();
 				if ( m.success ) m.result = psVal;
 				ps.set_memo(psStart, id, m);
-			} else {
-				m.result.bind(psVal);
 			}
 			return m.success;
 		};
