@@ -25,8 +25,9 @@
   - This may have licencing ramifications - consider a Bison-style exception
 - Modify makefile to remake `egg.hpp` from `egg.egg` or `egg-bak.hpp` as appropriate
 - Move redundant checks from compiler to normalizer
-- Rewrite normalizer to flatten nested sequences/choices
+- Rewrite normalizer to flatten nested sequences/choices (might fail for sequences if you re-introduce psStart)
 - Add flag to make "#pragma once" optional in generated files
 - Rewrite `parser::state.matches(string)` to use the deque iterators instead of generating a second string object
 - Maybe make Egg-based argument parsing grammar (might be more work to make input stream that inputs (argc, argv) than it's worth)
 - 1-index line numbers
+- add hash table to consolidate memoization entries for identical '*' and '+' grammars

@@ -92,9 +92,39 @@ namespace visitor {
 	}; /* class variable_list */
 	
 	/** AST visitor with function-like interface that checks whether an expression is free of 
-	 *  variable bindings or semantic actions. */
-	class is_lexical : ast::visitor {
-	
+	 *  variable bindings or semantic actions. Errors are acceptable, as the first pass will 
+	 *  produce the same errors as later passes. */
+	class is_lexical : ast::tree_visitor {
+	public:
+		/** Constructor; starts traversal */
+		is_lexical(ast::matcher* m) : lexical(true) { m->accept(this); }
+		is_lexical(ast::matcher_ptr m) : lexical(true) { m->accept(this); }
+		
+		operator bool () { return lexical; }
+		
+		void visit(ast::range_matcher& m) { lexical = m.var.empty(); }
+		
+		void visit(ast::rule_matcher& m) { lexical = m.var.empty(); }
+		
+		void visit(ast::any_matcher& m) { lexical = m.var.empty(); }
+		
+		void visit(ast::action_matcher&) { lexical = false; }
+		
+		void visit(ast::seq_matcher& m) {
+			for (auto it = m.ms.begin(); lexical && it != m.ms.end(); ++it) {
+				(*it)->accept(this);
+			}
+		}
+		
+		void visit(ast::alt_matcher& m) {
+			for (auto it = m.ms.begin(); lexical && it != m.ms.end(); ++it) {
+				(*it)->accept(this);
+			}
+		}
+		
+		void visit(ast::capt_matcher& m) { lexical = m.var.empty(); }
+	private:
+		bool lexical;  ///< Is the given expression lacking in semantic elements?
 	}; /* class is_lexical */
 	
 	/** Code generator for Egg matcher ASTs */
@@ -197,13 +227,21 @@ namespace visitor {
 		}
 
 		void visit(ast::many_matcher& m) {
-			out << "parser::many(";
+			if ( do_memo && is_lexical(m.m) ) {
+				out << "parser::memoize_many(" << ++max_memo_id << ", ";
+			} else {
+				out << "parser::many(";
+			}
 			m.m->accept(this);
 			out << ")";
 		}
 
 		void visit(ast::some_matcher& m) {
-			out << "parser::some(";
+			if ( do_memo && is_lexical(m.m) ) {
+				out << "parser::memoize_some(" << ++max_memo_id << ", ";
+			} else {
+				out << "parser::some(";
+			}
 			m.m->accept(this);
 			out << ")";
 		}
