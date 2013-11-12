@@ -34,7 +34,7 @@
 namespace visitor {
 
 	/** Gets a list of variables declared in a grammar rule. */
-	class variable_list : ast::visitor {
+	class variable_list : ast::tree_visitor {
 	public:
 		variable_list() {}
 
@@ -44,10 +44,6 @@ namespace visitor {
 				types.insert(std::make_pair(r.name, r.type));
 			}
 		}
-
-		void visit(ast::char_matcher& m) {}
-		
-		void visit(ast::str_matcher& m) {}
 
 		void visit(ast::range_matcher& m) {
 			if ( ! m.var.empty() ) {
@@ -67,53 +63,11 @@ namespace visitor {
 			}
 		}
 		
-		void visit(ast::empty_matcher& m) {}
-		
-		void visit(ast::action_matcher& m) {}
-		
-		void visit(ast::opt_matcher& m) {
-			m.m->accept(this);
-		}
-
-		void visit(ast::many_matcher& m) {
-			m.m->accept(this);
-		}
-
-		void visit(ast::some_matcher& m) {
-			m.m->accept(this);
-		}
-
-		void visit(ast::seq_matcher& m) {
-			for (auto it = m.ms.begin(); it != m.ms.end(); ++it) {
-				(*it)->accept(this);
-			}
-		}
-		
-		void visit(ast::alt_matcher& m) {
-			for (auto it = m.ms.begin(); it != m.ms.end(); ++it) {
-				(*it)->accept(this);
-			}
-		}
-
-		void visit(ast::look_matcher& m) {
-			m.m->accept(this);
-		}
-
-		void visit(ast::not_matcher& m) {
-			m.m->accept(this);
-		}
-
 		void visit(ast::capt_matcher& m) {
 			vars.insert(std::make_pair(m.var, "std::string"));
 			m.m->accept(this);
 		}
 		
-		void visit(ast::named_matcher& m) {
-			m.m->accept(this);
-		}
-		
-		void visit(ast::fail_matcher& m) {}
-
 		std::map<std::string, std::string> list(ast::matcher_ptr& m) {
 			vars.clear();
 			m->accept(this);
@@ -136,6 +90,12 @@ namespace visitor {
 		/** map of variable names to types */
 		std::map<std::string, std::string> vars;
 	}; /* class variable_list */
+	
+	/** AST visitor with function-like interface that checks whether an expression is free of 
+	 *  variable bindings or semantic actions. */
+	class is_lexical : ast::visitor {
+	
+	}; /* class is_lexical */
 	
 	/** Code generator for Egg matcher ASTs */
 	class compiler : ast::visitor {

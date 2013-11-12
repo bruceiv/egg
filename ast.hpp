@@ -364,26 +364,47 @@ namespace ast {
 
 	/** Empty visitor class; provides a default implementation of each of the 
 	 *  methods. */
-	class default_visitor : visitor {
+	class default_visitor : public visitor {
 	public:
-		void visit(char_matcher& m) {}
-		void visit(str_matcher& m) {}
-		void visit(range_matcher& m) {}
-		void visit(rule_matcher& m) {}
-		void visit(any_matcher& m) {}
-		void visit(empty_matcher& m) {}
-		void visit(action_matcher& m) {}
-		void visit(opt_matcher& m) {}
-		void visit(many_matcher& m) {}
-		void visit(some_matcher& m) {}
-		void visit(seq_matcher& m) {}
-		void visit(alt_matcher& m) {}
-		void visit(look_matcher& m) {}
-		void visit(not_matcher& m) {}
-		void visit(capt_matcher& m) {}
-		void visit(named_matcher& m) {}
-		void visit(fail_matcher& m) {}
+		virtual void visit(char_matcher& m) {}
+		virtual void visit(str_matcher& m) {}
+		virtual void visit(range_matcher& m) {}
+		virtual void visit(rule_matcher& m) {}
+		virtual void visit(any_matcher& m) {}
+		virtual void visit(empty_matcher& m) {}
+		virtual void visit(action_matcher& m) {}
+		virtual void visit(opt_matcher& m) {}
+		virtual void visit(many_matcher& m) {}
+		virtual void visit(some_matcher& m) {}
+		virtual void visit(seq_matcher& m) {}
+		virtual void visit(alt_matcher& m) {}
+		virtual void visit(look_matcher& m) {}
+		virtual void visit(not_matcher& m) {}
+		virtual void visit(capt_matcher& m) {}
+		virtual void visit(named_matcher& m) {}
+		virtual void visit(fail_matcher& m) {}
 	}; /* class default_visitor */
+	
+	/** Default visitor which visits the entire tree. */
+	class tree_visitor : public default_visitor {
+		virtual void visit(opt_matcher& m) { m.m->accept(this); }
+		virtual void visit(many_matcher& m) { m.m->accept(this); }
+		virtual void visit(some_matcher& m) { m.m->accept(this); }
+		virtual void visit(seq_matcher& m) {
+			for (auto it = m.ms.begin(); it != m.ms.end(); ++it) {
+				(*it)->accept(this);
+			}
+		}
+		virtual void visit(alt_matcher& m) {
+			for (auto it = m.ms.begin(); it != m.ms.end(); ++it) {
+				(*it)->accept(this);
+			}
+		}
+		virtual void visit(look_matcher& m) { m.m->accept(this); }
+		virtual void visit(not_matcher& m) { m.m->accept(this); }
+		virtual void visit(capt_matcher& m) { m.m->accept(this); }
+		virtual void visit(named_matcher& m) { m.m->accept(this); }
+	};
 
 	/** Represents a grammar rule.
 	 *  Pairs a name and optional type with a matching rule. The contained rule 
