@@ -1,5 +1,9 @@
 # Changelog #
 
+## v0.3.1 ##
+- Added memoization for repeated '*' and '+' rule
+- Added new "ast::tree_visitor" default base class for tree traversals
+
 ## v0.3.0 ##
 
 - Added grammar rule memoization

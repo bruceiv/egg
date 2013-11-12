@@ -1,11 +1,5 @@
 # Roadmap #
 
-## v0.3.1 ##
-
-Expected mid-November 2013
-
-- Add memoization for simple repeated matchers (* and + with no actions or variable bindings)
-
 ## v0.3.2 ##
 
 Expected mid-November 2013

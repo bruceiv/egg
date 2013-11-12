@@ -95,6 +95,7 @@ Egg-generated parsers use a hybrid recursive-descent/packrat parsing algorithm.
 By default each rule corresponds to a memoized function which will be evaluated at most once for each position in the input, with the result of that parsing attempt stored for later attempts. 
 This behaviour can be suppressed on a rule-by-rule basis by adding a `%no-memo` annotation to the rule definition before the `=`, or for the entire parser by calling egg with the `--no-memo` command line flag. 
 You may wish to suppress memoization on rules that will never be retried at a given position, or for rules with large return types to avoid storing a possibly linear number of copies. 
+'*' and '+' repetitive matchers are also memoized if possible; a repetitive matcher can be safely memoized if it doesn't bind any variables or include any semantic actions.
 Due to the inclusion of semantic actions and arbitrary rule types, Egg-generated parsers cannot guarantee the linear time or space bounds of packrat parsers, but careful grammar design and use of `%no-memo` should address these issues in practice.
 
 ## Egg Grammar ##

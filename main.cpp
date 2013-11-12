@@ -31,7 +31,7 @@
 #include "visitors/printer.hpp"
 
 /** Egg version */
-static const char* VERSION = "0.3.0";
+static const char* VERSION = "0.3.1";
 
 /** Egg usage string */
 static const char* USAGE = 
