@@ -16,6 +16,7 @@
 - Non-syntactic '{' and '}' characters in actions (e.g. those in comments or string literals) may break the parser if unmatched.
 - Parens in grammar pretty-printer are not entirely correct
 - Actions that modify psVal rather than assigning to it may behave differently under memoization than not
+- Should modify "many" and "some" combinators to break their loop on empty match (i.e. silently treat the language matched by their subexpression e as _L(e) \ epsilon_)
 
 ## Code Cleanup ##
 - Maybe move to `unique_ptr` from `shared_ptr`

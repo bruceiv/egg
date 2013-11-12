@@ -742,6 +742,42 @@ namespace parser {
 		};
 	}
 	
+	namespace {
+		/** Helper function for memoizing repetition */
+		memo many_memoized(ind id, const combinator& f, state& ps) {
+			memo m;
+			if ( ps.memo(id, m) ) {
+				if ( m.end > ps.posn() ) ps.set_posn(m.end);
+			} else {
+				posn psStart = ps.posn();
+				if ( f(ps) ) {
+					m = many_memoized(id, f, ps);
+				}
+				m.success = true;
+				m.end = ps.posn();
+				ps.set_memo(psStart, id, m);
+			}
+			return m;
+		}
+	} /* anonymous namespace */
+	
+	/** Memoizes a many-matcher  */
+	combinator memoize_many(ind id, const combinator& f) {
+		return [id,&f](state& ps) {
+			many_memoized(id, f, ps);
+			return true;
+		};
+	}
+	
+	/** Memoizes a some-matcher */
+	combinator memoize_some(ind id, const combinator& f) {
+		return [id,&f](state& ps) {
+			posn psStart;
+			many_memoized(id, f, ps);
+			return ( ps.posn() > psStart );
+		};
+	}
+	
 	/** Captures a string */
 	combinator capture(std::string& s, const combinator& f) {
 		return [&s,&f](state& ps) {
