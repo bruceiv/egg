@@ -1,4 +1,7 @@
 ## Feature Wishlist ##
+- Finish derivative implementation
+  - Add semantic actions
+  - Possibly add a "make" helper, implementing things like singleton fail/inf/eps expressions
 - add &{ ... } semantic predicates to the language
 - add ~{ ... } failure actions to the language
 - Add cut syntax
