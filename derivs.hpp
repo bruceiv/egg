@@ -24,6 +24,8 @@
 
 #include <string>
 #include <memory>
+#include <unordered_map>
+#include <utility>
 
 /**
  * Implements derivative parsing for parsing expression grammars, according to the algorithm 
@@ -74,8 +76,15 @@ namespace derivs {
 	
 	/// Abstract base class for parsing expressions
 	struct expr {
-		/// Derivative of this expression with respect to c
-		virtual ptr<expr> d(char c) const = 0;
+		/// Memoization table type
+		using memo_table = std::unordered_map<expr*, ptr<expr>>;
+		
+		/// Derivative of this expression with respect to x (memoized)
+		ptr<expr> d(char x) {
+			ptr<expr>& dx = memo[this];
+			if ( ! dx ) dx = deriv(x);
+			return dx;
+		}
 		
 		/// Is this expression nullable?
 		virtual nbl_mode nbl() const = 0;
@@ -85,13 +94,24 @@ namespace derivs {
 		
 		/// Expression node type
 		virtual expr_type type() const = 0;
+		
+	protected:
+		/// Constructor providing memoization table reference
+		expr(memo_table& memo) : memo(memo) {}
+		
+		/// Actual derivative calculation
+		virtual ptr<expr> deriv(char x) const = 0;
+		
+		/// Makes an expression pointer given the constructor arguments for some subclass T (less 
+		/// the memo-table)
+		template <typename T, typename... Args>
+		inline ptr<expr> expr_ptr(Args... args) const {
+			return std::static_ptr_cast<expr>(std::make_shared<T>(memo, args...));
+		}	
+		
+		/// Memoization table for derivatives
+		mutable memo_table& memo;	
 	}; // struct expr
-	
-	/// Makes an expression pointer given the constructor arguments for some subclass T
-	template <typename T, typename... Args>
-	inline ptr<expr> expr_ptr(Args... args) {
-		return std::static_ptr_cast<expr>(std::make_shared<T>(args...));
-	}
 	
 	class fail_expr;
 	class inf_expr;
@@ -112,7 +132,9 @@ namespace derivs {
 	
 	/// A failure parsing expression
 	struct fail_expr : public expr {
-		ptr<expr> d(char) const {
+		fail_expr(expr::memo_table& memo) : expr(memo) {}
+		
+		ptr<expr> deriv(char) const {
 			// A failure expression can't un-fail - no strings to match with any prefix
 			return expr_ptr<fail_expr>();
 		}
@@ -124,7 +146,9 @@ namespace derivs {
 	
 	/// An infinite loop failure parsing expression
 	struct inf_expr : public expr {
-		ptr<expr> d(char) const {
+		inf_expr(expr::memo_table& memo) : expr(memo) {}
+		
+		ptr<expr> deriv(char) const {
 			// An infinite loop expression never breaks, ill defined with any prefix
 			return expr_ptr<inf_expr>();
 		}
@@ -136,7 +160,9 @@ namespace derivs {
 	
 	/// An empty success parsing expression
 	struct eps_expr : public expr {
-		ptr<expr> d(char) const {
+		eps_expr(expr::memo_table& memo) : expr(memo) {}
+		
+		ptr<expr> deriv(char) const {
 			// No prefixes to remove from language containing the empty string; all fail
 			return expr_ptr<fail_expr>();
 		}
@@ -148,9 +174,9 @@ namespace derivs {
 	
 	/// A lookahead success parsing expression
 	struct look_expr : public expr {
-		look_expr(int gen = 0) : gen(gen) {}
+		look_expr(expr::memo_table& memo, int gen = 0) : expr(memo), gen(gen) {}
 		
-		ptr<expr> d(char) const {
+		ptr<expr> deriv(char) const {
 			// Lookahead success is just a marker, so persists (character will be parsed by sequel)
 			return expr_ptr<look_expr>(gen);
 		}
@@ -164,9 +190,9 @@ namespace derivs {
 	
 	/// A single-character parsing expression
 	struct char_expr : public expr {
-		char_expr(char c) : c(c) {}
+		char_expr(expr::memo_table& memo, char c) : expr(memo), c(c) {}
 		
-		ptr<expr> d(char x) const {
+		ptr<expr> deriv(char x) const {
 			// Single-character expression either consumes matching character or fails
 			return ( c == x ) ? 
 				expr_ptr<eps_expr>() : 
@@ -182,9 +208,9 @@ namespace derivs {
 	
 	/// A character range parsing expression
 	struct range_expr : public expr {
-		range_expr(char b, char e) : b(b), e(e) {}
+		range_expr(expr::memo_table& memo, char b, char e) : expr(memo), b(b), e(e) {}
 		
-		ptr<expr> d(char x) const {
+		ptr<expr> deriv(char x) const {
 			// Character range expression either consumes matching character or fails
 			return ( b <= x && x <= e ) ?
 				expr_ptr<eps_expr>() : 
@@ -201,7 +227,9 @@ namespace derivs {
 	
 	/// A parsing expression which matches any character
 	struct any_expr : public expr {
-		ptr<expr> d(char) const {
+		any_expr(expr::memo_table& memo) : expr(memo) {}
+		
+		ptr<expr> deriv(char) const {
 			// Any-character expression consumes any character
 			return expr_ptr<eps_expr>();
 		}
@@ -259,9 +287,11 @@ namespace derivs {
 		}; // struct str_node
 		
 		/// Constructs a string expression from a string node and a length
-		str_expr(str_node s, unsigned long len) : s(s), len(len) {}
+		str_expr(expr::memo_table& memo, str_node s, unsigned long len) 
+			: expr(memo), s(s), len(len) {}
 		/// Constructs a string expression from a standard string (should be non-empty)
-		str_expr(std::string t) : s(t), len(t.size()) {}
+		str_expr(expr::memo_table& memo, std::string t) 
+			: expr(memo), s(t), len(t.size()) {}
 		
 	public:
 		/// Makes an appropriate expression node for the length of the string
@@ -273,7 +303,7 @@ namespace derivs {
 			}
 		}
 		
-		ptr<expr> d(char x) const {
+		ptr<expr> deriv(char x) const {
 			// Check that the first character matches
 			if ( s.c != x ) return expr_ptr<fail_expr>();
 			
@@ -294,6 +324,86 @@ namespace derivs {
 		str_node s;         ///< Internal string representation
 		unsigned long len;  ///< length of internal string
 	}; // struct str_expr
+	
+	/// A parsing expression representing a non-terminal
+	struct rule_expr : public expr {
+	private:
+		unsigned char NBL_MASK  = 0x3;  ///< mask for nbl flag bits
+		unsigned char LK_MASK   = 0xC;  ///< mask for lk? flag bits
+		
+		unsigned char NBL_VAL   = 0x1;  ///< value for NBL
+		unsigned char EMPTY_VAL = 0x3;  ///< value for EMPTY
+		unsigned char SHFT_VAL  = 0x2;  ///< value for SHFT
+		
+		unsigned char LOOK_VAL  = 0x4;  ///< value for LOOK
+		unsigned char PART_VAL  = 0xC;  ///< value for PART
+		unsigned char READ_VAL  = 0x8;  ///< value for READ
+	public:
+		rule_expr(expr::memo_table& memo, ptr<expr> r) : expr(memo), r(r) {}
+		
+		ptr<expr> deriv(char x) const {
+			// signal infinite loop if we try to take this derivative again
+			memo[this] = expr_ptr<inf_expr>();
+			// calculate derivative
+			return r.d(x);
+		}
+		
+		nbl_mode nbl() const {
+			switch ( flags & NBL_MASK ) {
+			case SHFT_VAL:  return SHFT;
+			case NBL_VAL:   return NBL;
+			case EMPTY_VAL: return EMPTY;
+			
+			default:                      // no nullability set yet
+				flags |= SHFT_VAL;        // set nbl(this) to SHFT
+				nbl_mode mode = r.nbl();  // calculate nullability
+				
+				if ( mode == SHFT ) {
+					return SHFT;
+				} else {
+					flags &= ~NBL_MASK;      // unset nullability
+					if ( mode == NBL ) {
+						flags |= NBL_VAL;    // set nullability to NBL
+						return NBL;
+					} else {
+						flags |= EMPTY_VAL;  // set nullability to EMPTY
+						return EMPTY;
+					}
+				}
+			}
+		}
+		
+		lk_mode lk() const {
+			switch ( flags & LK_MASK ) {
+			case READ_VAL: return READ;
+			case LOOK_VAL: return LOOK;
+			case PART_VAL: return PART;
+			
+			default:                    // no lookahead set yet
+				flags |= READ_VAL;      // set lk?(this) to READ
+				lk_mode mode = r.lk();  // calculate lookahead
+				
+				if ( mode == READ ) {
+					return READ;
+				} else {
+					flags &= ~LK_MASK;      // unset lookahead
+					if ( mode == LOOK ) {
+						flags |= LOOK_VAL;  // set lookahead to LOOK
+						return LOOK;
+					} else {
+						flags |= PART_VAL;  // set lookahead to PART
+						return PART;
+					}
+				}
+			}
+		}
+		
+		expr_type type() const { return rule_type; }
+		
+		ptr<expr> r;  ///< Expression corresponding to this rule
+	private:
+		mutable unsigned char flags;
+	}; // struct rule_expr
 	
 } // namespace derivs
 
