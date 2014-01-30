@@ -101,7 +101,12 @@ namespace derivs {
 		uint16_t min;  ///< Minimum subexpression generation
 		uint16_t max;  ///< Maximum subexpression generation
 	}
-	using gen_type = std::pair<uint16_t, uint16_t>;
+	
+	/// Type of generation modification to perform in derivative
+	enum gen_mod {
+		ADD,  ///< add the given value to the generation
+		SET   ///< set the generation to the given value
+	};
 	
 	/// Abstract base class for parsing expressions
 	class expr {
@@ -156,7 +161,7 @@ namespace derivs {
 		expr(memo_table& memo) : memo(memo), flags(0) {}
 		
 		/// Actual derivative calculation
-		virtual ptr<expr> deriv(char x) const = 0;
+		virtual ptr<expr> deriv(char) const = 0;
 		
 		/// Actual computation of nullability mode
 		virtual nbl_mode nullable() const = 0;
