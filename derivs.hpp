@@ -78,35 +78,36 @@ namespace derivs {
 	}; // enum lk_mode
 	
 	/// Generation of an expression
-	struct gen_type {
-		/// Constructs a gen_type with matching bounds
-		gen_type(uint16_t x = 0) : min(x), max(x) {}
-		
-		/// Constructs a gen_type with the given minimum and maximum
-		gen_type(uint16_t min, uint16_t max) : min(min), max(max) {}
-		
-		/// Constructs a gen_type with the union of the two bounds
-		gen_type(const gen_type& a, const gen_type& b) {
-			min = std::min(a.min, b.min);
-			max = std::max(a.max, b.max);
-		}
-		
-		/// Unions the given bounds with this object
-		gen_type& operator |= (const gen_type& o) {
-			min = std::min(min, o.min);
-			max = std::max(max, o.max);
-			return *this;
-		}
-		
-		uint16_t min;  ///< Minimum subexpression generation
-		uint16_t max;  ///< Maximum subexpression generation
-	}
+//	struct gen_type {
+//		/// Constructs a gen_type with matching bounds
+//		gen_type(uint16_t x = 0) : min(x), max(x) {}
+//		
+//		/// Constructs a gen_type with the given minimum and maximum
+//		gen_type(uint16_t min, uint16_t max) : min(min), max(max) {}
+//		
+//		/// Constructs a gen_type with the union of the two bounds
+//		gen_type(const gen_type& a, const gen_type& b) {
+//			min = std::min(a.min, b.min);
+//			max = std::max(a.max, b.max);
+//		}
+//		
+//		/// Unions the given bounds with this object
+//		gen_type& operator |= (const gen_type& o) {
+//			min = std::min(min, o.min);
+//			max = std::max(max, o.max);
+//			return *this;
+//		}
+//		
+//		uint16_t min;  ///< Minimum subexpression generation
+//		uint16_t max;  ///< Maximum subexpression generation
+//	};
+
+	/// Type of generation value
+	using gen_type = uint8_t;
 	
-	/// Type of generation modification to perform in derivative
-	enum gen_mod {
-		ADD,  ///< add the given value to the generation
-		SET   ///< set the generation to the given value
-	};
+	/// Type of generation flags
+	using gen_flags = uint64_t;
+	
 	
 	/// Abstract base class for parsing expressions
 	class expr {
@@ -130,7 +131,7 @@ namespace derivs {
 		/// Is this a lookahead expression?
 		virtual lk_mode lk() const = 0;
 		
-		/// Lookahead generation of this expression
+		/// Maximum lookahead generation of this expression
 		virtual gen_type gen() const = 0;
 		
 		/// Expression node type
@@ -144,21 +145,16 @@ namespace derivs {
 		using table = std::unordered_map<expr*, ptr<expr>>;
 	
 	protected:
-		static const uint32_t NBL_MASK     = 0xC0000000;  ///< mask for nbl flag bits
-		static const uint32_t LK_MASK      = 0x30000000;  ///< mask for lk? flag bits
-		static const uint32_t GEN_SET_MASK = 0x08000000;  ///< mask for generation values set
-		static const uint16_t MIN_GEN_MASK = 0x07FF;      ///< mask for minimum generation value
+		static const uint8_t NBL_VAL      = 0x1;  ///< value for NBL
+		static const uint8_t EMPTY_VAL    = 0x3;  ///< value for EMPTY
+		static const uint8_t SHFT_VAL     = 0x2;  ///< value for SHFT
 		
-		static const uint32_t NBL_VAL      = 0x40000000;  ///< value for NBL
-		static const uint32_t EMPTY_VAL    = 0xC0000000;  ///< value for EMPTY
-		static const uint32_t SHFT_VAL     = 0x80000000;  ///< value for SHFT
-		
-		static const uint32_t LOOK_VAL     = 0x10000000;  ///< value for LOOK
-		static const uint32_t PART_VAL     = 0x30000000;  ///< value for PART
-		static const uint32_t READ_VAL     = 0x20000000;  ///< value for READ
+		static const uint8_t LOOK_VAL     = 0x1;  ///< value for LOOK
+		static const uint8_t PART_VAL     = 0x3;  ///< value for PART
+		static const uint8_t READ_VAL     = 0x2;  ///< value for READ
 		
 		/// Constructor providing memoization table reference
-		expr(memo_table& memo) : memo(memo), flags(0) {}
+		expr(memo_table& memo) : memo(memo), g(0) { flags = {0,0,false}; }
 		
 		/// Actual derivative calculation
 		virtual ptr<expr> deriv(char) const = 0;
@@ -169,7 +165,7 @@ namespace derivs {
 		/// Actual computation of lookahead mode
 		virtual lk_mode lookahead() const = 0;
 		
-		/// Actual computation of the generation
+		/// Actual computation of maximum generation
 		virtual gen_type generation() const = 0;
 		
 	public:
@@ -180,7 +176,7 @@ namespace derivs {
 		}
 		
 		virtual nbl_mode nbl() const {
-			switch ( flags & NBL_MASK ) {
+			switch ( flags.nbl ) {
 			case SHFT_VAL:  return SHFT;
 			case NBL_VAL:   return NBL;
 			case EMPTY_VAL: return EMPTY;
@@ -188,16 +184,16 @@ namespace derivs {
 			default:                         // no nullability set yet
 				nbl_mode mode = nullable();  // calculate nullability
 				switch ( mode ) {            // set nullability
-				case SHFT:  flags |= SHFT_VAL;  break;
-				case NBL:   flags |= NBL_VAL;   break;
-				case EMPTY: flags |= EMPTY_VAL; break;
+				case SHFT:  flags.nbl = SHFT_VAL;  break;
+				case NBL:   flags.nbl = NBL_VAL;   break;
+				case EMPTY: flags.nbl = EMPTY_VAL; break;
 				}
 				return mode;
 			}
 		}
 		
 		virtual lk_mode lk() const {
-			switch ( flags & LK_MASK ) {
+			switch ( flags.lk ) {
 			case READ_VAL: return READ;
 			case LOOK_VAL: return LOOK;
 			case PART_VAL: return PART;
@@ -205,32 +201,32 @@ namespace derivs {
 			default:                         // no lookahead set yet
 				lk_mode mode = lookahead();  // calculate lookahead
 				switch ( mode ) {            // set nullability
-				case READ: flags |= READ_VAL; break;
-				case LOOK: flags |= LOOK_VAL; break;
-				case PART: flags |= PART_VAL; break;
+				case READ: flags.lk = READ_VAL; break;
+				case LOOK: flags.lk = LOOK_VAL; break;
+				case PART: flags.lk = PART_VAL; break;
 				}
 				return mode;
 			}
 		}
 		
 		virtual gen_type gen() const {
-			if ( flags & GEN_SET_MASK ) return gen_type(gens[0] & MIN_GEN_MASK, gens[1]);
-			
-			gen_type g = generation();
-			
-			gens[0] |= g.min;
-			gens[1]  = g.max;
-			flags   |= GEN_SET_MASK;
+			// Set generation value if unset
+			if ( ! flags.gen ) {
+				g = generation(); 
+				flags.gen = true;
+			}
 			
 			return g;
 		}
 	
 	protected:
-		mutable table& memo;   ///< Memoization table for derivatives
-		mutable union {
-			uint32_t flags;    ///< Flags to cache state
-			uint16_t gens[2];  ///< Minimum/maximum generation
-		};
+		mutable table&   memo;     ///< Memoization table for derivatives
+		mutable gen_type g;        ///< Maximum generation value
+		mutable struct {
+			uint8_t nbl : 2;  ///< Nullable value: one of 0 (unset), 1 (NBL), 2(SHFT), 3(EMPTY)
+			uint8_t lk  : 2;  ///< Lookahead value: one of 0 (unset), 1(LOOK), 2(READ), 3(PART)
+			bool    gen : 1;  ///< Generation set?
+		} flags;                   ///< Memoization status flags
 	}; // class memo_expr
 	
 	class fail_expr;
@@ -300,10 +296,10 @@ namespace derivs {
 	
 	/// A lookahead success parsing expression
 	class look_expr : public expr {
-		look_expr(uint16_t g = 0) : g(g) {}
+		look_expr(gen_type g = 1) : g(g) {}
 		
 	public:
-		static ptr<expr> make(uint16_t g) {
+		static ptr<expr> make(gen_type g = 1) {
 			// gen-0 lookahead success is just an epsilon
 			return ( g == 0 ) ? 
 				expr::as_ptr<eps_expr>() :
@@ -311,14 +307,14 @@ namespace derivs {
 		}
 		
 		// Lookahead success is just a marker, so persists (character will be parsed by sequel)
-		virtual ptr<expr> d(char) const { return expr_ptr<look_expr>(gen); }
+		virtual ptr<expr> d(char) const { return expr_ptr<look_expr>(g); }
 		
 		virtual nbl_mode  nbl()   const { return NBL; }
 		virtual lk_mode   lk()    const { return LOOK; }
-		virtual gen_type  gen()   const { return gen_type(g); }
+		virtual gen_t     gen()   const { return gen_type(g); }
 		virtual expr_type type()  const { return look_type; }
 		
-		uint16_t g;  ///< Lookahead generation
+		gen_type g;  ///< Lookahead generation
 	}; // class look_expr
 	
 	/// A single-character parsing expression
@@ -516,25 +512,23 @@ namespace derivs {
 		
 		virtual nbl_mode nullable() const {
 			// Stop this from infinitely recursing
-			flags ^= SHFT_VAL;
+			flags.nbl = SHFT_VAL;
 			// Calculate nullability
-			nbl_mode mode = r.nbl();
-			// Unset NBL flag
-			flags ^= SHFT_VAL;
-			return mode;
+			return r.nbl();
 		}
 		
 		virtual lk_mode lookahead() const {
 			// Stop this from infinitely recursing
-			flags ^= READ_VAL;
-			// Calculate nullability
-			lk_mode mode = r.lk();
-			// Unset LOOK flag
-			flags ^= READ_VAL;
-			return mode;
+			flags.lk = READ_VAL;
+			// Calculate lookahead
+			return r.lk();
 		}
 		
-		virtual gen_type  gen()  const { return gen_type(0); }
+		virtual gen_type generation() const {
+			// Statically defined, can't have lookahead generation greater than 1
+			return gen_type(lk() == READ ? 0 : 1);
+		}
+		
 		virtual expr_type type() const { return rule_type; }
 		
 		ptr<expr> r;  ///< Expression corresponding to this rule
@@ -544,28 +538,28 @@ namespace derivs {
 	class not_expr : public memo_expr {
 		friend and_expr;
 		
-		not_expr(memo_expr::table& memo, ptr<expr> e, uint16_t g = 0)
-			: memo_expr(memo), e(e) { gens[1] = g; }
+		not_expr(memo_expr::table& memo, ptr<expr> e)
+			: memo_expr(memo), e(e) { g = 1; flags.gen = true; }
 		
 	public:
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> e, uint16_t g = 0) {
+		static ptr<expr> make(memo_expr::table& memo, ptr<expr> e) {
 			switch ( e->type() ) {
 			// return match on subexpression failure
-			case fail_type: return look_expr::make(g);
+			case fail_type: return look_expr::make(1);
 			// propegate infinite loop
 			case inf_type:  return inf_expr::make();
 			// collapse nested lookaheads
-			case not_type:  return expr::as_ptr<and_expr>(memo, e->e, g);
-			case and_type:  return expr::as_ptr<not_expr>(memo, e->e, g);
+			case not_type:  return expr::as_ptr<and_expr>(memo, e->e);
+			case and_type:  return expr::as_ptr<not_expr>(memo, e->e);
 			}
 			// return failure on subexpression success
 			if ( e->nbl() ) return fail_expr::make();
 			
-			return expr::as_ptr<not_expr>(memo, e, g);
+			return expr::as_ptr<not_expr>(memo, e);
 		}
 		
 		// Take negative lookahead of subexpression derivative
-		virtual ptr<expr> deriv(char x) const { return not_expr::make(memo, e->d(x), gens[1]); }
+		virtual ptr<expr> deriv(char x) const { return not_expr::make(memo, e->d(x)); }
 		
 		virtual nbl_mode nullable() const {
 			// not-expression generally matches on empty string, but not all strings; it will only 
@@ -574,7 +568,7 @@ namespace derivs {
 		}
 		
 		virtual lk_mode   lk()   const { return LOOK; }
-		virtual gen_type  gen()  const { return gen_type(gens[1]); }
+		virtual gen_type  gen()  const { return gen_type(1); }
 		virtual expr_type type() const { return not_type; }
 		
 		ptr<expr> e;  ///< Subexpression to negatively match
@@ -584,28 +578,28 @@ namespace derivs {
 	class and_expr : public memo_expr {
 		friend not_expr;
 		
-		and_expr(memo_expr::table& memo, ptr<expr> e, uint16_t g = 0) 
-			: memo_expr(memo), e(e) { gens[1] = g; }
+		and_expr(memo_expr::table& memo, ptr<expr> e) 
+			: memo_expr(memo), e(e) { g = 1; flags.gen = true; }
 		
 	public:
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> e, uint16_t g = 0) {
+		static ptr<expr> make(memo_expr::table& memo, ptr<expr> e) {
 			switch ( e->type() ) {
 			// return failure on subexpression failure
 			case fail_type: return fail_expr::make();
 			// propegate infinite loop
 			case inf_type:  return inf_expr::make();
 			// collapse nested lookaheads
-			case not_type:  return expr::as_ptr<not_expr>(memo, e->e, g);
-			case and_type:  return expr::as_ptr<and_expr>(memo, e->e, g);
+			case not_type:  return expr::as_ptr<not_expr>(memo, e->e);
+			case and_type:  return expr::as_ptr<and_expr>(memo, e->e);
 			}
 			// return success on subexpression success
-			if ( e->nbl() ) return look_expr::make(g);
+			if ( e->nbl() ) return look_expr::make(1);
 			
-			return expr::as_ptr<and_expr>(memo, e, g);
+			return expr::as_ptr<and_expr>(memo, e);
 		}
 		
 		// Take positive lookahead of subexpression derivative
-		virtual ptr<expr> deriv(char x) const { return and_expr::make(memo, e->d(x), gens[1]); }
+		virtual ptr<expr> deriv(char x) const { return and_expr::make(memo, e->d(x)); }
 		
 		virtual nbl_mode nullable() const {
 			// and-expression matches on the same set as its subexpression
@@ -613,7 +607,7 @@ namespace derivs {
 		}
 		
 		virtual lk_mode   lk()   const { return LOOK; }
-		virtual gen_type  gen()  const { return gen_type(gens[1]); }
+		virtual gen_type  gen()  const { return gen_type(1); }
 		virtual expr_type type() const { return and_type; }
 		
 		ptr<expr> e;  ///< Subexpression to match
@@ -664,7 +658,7 @@ namespace derivs {
 			else return PART;
 		}
 		
-		virtual gen_type generation() const { return gen_type(a.gen(), b.gen()); }
+		virtual gen_type generation() const { return gen_type(max(a.gen(), b.gen())); }
 		
 		virtual expr_type type() const { return seq_type; }
 		
@@ -674,10 +668,38 @@ namespace derivs {
 	
 	/// A parsing expression representing the alternation of two parsing expressions
 	class alt_expr : public memo_expr {
-	public:
-		static ptr<expr> make() {}
+		expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, gen_flags ag, gen_flags bg)
+			: memo_expr(memo), a(a), b(b), ag(ag), bg(bg) {}
 		
-		virtual ptr<expr> deriv(char x) const {}
+	public:
+		/// Make an expression using the default generation rules
+		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b) {
+			gen_flags ag, bg;
+						
+			// in both cases, 0 for READ, 1 for LOOK, 0 & 1 for PART
+			switch ( a->lk() ) {
+			case READ: flags::set(ag, 0);                    break;
+			case LOOK: flags::set(ag, 1);                    break;
+			case PART: flags::set(ag, 0); flags::set(ag, 1); break;
+			}
+			switch ( b->lk() ) {
+			case READ: flags::set(bg, 0);                    break;
+			case LOOK: flags::set(bg, 1);                    break;
+			case PART: flags::set(bg, 0); flags::set(bg, 1); break;
+			}
+			
+			return alt_expr::make(memo, a, b, ag, bg);
+		}
+		
+		/// Make an expression given the generation history
+		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
+		                      gen_flags ag, gen_flags bg) {
+			
+		}
+		
+		virtual ptr<expr> deriv(char x) const {
+			
+		}
 		
 		virtual nbl_mode nullable() const {
 			nbl_mode an = a->nbl(), bn = b->nbl();
@@ -695,12 +717,19 @@ namespace derivs {
 			else return PART;
 		}
 		
-		virtual gen_type generation() const { return gen_type(a.gen(), b.gen()); }
+		virtual gen_type generation() const {
+			gen_flags tg;
+			flags::set_union(ag, bg, tg, 1);       // Union generation flags into tg
+			// Don't want count, want high bit -- need to add to library
+			return gen_type(flags::count(tg, 1));  // Count set bits for maximum generation
+		}
 		
 		virtual expr_type type() const { return alt_type; }
 		
-		ptr<expr> a;  ///< First subexpression
-		ptr<expr> b;  ///< Second subexpression
+		ptr<expr> a;   ///< First subexpression
+		ptr<expr> b;   ///< Second subexpression
+		gen_flags ag;  ///< Generation flags for a
+		gen_flags bg;  ///< Generation flags for b
 	}; // class alt_expr
 	
 	/// A parsing expression to backtrack from a nullable first sequence element
