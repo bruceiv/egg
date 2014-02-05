@@ -547,7 +547,7 @@ namespace derivs {
 			// return match on subexpression failure
 			case fail_type: return look_expr::make(1);
 			// propegate infinite loop
-			case inf_type:  return inf_expr::make();
+			case inf_type:  return e; // an inf_expr
 			// collapse nested lookaheads
 			case not_type:  return expr::as_ptr<and_expr>(memo, e->e);
 			case and_type:  return expr::as_ptr<not_expr>(memo, e->e);
@@ -585,12 +585,12 @@ namespace derivs {
 		static ptr<expr> make(memo_expr::table& memo, ptr<expr> e) {
 			switch ( e->type() ) {
 			// return failure on subexpression failure
-			case fail_type: return fail_expr::make();
+			case fail_type: return e; // a fail_expr
 			// propegate infinite loop
-			case inf_type:  return inf_expr::make();
+			case inf_type:  return e; // an inf_expr
 			// collapse nested lookaheads
-			case not_type:  return expr::as_ptr<not_expr>(memo, e->e);
-			case and_type:  return expr::as_ptr<and_expr>(memo, e->e);
+			case not_type:  return e; // a not_expr wrapping e->e
+			case and_type:  return e; // an and_expr wrapping e->e
 			}
 			// return success on subexpression success
 			if ( e->nbl() ) return look_expr::make(1);
@@ -625,15 +625,15 @@ namespace derivs {
 			case eps_type:  return b;
 			case look_type: return b;
 			// failing or infinite loop first element propegates
-			case fail_type: return fail_expr::make();
-			case inf_type:  return inf_expr::make();
+			case fail_type: return a; // a fail_expr
+			case inf_type:  return a; // an inf_expr
 			}
 			
 			switch ( b->type() ) {
 			// empty second element leaves just first
 			case eps_type:  return a;
 			// failing second element propegates
-			case fail_type: return fail_expr::make();
+			case fail_type: return b; // a fail_expr
 			}
 			
 			return expr::as_ptr<seq_expr>(memo, a, b);
@@ -674,8 +674,19 @@ namespace derivs {
 	public:
 		/// Make an expression using the default generation rules
 		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b) {
+			switch ( a->type() ) {
+			// if first alternative fails, use second
+			case fail_type: return b;
+			// if first alternative is infinite loop, propegate
+			case inf_type:  return a; // an inf_expr
+			}
+			// if first alternative is nullable, use first
+			if ( a->nbl() ) return a;
+			// if second alternative fails, use first
+			if ( b->type() == fail_type ) return a;
+			
 			gen_flags ag, bg;
-						
+				
 			// in both cases, 0 for READ, 1 for LOOK, 0 & 1 for PART
 			switch ( a->lk() ) {
 			case READ: flags::set(ag, 0);                    break;
@@ -688,17 +699,34 @@ namespace derivs {
 			case PART: flags::set(bg, 0); flags::set(bg, 1); break;
 			}
 			
-			return alt_expr::make(memo, a, b, ag, bg);
-		}
-		
-		/// Make an expression given the generation history
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
-		                      gen_flags ag, gen_flags bg) {
-			
+			return expr::as_ptr<alt_expr>(memo, a, b, ag, bg);
 		}
 		
 		virtual ptr<expr> deriv(char x) const {
+			ptr<expr> da = a->d(x);
 			
+			// Check conditions on a before we calculate dx(b) [same as make()]
+			switch ( da->type() ) {
+			case fail_type: return b->d(x);
+			case inf_type:  return da; // an inf_expr
+			}
+			if ( da->nbl() ) return da;
+			
+			ptr<expr> db = b->d(x);
+			if ( db->type() == fail_type ) return da;
+			
+			// Calculate generations of new subexpressions
+			// - If we've added a lookahead generation that wasn't there before, map it into the 
+			//   generation space of the derived alternation
+			gen_flags dag = ag, dbg = bg;
+			if ( da->gen() > a->gen() ) {
+				flags::set(dag, gen()+1);
+			}
+			if ( db->gen() > b->gen() ) {
+				flags::set(dbg, gen()+1);
+			}
+			
+			return expr::as_ptr<alt_expr>(memo, da, db, dag, dbg);
 		}
 		
 		virtual nbl_mode nullable() const {
@@ -719,9 +747,8 @@ namespace derivs {
 		
 		virtual gen_type generation() const {
 			gen_flags tg;
-			flags::set_union(ag, bg, tg, 1);       // Union generation flags into tg
-			// Don't want count, want high bit -- need to add to library
-			return gen_type(flags::count(tg, 1));  // Count set bits for maximum generation
+			flags::set_union(ag, bg, tg);      // Union generation flags into tg
+			return gen_type(flags::last(tg));  // Count set bits for maximum generation
 		}
 		
 		virtual expr_type type() const { return alt_type; }
