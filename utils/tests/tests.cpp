@@ -90,12 +90,14 @@ void test_flags(tester& test) {
 	a[0] = UINT64_C(0x0000000000000000); a[1] = b[2];
 
 	// Test high bit function
-	test.equal(flags::high(b[0]),  0, "high(b[0])");
-	test.equal(flags::high(b[1]),  4, "high(b[1])");
-	test.equal(flags::high(b[2]), 12, "high(b[2])");
-	test.equal(flags::high(b[3]), 45, "high(b[3])");
-	test.equal(flags::high(b[4]), 59, "high(b[4])");
-	test.equal(flags::high(b[5]), -1, "high(b[5])");
+	test.equal(flags::first(b[0]),  0, "first(b[0])");
+	test.equal(flags::first(b[1]),  4, "first(b[1])");
+	test.equal(flags::first(b[2]), 12, "first(b[2])");
+	test.equal(flags::first(b[3]), 45, "first(b[3])");
+	test.equal(flags::first(b[4]), 59, "first(b[4])");
+	test.equal(flags::first(b[5]), -1, "first(b[5])");
+	
+	// TODO add tests for last bit function
 
 	// Test count bits
 	test.equal(flags::count(b[0]), 32, "count(b[0])");
@@ -127,6 +129,8 @@ void test_flags(tester& test) {
 	test.equal(flags::next(b, 6, 68),   69, "next(b, 68)");
 	test.equal(flags::next(b+4, 2, 60), -1, "next(b+4, 60)");
 	test.equal(flags::next(a, 2, 32),   76, "next(a, 32)");
+	
+	// TODO add tests for last
 	
 	test.cleanup();
 }
