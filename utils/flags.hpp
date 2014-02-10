@@ -177,6 +177,25 @@ uint64_t count(const uint64_t* a, uint64_t n) {
 inline uint64_t rank(const uint64_t& x, uint64_t i) { return count(x & ~((mask(i) << 1)-1)); }
 inline uint64_t rank(const uint64_t* a, uint64_t i) { return count(a, el(i)) + rank(a[el(i)], i); }
 
+/// gets the index of the j'th bit
+uint64_t select(const uint64_t& x, uint64_t s) {
+	uint64_t i = first(x);
+	for (uint64_t r = 1; i != -1 && r < s; ++r) i = next(x, i);
+	return i;
+}
+
+uint64_t select(const uint64_t* a, uint64_t n, uint64_t s) {
+	uint64_t c = 0;
+	uint64_t i;
+	for (i = 0; i < n-1; ++i) {
+		if ( a[i] == 0 ) continue;
+		uint64_t d = count(a[i]);
+		if ( c + d >= s ) break;
+		c += d;
+	}
+	return i*64 + select(a[i], s-c);
+}
+
 /// zero all flags
 inline void clear(uint64_t& x) { x = UINT64_C(0); }
 inline void clear(uint64_t* a, uint64_t n) { for (uint64_t i = 0; i < n; ++i) clear(a[i]); }

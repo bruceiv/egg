@@ -58,6 +58,7 @@ namespace derivs {
 		and_type,
 		seq_type,
 		alt_type,
+		map_type,
 		e_back_type,
 		l_back_type,
 		el_back_type
@@ -242,6 +243,7 @@ namespace derivs {
 	class and_expr;
 	class seq_expr;
 	class alt_expr;
+	class map_expr;
 	class e_back_expr;
 	class l_back_expr;
 	class el_back_expr;
@@ -307,7 +309,7 @@ namespace derivs {
 		}
 		
 		// Lookahead success is just a marker, so persists (character will be parsed by sequel)
-		virtual ptr<expr> d(char) const { return expr_ptr<look_expr>(g); }
+		virtual ptr<expr> d(char) const { return expr::as_ptr<look_expr>(g); }
 		
 		virtual nbl_mode  nbl()   const { return NBL; }
 		virtual lk_mode   lk()    const { return LOOK; }
@@ -666,6 +668,52 @@ namespace derivs {
 		ptr<expr> b;  ///< Second subexpression
 	}; // class seq_expr
 	
+	/// Maintains generation mapping from collapsed alternation expression.
+	class map_expr : public memo_expr {
+	friend alt_expr;
+		
+		map_expr(memo_expr::table& memo, ptr<expr> e, gen_flags eg)
+			: memo_expr(memo), e(e), eg(eg) {}
+		
+	public:
+		static ptr<expr> make(memo_expr::table& memo, ptr<expr> e, gen_flags eg) {
+			switch ( e->type() ) {
+			case eps_type:  return e; // an eps_expr
+			// a look expression with the generation translated
+			case look_type: return look_expr::make(flags::select(eg, e->gen()));
+			case fail_type: return e; // a fail_expr
+			case inf_type:  return e; // an inf_expr
+			}
+			
+			return expr::as_ptr<map_expr>(memo, e, eg);
+		}
+		
+		virtual ptr<expr> deriv(char x) const {
+			ptr<expr> de = e->d(x);
+			
+			// Check conditions on de [same as make]
+			switch ( de->type() ) {
+			case eps_type:  return de; // an eps_expr
+			// a look expression with the generation translated
+			case look_type: return look_expr::make(flags::select(eg, de->gen()));
+			case fail_type: return de; // a fail_expr
+			case inf_type:  return de; // an inf_expr
+			}
+			
+			return expr::as_ptr<map_expr>(memo, de, eg);
+		}
+		
+		virtual nbl_mode  nullable()   const { return e->nbl(); }
+		virtual lk_mode   lookahead()  const { return e->lk(); }
+		virtual gen_type  generation() const {
+			return gen_type(flags::last(eg));  // Last bit is highest generation present
+		}
+		virtual expr_type type()       const { return map_type; }
+		
+		ptr<expr> e;   ///< Subexpression
+		gen_flags eg;  ///< Generation flags for subexpression
+	}; // class map_expr
+	
 	/// A parsing expression representing the alternation of two parsing expressions
 	class alt_expr : public memo_expr {
 		expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, gen_flags ag, gen_flags bg)
@@ -707,13 +755,13 @@ namespace derivs {
 			
 			// Check conditions on a before we calculate dx(b) [same as make()]
 			switch ( da->type() ) {
-			case fail_type: return b->d(x);
+			case fail_type: return map_expr::make(memo, b->d(x), bg);
 			case inf_type:  return da; // an inf_expr
 			}
-			if ( da->nbl() ) return da;
+			if ( da->nbl() ) return map_expr::make(memo, da, ag);
 			
 			ptr<expr> db = b->d(x);
-			if ( db->type() == fail_type ) return da;
+			if ( db->type() == fail_type ) return map_expr::make(memo, da, ag);
 			
 			// Calculate generations of new subexpressions
 			// - If we've added a lookahead generation that wasn't there before, map it into the 
