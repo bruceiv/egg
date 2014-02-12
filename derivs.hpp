@@ -56,12 +56,10 @@ namespace derivs {
 		rule_type,
 		not_type,
 		and_type,
-		seq_type,
-		alt_type,
 		map_type,
-		e_back_type,
-		l_back_type,
-		el_back_type
+		alt_type,
+		seq_type,
+		back_type
 	}; // enum expr_type
 	
 	/// Nullability mode
@@ -78,31 +76,6 @@ namespace derivs {
 		READ   ///< Non-lookahead expression
 	}; // enum lk_mode
 	
-	/// Generation of an expression
-//	struct gen_type {
-//		/// Constructs a gen_type with matching bounds
-//		gen_type(uint16_t x = 0) : min(x), max(x) {}
-//		
-//		/// Constructs a gen_type with the given minimum and maximum
-//		gen_type(uint16_t min, uint16_t max) : min(min), max(max) {}
-//		
-//		/// Constructs a gen_type with the union of the two bounds
-//		gen_type(const gen_type& a, const gen_type& b) {
-//			min = std::min(a.min, b.min);
-//			max = std::max(a.max, b.max);
-//		}
-//		
-//		/// Unions the given bounds with this object
-//		gen_type& operator |= (const gen_type& o) {
-//			min = std::min(min, o.min);
-//			max = std::max(max, o.max);
-//			return *this;
-//		}
-//		
-//		uint16_t min;  ///< Minimum subexpression generation
-//		uint16_t max;  ///< Maximum subexpression generation
-//	};
-
 	/// Type of generation value
 	using gen_type = uint8_t;
 	
@@ -241,12 +214,10 @@ namespace derivs {
 	class rule_expr;
 	class not_expr;
 	class and_expr;
-	class seq_expr;
-	class alt_expr;
 	class map_expr;
-	class e_back_expr;
-	class l_back_expr;
-	class el_back_expr;
+	class alt_expr;
+	class seq_expr;
+	class back_expr;
 	
 	/// A failure parsing expression
 	class fail_expr : public expr {
@@ -615,59 +586,6 @@ namespace derivs {
 		ptr<expr> e;  ///< Subexpression to match
 	}; // class and_expr
 	
-	/// A parsing expression representing the concatenation of two parsing expressions
-	class seq_expr : public memo_expr {
-		seq_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b)
-			: memo_expr(memo), a(a), b(b) {}
-	
-	public:
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b) {
-			switch ( a->type() ) {
-			// empty first element leaves just second
-			case eps_type:  return b;
-			case look_type: return b;
-			// failing or infinite loop first element propegates
-			case fail_type: return a; // a fail_expr
-			case inf_type:  return a; // an inf_expr
-			}
-			
-			switch ( b->type() ) {
-			// empty second element leaves just first
-			case eps_type:  return a;
-			// failing second element propegates
-			case fail_type: return b; // a fail_expr
-			}
-			
-			return expr::as_ptr<seq_expr>(memo, a, b);
-		}
-		
-		virtual ptr<expr> deriv(char x) const {}
-		
-		virtual nbl_mode nullable() const {
-			nbl_mode an = a->nbl(), bn = b->nbl();
-			
-			if ( an == SHFT || bn == SHFT ) return SHFT;
-			else if ( an == NBL && bn == NBL ) return NBL;
-			else return EMPTY;
-		}
-		
-		virtual lk_mode lookahead() const {
-			lk_mode al = a->lk(), bl = b->lk();
-			
-			if ( al == LOOK && bl == LOOK ) return LOOK;
-			else if ( al == READ && bl == READ 
-			          && a->nbl() == SHFT && b->nbl() == SHFT ) return READ;
-			else return PART;
-		}
-		
-		virtual gen_type generation() const { return gen_type(max(a.gen(), b.gen())); }
-		
-		virtual expr_type type() const { return seq_type; }
-		
-		ptr<expr> a;  ///< First subexpression
-		ptr<expr> b;  ///< Second subexpression
-	}; // class seq_expr
-	
 	/// Maintains generation mapping from collapsed alternation expression.
 	class map_expr : public memo_expr {
 	friend alt_expr;
@@ -807,50 +725,108 @@ namespace derivs {
 		gen_flags bg;  ///< Generation flags for b
 	}; // class alt_expr
 	
-	/// A parsing expression to backtrack from a nullable first sequence element
-	class e_back_expr : public memo_expr {
+	/// A parsing expression representing the concatenation of two parsing expressions
+	class seq_expr : public memo_expr {
+		seq_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b)
+			: memo_expr(memo), a(a), b(b) {}
+	
 	public:
-		static ptr<expr> make() {}
+		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b) {
+			switch ( a->type() ) {
+			// empty first element leaves just second
+			case eps_type:  return b;
+			case look_type: return b;
+			// failing or infinite loop first element propegates
+			case fail_type: return a; // a fail_expr
+			case inf_type:  return a; // an inf_expr
+			}
+			
+			switch ( b->type() ) {
+			// empty second element leaves just first
+			case eps_type:  return a;
+			// failing second element propegates
+			case fail_type: return b; // a fail_expr
+			}
+			
+			return expr::as_ptr<seq_expr>(memo, a, b);
+		}
 		
-		virtual ptr<expr> deriv(char x) const {}
+		virtual ptr<expr> deriv(char x) const {
+			ptr<expr> da = a->d(x);
+			lk_mode al = a->lk();
+			
+			if ( al == LOOK ) {
+				// Precludes nullability; only nullable lookahead expression is look_expr, and that 
+				// one can't be `a` by the make rules. Therefore match both in sequence
+				return seq_expr::make(memo, da, b->d(x));
+			}
+			
+			if ( al == PART ) {
+				ptr<expr> db = b->d(x);
+				
+				// Track the lookahead generations of this sequence
+				ptr<expr> dx = back_expr::make(memo, da, b, db);
+				
+				if ( a->nbl() == NBL ) {
+					// Set up backtracking for nullable first expression
+					return alt_expr::make(memo, 
+					                      dx, 
+					                      seq_expr::make(not_expr::make(memo, da), db));
+				} else {
+					return dx;
+				}
+			}
+			
+			// Derivative of this sequence
+			ptr<expr> dx = seq_expr::make(memo, da, b);
+			
+			if ( a->nbl() == NBL ) {
+				// Set up backtracking for nullable first expression
+				return alt_expr::make(memo,
+				                      dx,
+				                      seq_expr::make(not_expr::make(memo, da), b->d(x)));
+			}
+			
+			return dx;
+		}
 		
 		virtual nbl_mode nullable() const {
-			nbl_mode an = a->nbl();
+			nbl_mode an = a->nbl(), bn = b->nbl();
 			
-			if ( an == EMPTY && b->nbl() != SHFT ) return EMPTY;
-			else if ( an == SHFT && c->nbl() != SHFT ) return EMPTY;
-			else return SHFT;
+			if ( an == SHFT || bn == SHFT ) return SHFT;
+			else if ( an == NBL && bn == NBL ) return NBL;
+			else return EMPTY;
 		}
 		
 		virtual lk_mode lookahead() const {
-			lk_mode al = a->lk(), bl = b->lk(), cl = c->lk();
+			lk_mode al = a->lk(), bl = b->lk();
 			
-			if ( al == LOOK && bl == LOOK && cl == LOOK ) return LOOK;
-			else if ( cl == READ && c->nbl() == SHFT
-			          && ( ( al == READ && a->nbl() == SHFT ) 
-			               || ( bl == READ && b->nbl() == SHFT ) ) ) return READ;
+			if ( al == LOOK && bl == LOOK ) return LOOK;
+			else if ( al == READ && bl == READ 
+			          && a->nbl() == SHFT && b->nbl() == SHFT ) return READ;
 			else return PART;
 		}
 		
 		virtual gen_type generation() const {
-			gen_type g(a.gen(), b.gen());
-			return x |= c.gen();
+			// If either a or b is READ and SHFT, the whole expression is, otherwise we take the 
+			// generation of the second element
+			if ( a->lk() == READ && a->nbl() == SHFT ) return gen_type(0);
+			else return b->gen();
 		}
 		
-		virtual expr_type type() const { return e_back_type; }
+		virtual expr_type type() const { return seq_type; }
 		
-		ptr<expr> a;  ///< Test subexpression
-		ptr<expr> b;  ///< Following subexpression
-		ptr<expr> c;  ///< Parallel derivation of nullable branch
-	}; // class e_back_expr
+		ptr<expr> a;  ///< First subexpression
+		ptr<expr> b;  ///< Second subexpression
+	}; // class seq_expr
 	
 	/// A parsing expression to backtrack from a partial lookahead first sequence element
-	class l_back_expr : public memo_expr {
+	class back_expr : public memo_expr {
 	public:
 		struct look_node {
-			look_node(uint16_t g, ptr<expr> e) : g(g), e(e) {}
+			look_node(gen_type g, ptr<expr> e) : g(g), e(e) {}
 			
-			uint16_t g;      ///< Generation of lookahead this derivation corresponds to
+			gen_type g;      ///< Generation of lookahead this derivation corresponds to
 			ptr<expr> e;     ///< Following expression for this lookahead generation
 		}; // struct look_list
 		using look_list = std::list<look_node>;
@@ -865,30 +841,11 @@ namespace derivs {
 		
 		virtual gen_type generation() const {}
 		
-		virtual expr_type type() const { return l_back_type; }
+		virtual expr_type type() const { return back_type; }
 		
 		ptr<expr> a;   ///< Test subexpression
 		look_list bs;  ///< List of following subexpressions for each lookahead generation
 	}; // class l_back_expr
-	
-	/// A parsing expression to backtrack from a nullable and partial lookahead first sequence 
-	/// element
-	class el_back_expr : public l_back_expr {
-	public:
-		static ptr<expr> make() {}
-		
-		virtual ptr<expr> deriv(char x) const {}
-		
-		virtual nbl_mode nullable() const {}
-		
-		virtual lk_mode lookahead() const {}
-		
-		virtual gen_type generation() const {}
-		
-		virtual expr_type type() const { return el_back_type; }
-		
-		ptr<expr> c;  ///< Parallel derivation of nullable branch
-	};
 	
 } // namespace derivs
 
