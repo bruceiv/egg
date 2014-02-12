@@ -727,6 +727,7 @@ namespace derivs {
 	
 	/// A parsing expression representing the concatenation of two parsing expressions
 	class seq_expr : public memo_expr {
+	protected:
 		seq_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b)
 			: memo_expr(memo), a(a), b(b) {}
 	
@@ -821,31 +822,97 @@ namespace derivs {
 	}; // class seq_expr
 	
 	/// A parsing expression to backtrack from a partial lookahead first sequence element
-	class back_expr : public memo_expr {
+	class back_expr : public seq_expr {
 	public:
 		struct look_node {
-			look_node(gen_type g, ptr<expr> e) : g(g), e(e) {}
+			look_node(gen_type g, gen_flags eg, ptr<expr> e) : g(g), eg(eg), e(e) {}
 			
-			gen_type g;      ///< Generation of lookahead this derivation corresponds to
-			ptr<expr> e;     ///< Following expression for this lookahead generation
+			gen_type  g;   ///< Generation of lookahead this derivation corresponds to
+			gen_flags eg;  ///< Map of generations from this node to the containing node
+			ptr<expr> e;   ///< Following expression for this lookahead generation
 		}; // struct look_list
 		using look_list = std::list<look_node>;
+	
+	private:
+		back_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, look_list bs) 
+			: seq_expr(memo, a, b), bs(bs) {}
 		
-		static ptr<expr> make() {}
+	public:
+		/// Makes an expression given the memoization table, partial lookahead expression a, 
+		/// following expression b, and lookahead-following expression b1
+		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, ptr<expr> b1) {
+			switch ( a->type() ) {
+			// empty first element leaves just follower
+			case eps_type:  return b;
+			// lookahead first element leaves just lookahead-follower
+			case look_type: return b1;
+			// failing or infinite loop first element propegates
+			case fail_type: return a; // a fail_expr
+			case inf_type:  return a; // an inf_expr
+			}
+			
+			// If a is no longer a partial lookahead expression, form the appropriate sequence
+			switch ( a->lk() ) {
+			case READ: return seq_expr::make(memo, a, b);
+			case LOOK: return seq_expr::make(memo, a, b1);
+			}
+			
+			look_list bs;
+			
+			if ( b1->type() != fail_type ) {
+				// If the lookahead-follower did not fail immediately, map in its generation flags
+				gen_flags eg;
+				switch ( b1->lk() ) {
+				case READ: flags::set(eg, 0);                    break;
+				case LOOK: flags::set(eg, 1);                    break;
+				case PART: flags::set(eg, 0); flags::set(eg, 1); break;
+				}
+				
+				// Add the lookahead generation to the list
+				bs.emplace_back(1, eg, b1);
+			}
+			
+			return expr::as_ptr<back_expr>(memo, a, b, bs);
+		}
 		
 		virtual ptr<expr> deriv(char x) const {}
 		
-		virtual nbl_mode nullable() const {}
+		virtual nbl_mode nullable() const {
+			switch ( a->nbl() ) {
+			case NBL:
+				if ( b->nbl() == NBL ) return NBL;
+				// fallthrough
+			case EMPTY:
+				for (look_node& bi : bs) if ( bi.e->nbl() != SHFT ) return EMPTY;
+				// fallthrough
+			}
+			return SHFT;
+		}
 		
-		virtual lk_mode lookahead() const {}
+		virtual lk_mode lookahead() const {
+			// Scan the b_i for followers that don't always consume characters - PART if so
+			if ( b->nbl() != SHFT || b->lk() != READ ) return PART;
+			for (look_node& bi : bs) {
+				if ( bi.e->nbl() != SHFT || bi.e->lk() != READ ) return PART;
+			}
+			// READ otherwise
+			return READ;
+		}
 		
-		virtual gen_type generation() const {}
+		virtual gen_type generation() const {
+			gen_flags tg;
+			flags::set(tg, 0);
+			
+			// Take union of all generation flags into tg
+			for (look_node& bi : bs) { flags::set_union(tg, bi.eg, tg); }
+			
+			return gen_type(flags::last(tg));  // Count set bits for maximum generation
+		}
 		
 		virtual expr_type type() const { return back_type; }
 		
-		ptr<expr> a;   ///< Test subexpression
 		look_list bs;  ///< List of following subexpressions for each lookahead generation
-	}; // class l_back_expr
+	}; // class back_expr
 	
 } // namespace derivs
 
