@@ -284,7 +284,7 @@ namespace derivs {
 		
 		virtual nbl_mode  nbl()   const { return NBL; }
 		virtual lk_mode   lk()    const { return LOOK; }
-		virtual gen_t     gen()   const { return gen_type(g); }
+		virtual gen_type  gen()   const { return gen_type(g); }
 		virtual expr_type type()  const { return look_type; }
 		
 		gen_type g;  ///< Lookahead generation
@@ -875,7 +875,63 @@ namespace derivs {
 			return expr::as_ptr<back_expr>(memo, a, b, bs);
 		}
 		
-		virtual ptr<expr> deriv(char x) const {}
+		virtual ptr<expr> deriv(char x) const {
+			ptr<expr> da  = a->d(x);
+			
+			switch ( da->type() ) {
+			// non-lookahead success leaves just follower
+			case eps_type:  return b;
+			// lookahead success leaves appropriate lookahead follower
+			case look_type:
+				gen_type i = da->gen();
+				for (look_node& bi : bs) {
+					if ( bi.g == i ) return map_expr::make(memo, bi.e, bi.eg);
+					else if ( bi.g > i ) break;  // generation list is sorted
+				}
+				return fail_type::make();  // if none found, fail
+			// failing or infinite loop element propegates
+			case fail_type: return da; // a fail_expr
+			case inf_type:  return da; // an inf_expr
+			}
+			
+			lk_mode   dal = da->lk();
+			
+			// Fall back to regular sequence expression if first expression ceases to be lookahead
+			if ( dal == READ ) return seq_expr::make(memo, dal, b);
+			
+			// Free storage for sequential follower if first expression is all lookahead
+			ptr<expr> bn = ( dal == LOOK ) ? fail_expr::make() : b;
+			
+			// Take derivative of all lookahead options
+			look_list dbs;
+			for (look_node& bi : bs) {
+				ptr<expr> dbi = bi->d(x);
+				if ( dbi->type() != fail_type ) {
+					// Map new lookahead generations into the space of the backtracking expression
+					gen_flags dbig = bi.eg;
+					if ( dbi->gen() > bi.e->gen() ) flags::set(dbig, gen()+1);
+					dbs.emplace_back(bi.g, dbig, dbi);
+				}
+			}
+			
+			// Add any new lookahead generations to the list
+			gen_type dag = da->gen();
+			if ( dag > a->gen() ) {
+				ptr<expr> db = b->d(x);
+				if ( db->type() != fail_type ) {
+					gen_flags bg;
+					switch ( db->lk() ) {
+					case READ: flags::set(bg, 0);                    break;
+					case LOOK: flags::set(bg, 1);                    break;
+					case PART: flags::set(bg, 0); flags::set(bg, 1); break;
+					}
+					
+					dbs.emplace_back(dag, bg, db);
+				}
+			}
+			
+			return expr::as_ptr<back_expr>(memo, da, bn, dbs);
+		}
 		
 		virtual nbl_mode nullable() const {
 			switch ( a->nbl() ) {
