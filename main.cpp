@@ -29,14 +29,15 @@
 #include "visitors/compiler.hpp"
 #include "visitors/normalizer.hpp"
 #include "visitors/printer.hpp"
+#include "visitors/interpreter.hpp"
 
 /** Egg version */
 static const char* VERSION = "0.3.1";
 
 /** Egg usage string */
 static const char* USAGE = 
-"[-c print|compile] [-i input_file] [-o output_file] [--no-norm] [--no-memo]\n\
- [--help] [--version] [--usage]";
+"[-c print|compile|interpret source_file non-terminal] [-i input_file]\n\
+ [-o output_file] [--no-norm] [--no-memo] [--help] [--version] [--usage]";
 
 /** Full Egg help string */
 static const char* HELP = 
@@ -45,8 +46,8 @@ static const char* HELP =
 Supported flags are\n\
  -i --input    input file (default stdin)\n\
  -o --output   output file (default stdout)\n\
- -c --command  command - either compile, print, help, usage, or version\n\
-               (default compile)\n\
+ -c --command  command - either compile, interpret, print, help, usage, or\n\
+               version (default compile, interpret takes two arguments)\n\
  -n --name     grammar name - if none given, takes the longest prefix of\n\
                the input or output file name (output preferred) which is a\n\
                valid Egg identifier (default empty)\n\
@@ -58,11 +59,12 @@ Supported flags are\n\
 
 /** Command to run */
 enum egg_mode {
-	PRINT_MODE,		/**< Print grammar */
-	COMPILE_MODE,	/**< Compile grammar */
-	USAGE_MODE,     /**< Print usage */
-	HELP_MODE,      /**< Print help */
-	VERSION_MODE    /**< Print version */
+	PRINT_MODE,      /**< Print grammar */
+	COMPILE_MODE,    /**< Compile grammar */
+	INTERPRET_MODE,  /**< Interpret grammar */
+	USAGE_MODE,      /**< Print usage */
+	HELP_MODE,       /**< Print help */
+	VERSION_MODE     /**< Print version */
 };
 
 class args {
@@ -104,6 +106,9 @@ private:
 		} else if ( eq("compile", s) ) {
 			eMode = COMPILE_MODE;
 			return true;
+		} else if ( eq("interpret", s) ) {
+			eMode = INTERPRET_MODE;
+			return true;
 		} else if ( eq("help", s) ) {
 			eMode = HELP_MODE;
 			return true;
@@ -131,6 +136,14 @@ private:
 			pName = id_prefix(s);
 		}
 	}
+	
+	void parse_src(char* s) {
+		src = new std::ifstream(s);
+	}
+	
+	void parse_rule(char* s) {
+		rName = id_prefix(s);
+	}
 
 	void parse_name(char* s) {
 		pName = id_prefix(s);
@@ -139,10 +152,9 @@ private:
 
 public:
 	args(int argc, char** argv) {
-		//in = (std::ifstream*)0;
-		//out = (std::ofstream*)0;
 		in = nullptr;
 		out = nullptr;
+		src = nullptr;
 		pName = std::string("");
 		nameFlag = false;
 		normFlag = true;
@@ -165,7 +177,14 @@ public:
 				parse_output(argv[++i]);
 			} else if ( match("-c", "--command", argv[i]) ) {
 				if ( i+1 >= argc ) return;
-				if ( parse_mode(argv[++i]) ) { ++i; }
+				if ( parse_mode(argv[++i]) ) {
+					++i;
+					if ( eMode == INTERPRET_MODE ) {
+						if ( i+2 >= argc ) return;
+						parse_src(argv[i++]);
+						parse_rule(argv[i++]);
+					}
+				}
 			} else if ( match("-n", "--name", argv[i]) ) {
 				if ( i+1 >= argc ) return;
 				parse_name(argv[++i]);
@@ -197,7 +216,9 @@ public:
 
 	std::istream& input() { if ( in ) return *in; else return std::cin; }
 	std::ostream& output() { if ( out ) return *out; else return std::cout; }
+	std::istream& source() { if ( src ) return *src; else return std::cin; }
 	std::string name() { return pName; }
+	std::string rule() { return rName; }
 	bool norm() { return normFlag; }
 	bool memo() { return memoFlag; }
 	egg_mode mode() { return eMode; }
@@ -206,7 +227,9 @@ private:
 	int i;				 /**< next unparsed value */
 	std::ifstream* in;	 /**< pointer to input stream (0 for stdin) */
 	std::ofstream* out;	 /**< pointer to output stream (0 for stdout) */
+	std::ifstream& src;  /**< pointer to the sourcefile input stream (0 for none) */
 	std::string pName;	 /**< the name of the parser (empty if none) */
+	std::string rName;   /**< the name of the rule to interpret (empty if none) */
 	bool nameFlag;		 /**< has the parser name been explicitly set? */
 	bool normFlag;       /**< should egg do grammar normalization? */
 	bool memoFlag;       /**< should the generated grammar do memoization? */
@@ -219,8 +242,8 @@ private:
  *  Supported flags are
  *  -i --input    input file (default stdin)
  *  -o --output   output file (default stdout)
- *  -c --command  command - either compile, print, help, usage, or version 
- *                (default compile)
+ *  -c --command  command - either compile, interpret, print, help, usage, or
+ *                version (default compile, interpret takes two arguments)
  *  -n --name     grammar name - if none given, takes the longest prefix of 
  *                the input or output file name (output preferred) which is a 
  *                valid Egg identifier (default empty)
@@ -266,6 +289,11 @@ int main(int argc, char** argv) {
 			c.memo(a.memo());
 			c.compile(*g);
 			break;
+		} case INTERPRET_MODE: {
+			derivs::interpreter i(*g);
+			parser::state in(a.source());
+			bool b = i.match(in, a.rule());
+			cout << "Grammar " << ( b ? "matched" : "DID NOT match" ) << std::endl;
 		} default: break;
 		}
 		
