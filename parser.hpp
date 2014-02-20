@@ -103,10 +103,10 @@ namespace parser {
 		}
 		
 		/** Adds an "expected" message */
-		inline error& expect(const std::string& s) { expected.emplace(s); return *this; }
+		inline error& expect(const std::string& s) { expected./*emplace*/insert(s); return *this; }
 		
 		/** Adds a programmer-defined error message */
-		inline error& message(const std::string& s) { messages.emplace(s); return *this; }
+		inline error& message(const std::string& s) { messages./*emplace*/insert(s); return *this; }
 		
 		/** Tests both sets of messages for emptiness */
 		inline bool empty() const { return expected.empty() && messages.empty(); }
