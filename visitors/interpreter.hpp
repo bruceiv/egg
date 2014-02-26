@@ -45,7 +45,7 @@ namespace derivs {
 		/// Makes a new anonymous nonterminal for a many-expression
 		ptr<expr> make_many(ptr<expr> e) {
 			// make anonymous non-terminal R
-			ptr<expr> r = rule_expr::make(memo, ptr<expr>(nullptr));
+			ptr<expr> r = rule_expr::make(memo, fail_expr::make());
 			// set non-terminal rule to e R / eps
 			std::static_pointer_cast<rule_expr>(r)->r = 
 				alt_expr::make(memo, 
@@ -99,7 +99,7 @@ namespace derivs {
 			// Make sure all instances of the same rule matcher are actually the same object
 			if ( rns.count(m.rule) == 0 ) {
 				// Insert a new rule with a placeholder subexpression
-				rVal = rule_expr::make(memo, ptr<expr>(nullptr));
+				rVal = rule_expr::make(memo, fail_expr::make());
 				rns/*.emplace(m.rule, rVal)*/
 					.insert(std::make_pair(m.rule, 
 					                       std::static_pointer_cast<rule_expr>(rVal)));
