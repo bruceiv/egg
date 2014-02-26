@@ -148,7 +148,10 @@ static uint64_t last(uint64_t x) {
 
 /// gets the index of the last bit of a (length n) set
 uint64_t last(const uint64_t* a, uint64_t n) {
-	for (uint64_t i = n-1; i >= 0; --i) if ( a[i] != 0 ) return i*64 + last(a[i]);
+	do {
+		--n;
+		if ( a[n] != 0 ) return n*64 + last(a[n]);
+	} while ( n > 0 );
 	return -1;
 }
 

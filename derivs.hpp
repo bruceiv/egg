@@ -30,6 +30,8 @@
 #include <unordered_map>
 #include <utility>
 
+#include "utils/flags.hpp"
+
 /**
  * Implements derivative parsing for parsing expression grammars, according to the algorithm 
  * described by Aaron Moss in 2014 (currently unpublished - contact the author for a manuscript).
@@ -88,13 +90,6 @@ namespace derivs {
 	protected:
 		expr() = default;
 		
-		/// Makes an expression pointer given the constructor arguments for some subclass T (less 
-		/// the memo-table)
-		template <typename T, typename... Args>
-		static inline ptr<expr> as_ptr(Args... args) {
-			return std::static_ptr_cast<expr>(std::make_shared<T>(args...));
-		}	
-	
 	public:			
 		/// Derivative of this expression with respect to x
 		virtual ptr<expr> d(char x) const = 0;
@@ -128,7 +123,7 @@ namespace derivs {
 		static const uint8_t READ_VAL     = 0x2;  ///< value for READ
 		
 		/// Constructor providing memoization table reference
-		expr(memo_table& memo) : memo(memo), g(0) { flags = {0,0,false}; }
+		memo_expr(table& memo) : memo(memo), g(0) { flags = {0,0,false}; }
 		
 		/// Actual derivative calculation
 		virtual ptr<expr> deriv(char) const = 0;
@@ -144,7 +139,7 @@ namespace derivs {
 		
 	public:
 		ptr<expr> d(char x) const final {
-			ptr<expr>& dx = memo[this];
+			ptr<expr>& dx = memo[const_cast<memo_expr* const>(this)];
 			if ( ! dx ) dx = deriv(x);
 			return dx;
 		}
@@ -194,7 +189,7 @@ namespace derivs {
 		}
 	
 	protected:
-		mutable table&   memo;     ///< Memoization table for derivatives
+		table&           memo;     ///< Memoization table for derivatives
 		mutable gen_type g;        ///< Maximum generation value
 		mutable struct {
 			uint8_t nbl : 2;  ///< Nullable value: one of 0 (unset), 1 (NBL), 2(SHFT), 3(EMPTY)
@@ -224,7 +219,7 @@ namespace derivs {
 		fail_expr() = default;
 	
 	public:
-		static ptr<expr> make() { return expr::as_ptr<fail_expr>(); }
+		static ptr<expr> make() { return ptr<expr>(new fail_expr()); }
 		
 		// A failure expression can't un-fail - no strings to match with any prefix
 		virtual ptr<expr> d(char) const { return fail_expr::make(); }
@@ -240,7 +235,7 @@ namespace derivs {
 		inf_expr() = default;
 		
 	public:
-		static ptr<expr> make() { return expr::as_ptr<inf_expr>(); }
+		static ptr<expr> make() { return ptr<expr>(new inf_expr()); }
 		
 		// An infinite loop expression never breaks, ill defined with any prefix
 		virtual ptr<expr> d(char) const { return inf_expr::make(); }
@@ -256,7 +251,7 @@ namespace derivs {
 		eps_expr() = default;
 	
 	public:
-		static ptr<expr> make() { return expr::as_ptr<eps_expr>(); }
+		static ptr<expr> make() { return ptr<expr>(new eps_expr()); }
 		
 		// No prefixes to remove from language containing the empty string; all fail
 		virtual ptr<expr> d(char) const { return fail_expr::make(); }
@@ -275,12 +270,12 @@ namespace derivs {
 		static ptr<expr> make(gen_type g = 1) {
 			// gen-0 lookahead success is just an epsilon
 			return ( g == 0 ) ? 
-				expr::as_ptr<eps_expr>() :
-				expr::as_ptr<look_expr>(g);
+				eps_expr::make() :
+				ptr<expr>(new look_expr(g));
 		}
 		
 		// Lookahead success is just a marker, so persists (character will be parsed by sequel)
-		virtual ptr<expr> d(char) const { return expr::as_ptr<look_expr>(g); }
+		virtual ptr<expr> d(char) const { return ptr<expr>(new look_expr(g)); }
 		
 		virtual nbl_mode  nbl()   const { return NBL; }
 		virtual lk_mode   lk()    const { return LOOK; }
@@ -295,7 +290,7 @@ namespace derivs {
 		char_expr(char c) : c(c) {}
 		
 	public:
-		static ptr<expr> make(char c) { return expr::as_ptr<char_expr>(c); }
+		static ptr<expr> make(char c) { return ptr<expr>(new char_expr(c)); }
 		
 		// Single-character expression either consumes matching character or fails
 		virtual ptr<expr> d(char x) const {
@@ -315,7 +310,7 @@ namespace derivs {
 		range_expr(char b, char e) : b(b), e(e) {}
 		
 	public:
-		static ptr<expr> make(char b, char e) { return expr::as_ptr<range_expr>(b, e); }
+		static ptr<expr> make(char b, char e) { return ptr<expr>(new range_expr(b, e)); }
 		
 		// Character range expression either consumes matching character or fails
 		virtual ptr<expr> d(char x) const {
@@ -336,7 +331,7 @@ namespace derivs {
 		any_expr() = default;
 		
 	public:
-		static ptr<expr> make() { return expr::as_ptr<any_expr>(); }
+		static ptr<expr> make() { return ptr<expr>(new any_expr()); }
 		
 		// Any-character expression consumes any character
 		virtual ptr<expr> d(char) const { return eps_expr::make(); }
@@ -347,7 +342,7 @@ namespace derivs {
 		virtual expr_type type()  const { return any_type; }
 	}; // class any_expr
 
-#if 1	
+#if 1
 	/// A parsing expression representing a character string
 	class str_expr : public expr {
 		/// Ref-counted cons-list representation of a string
@@ -365,7 +360,7 @@ namespace derivs {
 			/// Warning: string should have length of at least one
 			str_node(const std::string& s) {
 				// make node for end of string
-				std::string::const_iterator it = s.rbegin();
+				auto it = s.rbegin();
 				ptr<str_node> last = std::make_shared<str_node>(*it);
 				
 				// make nodes for internal characters
@@ -387,7 +382,7 @@ namespace derivs {
 				char a[len];
 				for (unsigned long i = 0; i < len; ++i) {
 					a[i] = n->c;
-					n = n->next;
+					n = n->next.get();
 				}
 				
 				return std::string(a, len);
@@ -402,10 +397,10 @@ namespace derivs {
 	public:
 		/// Makes an appropriate expression node for the length of the string
 		static ptr<expr> make(std::string s) {
-			switch ( t.size() ) {
+			switch ( s.size() ) {
 			case 0:  return eps_expr::make();
 			case 1:  return char_expr::make(s[0]);
-			default: return expr::as_ptr<str_expr>(s);
+			default: return ptr<expr>(new str_expr(s));
 			}
 		}
 		
@@ -415,8 +410,8 @@ namespace derivs {
 			
 			// Otherwise return a character or string expression, as appropriate
 			return ( len == 2 ) ? 
-				char_expr::make(s.next.c) :
-				expr::as_ptr<str_expr>(s.next, len - 1);
+				char_expr::make(s.next->c) :
+				ptr<expr>(new str_expr(*s.next, len - 1));
 		}
 		
 		virtual nbl_mode  nbl()  const { return SHFT; }
@@ -425,7 +420,7 @@ namespace derivs {
 		virtual expr_type type() const { return str_type; }
 		
 		/// Gets the string represented by this node
-		std::string str() const { return s.str(); }
+		std::string str() const { return s.str(len); }
 		/// Gets the length of the string represented by this node
 		unsigned long size() const { return len; }
 		
@@ -443,7 +438,7 @@ namespace derivs {
 			switch ( t.size() ) {
 			case 0:  return eps_expr::make();
 			case 1:  return char_expr::make(s[0]);
-			default: return expr::as_ptr<str_expr>(s);
+			default: return ptr<expr>(new str_expr(s));
 			}
 		}
 		
@@ -455,7 +450,7 @@ namespace derivs {
 			if ( s.size() == 2 ) return char_expr::make(s[1]);
 			
 			std::string t(s, 1);
-			return expr::as_ptr<str_expr>(t);
+			return ptr<expr>(new str_expr(t));
 		}
 		
 		virtual nbl_mode  nbl()  const { return SHFT; }
@@ -472,36 +467,11 @@ namespace derivs {
 		rule_expr(memo_expr::table& memo, ptr<expr> r) : memo_expr(memo), r(r) {}
 		
 	public:
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> r) {
-			return expr::as_ptr<rule_expr>(memo, r);
-		}
-		
-		virtual ptr<expr> deriv(char x) const {
-			// signal infinite loop if we try to take this derivative again
-			memo[this] = inf_expr::make();
-			// calculate derivative
-			return r->d(x);
-		}
-		
-		virtual nbl_mode nullable() const {
-			// Stop this from infinitely recursing
-			flags.nbl = SHFT_VAL;
-			// Calculate nullability
-			return r.nbl();
-		}
-		
-		virtual lk_mode lookahead() const {
-			// Stop this from infinitely recursing
-			flags.lk = READ_VAL;
-			// Calculate lookahead
-			return r.lk();
-		}
-		
-		virtual gen_type generation() const {
-			// Statically defined, can't have lookahead generation greater than 1
-			return gen_type(lk() == READ ? 0 : 1);
-		}
-		
+		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> r);
+		virtual ptr<expr> deriv(char x) const;
+		virtual nbl_mode  nullable() const;
+		virtual lk_mode   lookahead() const;
+		virtual gen_type  generation() const;
 		virtual expr_type type() const { return rule_type; }
 		
 		ptr<expr> r;  ///< Expression corresponding to this rule
@@ -509,39 +479,18 @@ namespace derivs {
 	
 	/// A parsing expression representing negative lookahead
 	class not_expr : public memo_expr {
-		friend and_expr;
-		
+	friend and_expr;
 		not_expr(memo_expr::table& memo, ptr<expr> e)
 			: memo_expr(memo), e(e) { g = 1; flags.gen = true; }
 		
 	public:
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> e) {
-			switch ( e->type() ) {
-			// return match on subexpression failure
-			case fail_type: return look_expr::make(1);
-			// propegate infinite loop
-			case inf_type:  return e; // an inf_expr
-			// collapse nested lookaheads
-			case not_type:  return expr::as_ptr<and_expr>(memo, e->e);
-			case and_type:  return expr::as_ptr<not_expr>(memo, e->e);
-			}
-			// return failure on subexpression success
-			if ( e->nbl() ) return fail_expr::make();
-			
-			return expr::as_ptr<not_expr>(memo, e);
-		}
-		
-		// Take negative lookahead of subexpression derivative
-		virtual ptr<expr> deriv(char x) const { return not_expr::make(memo, e->d(x)); }
-		
-		virtual nbl_mode nullable() const {
-			// not-expression generally matches on empty string, but not all strings; it will only 
-			// fail to match on the empty string if its subexpression does
-			return ( e.nbl() == EMPTY ) ? SHFT : EMPTY;
-		}
-		
-		virtual lk_mode   lk()   const { return LOOK; }
-		virtual gen_type  gen()  const { return gen_type(1); }
+		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> e);
+		virtual ptr<expr> deriv(char x) const;
+		virtual nbl_mode  nullable() const;
+		virtual lk_mode   lk() const;
+		virtual lk_mode   lookahead() const { return lk(); }
+		virtual gen_type  gen() const;
+		virtual gen_type  generation() const { return gen(); }
 		virtual expr_type type() const { return not_type; }
 		
 		ptr<expr> e;  ///< Subexpression to negatively match
@@ -549,38 +498,18 @@ namespace derivs {
 	
 	/// A parsing expression representing positive lookahead
 	class and_expr : public memo_expr {
-		friend not_expr;
-		
+	friend not_expr;
 		and_expr(memo_expr::table& memo, ptr<expr> e) 
 			: memo_expr(memo), e(e) { g = 1; flags.gen = true; }
 		
 	public:
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> e) {
-			switch ( e->type() ) {
-			// return failure on subexpression failure
-			case fail_type: return e; // a fail_expr
-			// propegate infinite loop
-			case inf_type:  return e; // an inf_expr
-			// collapse nested lookaheads
-			case not_type:  return e; // a not_expr wrapping e->e
-			case and_type:  return e; // an and_expr wrapping e->e
-			}
-			// return success on subexpression success
-			if ( e->nbl() ) return look_expr::make(1);
-			
-			return expr::as_ptr<and_expr>(memo, e);
-		}
-		
-		// Take positive lookahead of subexpression derivative
-		virtual ptr<expr> deriv(char x) const { return and_expr::make(memo, e->d(x)); }
-		
-		virtual nbl_mode nullable() const {
-			// and-expression matches on the same set as its subexpression
-			return e.nbl();
-		}
-		
-		virtual lk_mode   lk()   const { return LOOK; }
-		virtual gen_type  gen()  const { return gen_type(1); }
+		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> e);
+		virtual ptr<expr> deriv(char x) const;
+		virtual nbl_mode  nullable() const;
+		virtual lk_mode   lk() const;
+		virtual lk_mode   lookahead() const { return lk(); }
+		virtual gen_type  gen() const;
+		virtual gen_type  generation() const { return gen(); }
 		virtual expr_type type() const { return and_type; }
 		
 		ptr<expr> e;  ///< Subexpression to match
@@ -589,44 +518,16 @@ namespace derivs {
 	/// Maintains generation mapping from collapsed alternation expression.
 	class map_expr : public memo_expr {
 	friend alt_expr;
-		
 		map_expr(memo_expr::table& memo, ptr<expr> e, gen_flags eg)
 			: memo_expr(memo), e(e), eg(eg) {}
 		
 	public:
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> e, gen_flags eg) {
-			switch ( e->type() ) {
-			case eps_type:  return e; // an eps_expr
-			// a look expression with the generation translated
-			case look_type: return look_expr::make(flags::select(eg, e->gen()));
-			case fail_type: return e; // a fail_expr
-			case inf_type:  return e; // an inf_expr
-			}
-			
-			return expr::as_ptr<map_expr>(memo, e, eg);
-		}
-		
-		virtual ptr<expr> deriv(char x) const {
-			ptr<expr> de = e->d(x);
-			
-			// Check conditions on de [same as make]
-			switch ( de->type() ) {
-			case eps_type:  return de; // an eps_expr
-			// a look expression with the generation translated
-			case look_type: return look_expr::make(flags::select(eg, de->gen()));
-			case fail_type: return de; // a fail_expr
-			case inf_type:  return de; // an inf_expr
-			}
-			
-			return expr::as_ptr<map_expr>(memo, de, eg);
-		}
-		
-		virtual nbl_mode  nullable()   const { return e->nbl(); }
-		virtual lk_mode   lookahead()  const { return e->lk(); }
-		virtual gen_type  generation() const {
-			return gen_type(flags::last(eg));  // Last bit is highest generation present
-		}
-		virtual expr_type type()       const { return map_type; }
+		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> e, gen_flags eg);
+		virtual ptr<expr> deriv(char x) const;
+		virtual nbl_mode  nullable() const;
+		virtual lk_mode   lookahead() const;
+		virtual gen_type  generation() const;
+		virtual expr_type type() const { return map_type; }
 		
 		ptr<expr> e;   ///< Subexpression
 		gen_flags eg;  ///< Generation flags for subexpression
@@ -634,89 +535,16 @@ namespace derivs {
 	
 	/// A parsing expression representing the alternation of two parsing expressions
 	class alt_expr : public memo_expr {
-		expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, gen_flags ag, gen_flags bg)
+		alt_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, gen_flags ag, gen_flags bg)
 			: memo_expr(memo), a(a), b(b), ag(ag), bg(bg) {}
 		
 	public:
 		/// Make an expression using the default generation rules
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b) {
-			switch ( a->type() ) {
-			// if first alternative fails, use second
-			case fail_type: return b;
-			// if first alternative is infinite loop, propegate
-			case inf_type:  return a; // an inf_expr
-			}
-			// if first alternative is nullable, use first
-			if ( a->nbl() ) return a;
-			// if second alternative fails, use first
-			if ( b->type() == fail_type ) return a;
-			
-			gen_flags ag, bg;
-				
-			// in both cases, 0 for READ, 1 for LOOK, 0 & 1 for PART
-			switch ( a->lk() ) {
-			case READ: flags::set(ag, 0);                    break;
-			case LOOK: flags::set(ag, 1);                    break;
-			case PART: flags::set(ag, 0); flags::set(ag, 1); break;
-			}
-			switch ( b->lk() ) {
-			case READ: flags::set(bg, 0);                    break;
-			case LOOK: flags::set(bg, 1);                    break;
-			case PART: flags::set(bg, 0); flags::set(bg, 1); break;
-			}
-			
-			return expr::as_ptr<alt_expr>(memo, a, b, ag, bg);
-		}
-		
-		virtual ptr<expr> deriv(char x) const {
-			ptr<expr> da = a->d(x);
-			
-			// Check conditions on a before we calculate dx(b) [same as make()]
-			switch ( da->type() ) {
-			case fail_type: return map_expr::make(memo, b->d(x), bg);
-			case inf_type:  return da; // an inf_expr
-			}
-			if ( da->nbl() ) return map_expr::make(memo, da, ag);
-			
-			ptr<expr> db = b->d(x);
-			if ( db->type() == fail_type ) return map_expr::make(memo, da, ag);
-			
-			// Calculate generations of new subexpressions
-			// - If we've added a lookahead generation that wasn't there before, map it into the 
-			//   generation space of the derived alternation
-			gen_flags dag = ag, dbg = bg;
-			if ( da->gen() > a->gen() ) {
-				flags::set(dag, gen()+1);
-			}
-			if ( db->gen() > b->gen() ) {
-				flags::set(dbg, gen()+1);
-			}
-			
-			return expr::as_ptr<alt_expr>(memo, da, db, dag, dbg);
-		}
-		
-		virtual nbl_mode nullable() const {
-			nbl_mode an = a->nbl(), bn = b->nbl();
-			
-			if ( an == NBL || bn == NBL ) return NBL;
-			else if ( an == EMPTY || bn == EMPTY ) return EMPTY;
-			else return SHFT;
-		}
-		
-		virtual lk_mode lookahead() const {
-			lk_mode al = a->lk(), bl = b->lk();
-			
-			if ( al == LOOK && bl == LOOK ) return LOOK;
-			else if ( al == READ && bl == READ ) return READ;
-			else return PART;
-		}
-		
-		virtual gen_type generation() const {
-			gen_flags tg;
-			flags::set_union(ag, bg, tg);      // Union generation flags into tg
-			return gen_type(flags::last(tg));  // Count set bits for maximum generation
-		}
-		
+		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
+		virtual ptr<expr> deriv(char x) const;
+		virtual nbl_mode  nullable() const;
+		virtual lk_mode   lookahead() const;
+		virtual gen_type  generation() const;
 		virtual expr_type type() const { return alt_type; }
 		
 		ptr<expr> a;   ///< First subexpression
@@ -732,89 +560,11 @@ namespace derivs {
 			: memo_expr(memo), a(a), b(b) {}
 	
 	public:
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b) {
-			switch ( a->type() ) {
-			// empty first element leaves just second
-			case eps_type:  return b;
-			case look_type: return b;
-			// failing or infinite loop first element propegates
-			case fail_type: return a; // a fail_expr
-			case inf_type:  return a; // an inf_expr
-			}
-			
-			switch ( b->type() ) {
-			// empty second element leaves just first
-			case eps_type:  return a;
-			// failing second element propegates
-			case fail_type: return b; // a fail_expr
-			}
-			
-			return expr::as_ptr<seq_expr>(memo, a, b);
-		}
-		
-		virtual ptr<expr> deriv(char x) const {
-			ptr<expr> da = a->d(x);
-			lk_mode al = a->lk();
-			
-			if ( al == LOOK ) {
-				// Precludes nullability; only nullable lookahead expression is look_expr, and that 
-				// one can't be `a` by the make rules. Therefore match both in sequence
-				return seq_expr::make(memo, da, b->d(x));
-			}
-			
-			if ( al == PART ) {
-				ptr<expr> db = b->d(x);
-				
-				// Track the lookahead generations of this sequence
-				ptr<expr> dx = back_expr::make(memo, da, b, db);
-				
-				if ( a->nbl() == NBL ) {
-					// Set up backtracking for nullable first expression
-					return alt_expr::make(memo, 
-					                      dx, 
-					                      seq_expr::make(not_expr::make(memo, da), db));
-				} else {
-					return dx;
-				}
-			}
-			
-			// Derivative of this sequence
-			ptr<expr> dx = seq_expr::make(memo, da, b);
-			
-			if ( a->nbl() == NBL ) {
-				// Set up backtracking for nullable first expression
-				return alt_expr::make(memo,
-				                      dx,
-				                      seq_expr::make(not_expr::make(memo, da), b->d(x)));
-			}
-			
-			return dx;
-		}
-		
-		virtual nbl_mode nullable() const {
-			nbl_mode an = a->nbl(), bn = b->nbl();
-			
-			if ( an == SHFT || bn == SHFT ) return SHFT;
-			else if ( an == NBL && bn == NBL ) return NBL;
-			else return EMPTY;
-		}
-		
-		virtual lk_mode lookahead() const {
-			lk_mode al = a->lk(), bl = b->lk();
-			
-			if ( al == LOOK && bl == LOOK ) return LOOK;
-			else if ( al == READ && bl == READ 
-			          && a->nbl() == SHFT && b->nbl() == SHFT ) return READ;
-			else return PART;
-		}
-		
-		virtual gen_type generation() const {
-			// If either a or b is READ and SHFT, the whole expression is, otherwise we take the 
-			// generation of the second element
-			if ( a->lk() == READ && a->nbl() == SHFT ) return gen_type(0);
-			else return b->gen();
-		}
-		
+		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
+		virtual ptr<expr> deriv(char x) const;
+		virtual nbl_mode  nullable() const;
+		virtual lk_mode   lookahead() const;
+		virtual gen_type  generation() const;
 		virtual expr_type type() const { return seq_type; }
 		
 		ptr<expr> a;  ///< First subexpression
@@ -840,135 +590,456 @@ namespace derivs {
 	public:
 		/// Makes an expression given the memoization table, partial lookahead expression a, 
 		/// following expression b, and lookahead-following expression b1
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, ptr<expr> b1) {
-			switch ( a->type() ) {
-			// empty first element leaves just follower
-			case eps_type:  return b;
-			// lookahead first element leaves just lookahead-follower
-			case look_type: return b1;
-			// failing or infinite loop first element propegates
-			case fail_type: return a; // a fail_expr
-			case inf_type:  return a; // an inf_expr
-			}
-			
-			// If a is no longer a partial lookahead expression, form the appropriate sequence
-			switch ( a->lk() ) {
-			case READ: return seq_expr::make(memo, a, b);
-			case LOOK: return seq_expr::make(memo, a, b1);
-			}
-			
-			look_list bs;
-			
-			if ( b1->type() != fail_type ) {
-				// If the lookahead-follower did not fail immediately, map in its generation flags
-				gen_flags eg;
-				switch ( b1->lk() ) {
-				case READ: flags::set(eg, 0);                    break;
-				case LOOK: flags::set(eg, 1);                    break;
-				case PART: flags::set(eg, 0); flags::set(eg, 1); break;
-				}
-				
-				// Add the lookahead generation to the list
-				bs.emplace_back(1, eg, b1);
-			}
-			
-			return expr::as_ptr<back_expr>(memo, a, b, bs);
-		}
-		
-		virtual ptr<expr> deriv(char x) const {
-			ptr<expr> da  = a->d(x);
-			
-			switch ( da->type() ) {
-			// non-lookahead success leaves just follower
-			case eps_type:  return b;
-			// lookahead success leaves appropriate lookahead follower
-			case look_type:
-				gen_type i = da->gen();
-				for (look_node& bi : bs) {
-					if ( bi.g == i ) return map_expr::make(memo, bi.e, bi.eg);
-					else if ( bi.g > i ) break;  // generation list is sorted
-				}
-				return fail_type::make();  // if none found, fail
-			// failing or infinite loop element propegates
-			case fail_type: return da; // a fail_expr
-			case inf_type:  return da; // an inf_expr
-			}
-			
-			lk_mode   dal = da->lk();
-			
-			// Fall back to regular sequence expression if first expression ceases to be lookahead
-			if ( dal == READ ) return seq_expr::make(memo, dal, b);
-			
-			// Free storage for sequential follower if first expression is all lookahead
-			ptr<expr> bn = ( dal == LOOK ) ? fail_expr::make() : b;
-			
-			// Take derivative of all lookahead options
-			look_list dbs;
-			for (look_node& bi : bs) {
-				ptr<expr> dbi = bi->d(x);
-				if ( dbi->type() != fail_type ) {
-					// Map new lookahead generations into the space of the backtracking expression
-					gen_flags dbig = bi.eg;
-					if ( dbi->gen() > bi.e->gen() ) flags::set(dbig, gen()+1);
-					dbs.emplace_back(bi.g, dbig, dbi);
-				}
-			}
-			
-			// Add any new lookahead generations to the list
-			gen_type dag = da->gen();
-			if ( dag > a->gen() ) {
-				ptr<expr> db = b->d(x);
-				if ( db->type() != fail_type ) {
-					gen_flags bg;
-					switch ( db->lk() ) {
-					case READ: flags::set(bg, 0);                    break;
-					case LOOK: flags::set(bg, 1);                    break;
-					case PART: flags::set(bg, 0); flags::set(bg, 1); break;
-					}
-					
-					dbs.emplace_back(dag, bg, db);
-				}
-			}
-			
-			return expr::as_ptr<back_expr>(memo, da, bn, dbs);
-		}
-		
-		virtual nbl_mode nullable() const {
-			switch ( a->nbl() ) {
-			case NBL:
-				if ( b->nbl() == NBL ) return NBL;
-				// fallthrough
-			case EMPTY:
-				for (look_node& bi : bs) if ( bi.e->nbl() != SHFT ) return EMPTY;
-				// fallthrough
-			}
-			return SHFT;
-		}
-		
-		virtual lk_mode lookahead() const {
-			// Scan the b_i for followers that don't always consume characters - PART if so
-			if ( b->nbl() != SHFT || b->lk() != READ ) return PART;
-			for (look_node& bi : bs) {
-				if ( bi.e->nbl() != SHFT || bi.e->lk() != READ ) return PART;
-			}
-			// READ otherwise
-			return READ;
-		}
-		
-		virtual gen_type generation() const {
-			gen_flags tg;
-			flags::set(tg, 0);
-			
-			// Take union of all generation flags into tg
-			for (look_node& bi : bs) { flags::set_union(tg, bi.eg, tg); }
-			
-			return gen_type(flags::last(tg));  // Count set bits for maximum generation
-		}
-		
+		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, ptr<expr> b1);
+		virtual ptr<expr> deriv(char x) const;
+		virtual nbl_mode  nullable() const;
+		virtual lk_mode   lookahead() const;
+		virtual gen_type  generation() const;
 		virtual expr_type type() const { return back_type; }
 		
 		look_list bs;  ///< List of following subexpressions for each lookahead generation
 	}; // class back_expr
+	
+	////////////////////////////////////////////////////////////////////////////////
+	//
+	//  Implementations
+	//
+	////////////////////////////////////////////////////////////////////////////////
+	
+	// rule_expr ///////////////////////////////////////////////////////////////////
+	
+	ptr<expr> rule_expr::make(memo_expr::table& memo, ptr<expr> r) {
+		return ptr<expr>(new rule_expr(memo, r));
+	}
+	
+	ptr<expr> rule_expr::deriv(char x) const {
+		// signal infinite loop if we try to take this derivative again
+		memo[const_cast<rule_expr* const>(this)] = inf_expr::make();
+		// calculate derivative
+		return r->d(x);
+	}
+	
+	nbl_mode rule_expr::nullable() const {
+		// Stop this from infinitely recursing
+		flags.nbl = SHFT_VAL;
+		// Calculate nullability
+		return r->nbl();
+	}
+	
+	lk_mode rule_expr::lookahead() const {
+		// Stop this from infinitely recursing
+		flags.lk = READ_VAL;
+		// Calculate lookahead
+		return r->lk();
+	}
+	
+	gen_type rule_expr::generation() const {
+		// Statically defined, can't have lookahead generation greater than 1
+		return gen_type(lk() == READ ? 0 : 1);
+	}
+	
+	// not_expr ////////////////////////////////////////////////////////////////////
+	
+	ptr<expr> not_expr::make(memo_expr::table& memo, ptr<expr> e) {
+		switch ( e->type() ) {
+		// return match on subexpression failure
+		case fail_type: return look_expr::make(1);
+		// propegate infinite loop
+		case inf_type:  return e; // an inf_expr
+		// collapse nested lookaheads
+		case not_type:
+			return ptr<expr>(new and_expr(memo, std::static_pointer_cast<not_expr>(e)->e));
+		case and_type:
+			return ptr<expr>(new not_expr(memo, std::static_pointer_cast<and_expr>(e)->e));
+		default:        break; // do nothing
+		}
+		// return failure on subexpression success
+		if ( e->nbl() ) return fail_expr::make();
+		
+		return ptr<expr>(new not_expr(memo, e));
+	}
+	
+	// Take negative lookahead of subexpression derivative
+	ptr<expr> not_expr::deriv(char x) const { return not_expr::make(memo, e->d(x)); }
+	
+	nbl_mode not_expr::nullable() const {
+		// not-expression generally matches on empty string, but not all strings; it will only 
+		// fail to match on the empty string if its subexpression does
+		return ( e->nbl() == EMPTY ) ? SHFT : EMPTY;
+	}
+	
+	lk_mode  not_expr::lk()  const { return LOOK; }
+	gen_type not_expr::gen() const { return gen_type(1); }
+	
+	// and_expr ////////////////////////////////////////////////////////////////////
+	
+	ptr<expr> and_expr::make(memo_expr::table& memo, ptr<expr> e) {
+		switch ( e->type() ) {
+		// return failure on subexpression failure
+		case fail_type: return e; // a fail_expr
+		// propegate infinite loop
+		case inf_type:  return e; // an inf_expr
+		// collapse nested lookaheads
+		case not_type:  return e; // a not_expr wrapping e->e
+		case and_type:  return e; // an and_expr wrapping e->e
+		default:        break; // do nothing
+		}
+		// return success on subexpression success
+		if ( e->nbl() ) return look_expr::make(1);
+		
+		return ptr<expr>(new and_expr(memo, e));
+	}
+	
+	// Take positive lookahead of subexpression derivative
+	ptr<expr> and_expr::deriv(char x) const { return and_expr::make(memo, e->d(x)); }
+	
+	nbl_mode and_expr::nullable() const {
+		// and-expression matches on the same set as its subexpression
+		return e->nbl();
+	}
+	
+	lk_mode  and_expr::lk()  const { return LOOK; }
+	gen_type and_expr::gen() const { return gen_type(1); }
+	
+	// map_expr ////////////////////////////////////////////////////////////////////
+	
+	ptr<expr> map_expr::make(memo_expr::table& memo, ptr<expr> e, gen_flags eg) {
+		switch ( e->type() ) {
+		case eps_type:  return e; // an eps_expr
+		// a look expression with the generation translated
+		case look_type: return look_expr::make(flags::select(eg, e->gen()));
+		case fail_type: return e; // a fail_expr
+		case inf_type:  return e; // an inf_expr
+		default:        break; // do nothing
+		}
+		
+		return ptr<expr>(new map_expr(memo, e, eg));
+	}
+	
+	ptr<expr> map_expr::deriv(char x) const {
+		ptr<expr> de = e->d(x);
+		
+		// Check conditions on de [same as make]
+		switch ( de->type() ) {
+		case eps_type:  return de; // an eps_expr
+		// a look expression with the generation translated
+		case look_type: return look_expr::make(flags::select(eg, de->gen()));
+		case fail_type: return de; // a fail_expr
+		case inf_type:  return de; // an inf_expr
+		default:        break; // do nothing
+		}
+		
+		return ptr<expr>(new map_expr(memo, de, eg));
+	}
+	
+	nbl_mode map_expr::nullable()   const { return e->nbl(); }
+	lk_mode  map_expr::lookahead()  const { return e->lk(); }
+	gen_type map_expr::generation() const {
+		return gen_type(flags::last(eg));  // Last bit is highest generation present
+	}
+	
+	// alt_expr ////////////////////////////////////////////////////////////////////
+	
+	ptr<expr> alt_expr::make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b) {
+		switch ( a->type() ) {
+		// if first alternative fails, use second
+		case fail_type: return b;
+		// if first alternative is infinite loop, propegate
+		case inf_type:  return a; // an inf_expr
+		default:        break; // do nothing
+		}
+		// if first alternative is nullable, use first
+		if ( a->nbl() ) return a;
+		// if second alternative fails, use first
+		if ( b->type() == fail_type ) return a;
+		
+		gen_flags ag, bg;
+			
+		// in both cases, 0 for READ, 1 for LOOK, 0 & 1 for PART
+		switch ( a->lk() ) {
+		case READ: flags::set(ag, 0);                    break;
+		case LOOK: flags::set(ag, 1);                    break;
+		case PART: flags::set(ag, 0); flags::set(ag, 1); break;
+		}
+		switch ( b->lk() ) {
+		case READ: flags::set(bg, 0);                    break;
+		case LOOK: flags::set(bg, 1);                    break;
+		case PART: flags::set(bg, 0); flags::set(bg, 1); break;
+		}
+		
+		return ptr<expr>(new alt_expr(memo, a, b, ag, bg));
+	}
+	
+	ptr<expr> alt_expr::deriv(char x) const {
+		ptr<expr> da = a->d(x);
+		
+		// Check conditions on a before we calculate dx(b) [same as make()]
+		switch ( da->type() ) {
+		case fail_type: return map_expr::make(memo, b->d(x), bg);
+		case inf_type:  return da; // an inf_expr
+		default:        break; // do nothing
+		}
+		if ( da->nbl() ) return map_expr::make(memo, da, ag);
+		
+		ptr<expr> db = b->d(x);
+		if ( db->type() == fail_type ) return map_expr::make(memo, da, ag);
+		
+		// Calculate generations of new subexpressions
+		// - If we've added a lookahead generation that wasn't there before, map it into the 
+		//   generation space of the derived alternation
+		gen_flags dag = ag, dbg = bg;
+		if ( da->gen() > a->gen() ) {
+			flags::set(dag, gen()+1);
+		}
+		if ( db->gen() > b->gen() ) {
+			flags::set(dbg, gen()+1);
+		}
+		
+		return ptr<expr>(new alt_expr(memo, da, db, dag, dbg));
+	}
+	
+	nbl_mode alt_expr::nullable() const {
+		nbl_mode an = a->nbl(), bn = b->nbl();
+		
+		if ( an == NBL || bn == NBL ) return NBL;
+		else if ( an == EMPTY || bn == EMPTY ) return EMPTY;
+		else return SHFT;
+	}
+	
+	lk_mode alt_expr::lookahead() const {
+		lk_mode al = a->lk(), bl = b->lk();
+		
+		if ( al == LOOK && bl == LOOK ) return LOOK;
+		else if ( al == READ && bl == READ ) return READ;
+		else return PART;
+	}
+	
+	gen_type alt_expr::generation() const {
+		gen_flags tg;
+		flags::set_union(ag, bg, tg);      // Union generation flags into tg
+		return gen_type(flags::last(tg));  // Count set bits for maximum generation
+	}
+	
+	// seq_expr ////////////////////////////////////////////////////////////////////
+	
+	ptr<expr> seq_expr::make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b) {
+		switch ( a->type() ) {
+		// empty first element leaves just second
+		case eps_type:  return b;
+		case look_type: return b;
+		// failing or infinite loop first element propegates
+		case fail_type: return a; // a fail_expr
+		case inf_type:  return a; // an inf_expr
+		default:        break; // do nothing
+		}
+		
+		switch ( b->type() ) {
+		// empty second element leaves just first
+		case eps_type:  return a;
+		// failing second element propegates
+		case fail_type: return b; // a fail_expr
+		default:        break; // do nothing
+		}
+		
+		return ptr<expr>(new seq_expr(memo, a, b));
+	}
+	
+	ptr<expr> seq_expr::deriv(char x) const {
+		ptr<expr> da = a->d(x);
+		lk_mode al = a->lk();
+		
+		if ( al == LOOK ) {
+			// Precludes nullability; only nullable lookahead expression is look_expr, and that 
+			// one can't be `a` by the make rules. Therefore match both in sequence
+			return seq_expr::make(memo, da, b->d(x));
+		}
+		
+		if ( al == PART ) {
+			ptr<expr> db = b->d(x);
+			
+			// Track the lookahead generations of this sequence
+			ptr<expr> dx = back_expr::make(memo, da, b, db);
+			
+			if ( a->nbl() == NBL ) {
+				// Set up backtracking for nullable first expression
+				return alt_expr::make(memo, 
+				                      dx, 
+				                      seq_expr::make(memo, not_expr::make(memo, da), db));
+			} else {
+				return dx;
+			}
+		}
+		
+		// Derivative of this sequence
+		ptr<expr> dx = seq_expr::make(memo, da, b);
+		
+		if ( a->nbl() == NBL ) {
+			// Set up backtracking for nullable first expression
+			return alt_expr::make(memo,
+			                      dx,
+			                      seq_expr::make(memo, not_expr::make(memo, da), b->d(x)));
+		}
+		
+		return dx;
+	}
+	
+	nbl_mode seq_expr::nullable() const {
+		nbl_mode an = a->nbl(), bn = b->nbl();
+		
+		if ( an == SHFT || bn == SHFT ) return SHFT;
+		else if ( an == NBL && bn == NBL ) return NBL;
+		else return EMPTY;
+	}
+	
+	lk_mode seq_expr::lookahead() const {
+		lk_mode al = a->lk(), bl = b->lk();
+		
+		if ( al == LOOK && bl == LOOK ) return LOOK;
+		else if ( al == READ && bl == READ 
+		          && a->nbl() == SHFT && b->nbl() == SHFT ) return READ;
+		else return PART;
+	}
+	
+	gen_type seq_expr::generation() const {
+		// If either a or b is READ and SHFT, the whole expression is, otherwise we take the 
+		// generation of the second element
+		if ( a->lk() == READ && a->nbl() == SHFT ) return gen_type(0);
+		else return b->gen();
+	}
+	
+	// back_expr ///////////////////////////////////////////////////////////////////
+	
+	ptr<expr> back_expr::make(memo_expr::table& memo, 
+	                                 ptr<expr> a, ptr<expr> b, ptr<expr> b1) {
+		switch ( a->type() ) {
+		// empty first element leaves just follower
+		case eps_type:  return b;
+		// lookahead first element leaves just lookahead-follower
+		case look_type: return b1;
+		// failing or infinite loop first element propegates
+		case fail_type: return a; // a fail_expr
+		case inf_type:  return a; // an inf_expr
+		default:        break; // do nothing
+		}
+		
+		// If a is no longer a partial lookahead expression, form the appropriate sequence
+		switch ( a->lk() ) {
+		case READ: return seq_expr::make(memo, a, b);
+		case LOOK: return seq_expr::make(memo, a, b1);
+		default:   break; // do nothing
+		}
+		
+		look_list bs;
+		
+		if ( b1->type() != fail_type ) {
+			// If the lookahead-follower did not fail immediately, map in its generation flags
+			gen_flags eg;
+			switch ( b1->lk() ) {
+			case READ: flags::set(eg, 0);                    break;
+			case LOOK: flags::set(eg, 1);                    break;
+			case PART: flags::set(eg, 0); flags::set(eg, 1); break;
+			}
+			
+			// Add the lookahead generation to the list
+			bs.emplace_back(1, eg, b1);
+		}
+		
+		return ptr<expr>(new back_expr(memo, a, b, bs));
+	}
+	
+	ptr<expr> back_expr::deriv(char x) const {
+		ptr<expr> da  = a->d(x);
+		
+		switch ( da->type() ) {
+		case eps_type: { 
+			return b; // non-lookahead success leaves just follower
+		} case look_type: { 
+			// lookahead success leaves appropriate lookahead follower
+			gen_type i = da->gen();
+			for (const look_node& bi : bs) {
+				if ( bi.g == i ) return map_expr::make(memo, bi.e, bi.eg);
+				else if ( bi.g > i ) break;  // generation list is sorted
+			}
+			return fail_expr::make();  // if none found, fail
+		} case fail_type: { 
+			// failing or infinite loop element propegates
+			return da; // a fail_expr
+		} case inf_type: { 
+			return da; // an inf_expr
+		} default: break; // do nothing
+		}
+		
+		lk_mode   dal = da->lk();
+		
+		// Fall back to regular sequence expression if first expression ceases to be lookahead
+		if ( dal == READ ) return seq_expr::make(memo, da, b);
+		
+		// Free storage for sequential follower if first expression is all lookahead
+		ptr<expr> bn = ( dal == LOOK ) ? fail_expr::make() : b;
+		
+		// Take derivative of all lookahead options
+		look_list dbs;
+		for (const look_node& bi : bs) {
+			ptr<expr> dbi = bi.e->d(x);
+			if ( dbi->type() != fail_type ) {
+				// Map new lookahead generations into the space of the backtracking expression
+				gen_flags dbig = bi.eg;
+				if ( dbi->gen() > bi.e->gen() ) flags::set(dbig, gen()+1);
+				dbs.emplace_back(bi.g, dbig, dbi);
+			}
+		}
+		
+		// Add any new lookahead generations to the list
+		gen_type dag = da->gen();
+		if ( dag > a->gen() ) {
+			ptr<expr> db = b->d(x);
+			if ( db->type() != fail_type ) {
+				gen_flags bg;
+				switch ( db->lk() ) {
+				case READ: flags::set(bg, 0);                    break;
+				case LOOK: flags::set(bg, 1);                    break;
+				case PART: flags::set(bg, 0); flags::set(bg, 1); break;
+				}
+				
+				dbs.emplace_back(dag, bg, db);
+			}
+		}
+		
+		return ptr<expr>(new back_expr(memo, da, bn, dbs));
+	}
+	
+	nbl_mode back_expr::nullable() const {
+		switch ( a->nbl() ) {
+		case NBL:
+			if ( b->nbl() == NBL ) return NBL;
+			// fallthrough
+		case EMPTY:
+			for (const look_node& bi : bs) if ( bi.e->nbl() != SHFT ) return EMPTY;
+			// fallthrough
+		case SHFT:
+			return SHFT;
+		}
+	}
+	
+	lk_mode back_expr::lookahead() const {
+		// Scan the b_i for followers that don't always consume characters - PART if so
+		if ( b->nbl() != SHFT || b->lk() != READ ) return PART;
+		for (const look_node& bi : bs) {
+			if ( bi.e->nbl() != SHFT || bi.e->lk() != READ ) return PART;
+		}
+		// READ otherwise
+		return READ;
+	}
+	
+	gen_type back_expr::generation() const {
+		gen_flags tg;
+		flags::set(tg, 0);
+		
+		// Take union of all generation flags into tg
+		for (const look_node& bi : bs) { flags::set_union(tg, bi.eg, tg); }
+		
+		return gen_type(flags::last(tg));  // Count set bits for maximum generation
+	}
 	
 } // namespace derivs
 

@@ -227,7 +227,7 @@ private:
 	int i;				 /**< next unparsed value */
 	std::ifstream* in;	 /**< pointer to input stream (0 for stdin) */
 	std::ofstream* out;	 /**< pointer to output stream (0 for stdout) */
-	std::ifstream& src;  /**< pointer to the sourcefile input stream (0 for none) */
+	std::ifstream* src;  /**< pointer to the sourcefile input stream (0 for none) */
 	std::string pName;	 /**< the name of the parser (empty if none) */
 	std::string rName;   /**< the name of the rule to interpret (empty if none) */
 	bool nameFlag;		 /**< has the parser name been explicitly set? */
@@ -290,10 +290,10 @@ int main(int argc, char** argv) {
 			c.compile(*g);
 			break;
 		} case INTERPRET_MODE: {
-			derivs::interpreter i(*g);
+			derivs::interpreter i = derivs::interpreter::from_ast(*g);
 			parser::state in(a.source());
 			bool b = i.match(in, a.rule());
-			cout << "Grammar " << ( b ? "matched" : "DID NOT match" ) << std::endl;
+			std::cout << "Grammar " << ( b ? "matched" : "DID NOT match" ) << std::endl;
 		} default: break;
 		}
 		
