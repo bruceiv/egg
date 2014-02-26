@@ -36,18 +36,20 @@ static const char* VERSION = "0.3.1";
 
 /** Egg usage string */
 static const char* USAGE = 
-"[-c print|compile|interpret source_file non-terminal] [-i input_file]\n\
- [-o output_file] [--no-norm] [--no-memo] [--help] [--version] [--usage]";
+"[-c print|compile|interpret] [-d defn_file] [-i input_file] [-o output_file]\n\
+ [-r rule_name] [--no-norm] [--no-memo] [--help] [--version] [--usage]";
 
 /** Full Egg help string */
 static const char* HELP = 
 "egg [command] [flags] [input-file [output-file]]\n\
 \n\
 Supported flags are\n\
+ -d --defn     grammar definition file (default stdin)\n\
  -i --input    input file (default stdin)\n\
  -o --output   output file (default stdout)\n\
  -c --command  command - either compile, interpret, print, help, usage, or\n\
                version (default compile, interpret takes two arguments)\n\
+ -r --rule     interpreter rule name (default empty)\n\
  -n --name     grammar name - if none given, takes the longest prefix of\n\
                the input or output file name (output preferred) which is a\n\
                valid Egg identifier (default empty)\n\
@@ -125,6 +127,7 @@ private:
 
 	void parse_input(char* s) {
 		in = new std::ifstream(s);
+		inName = s;
 		if ( !nameFlag && out == nullptr ) {
 			pName = id_prefix(s);
 		}
@@ -132,13 +135,15 @@ private:
 
 	void parse_output(char* s) {
 		out = new std::ofstream(s);
+		outName = s;
 		if ( !nameFlag ) {
 			pName = id_prefix(s);
 		}
 	}
 	
-	void parse_src(char* s) {
+	void parse_source(char* s) {
 		src = new std::ifstream(s);
+		srcName = s;
 	}
 	
 	void parse_rule(char* s) {
@@ -151,22 +156,17 @@ private:
 	}
 
 public:
-	args(int argc, char** argv) {
-		in = nullptr;
-		out = nullptr;
-		src = nullptr;
-		pName = std::string("");
-		nameFlag = false;
-		normFlag = true;
-		memoFlag = true;
-		eMode = COMPILE_MODE;
-
+	args(int argc, char** argv) 
+		: in(nullptr), out(nullptr), src(nullptr),
+		  inName(), outName(), srcName(), pName(), rName(),
+		  nameFlag(false), normFlag(true), memoFlag(true), eMode(COMPILE_MODE) {
+		
 		i = 1;
 		if ( argc <= 1 ) return;
 
 		//parse optional sub-command
 		if ( parse_mode(argv[i]) ) { ++i; }
-
+		
 		//parse explicit flags
 		for (; i < argc; ++i) {
 			if ( match("-i", "--input", argv[i]) ) {
@@ -175,19 +175,18 @@ public:
 			} else if ( match("-o", "--output", argv[i]) ) {
 				if ( i+1 >= argc ) return;
 				parse_output(argv[++i]);
+			} else if ( match("-s", "--source", argv[i]) ) {
+				if ( i+1 >= argc ) return;
+				parse_source(argv[++i]);
 			} else if ( match("-c", "--command", argv[i]) ) {
 				if ( i+1 >= argc ) return;
-				if ( parse_mode(argv[++i]) ) {
-					++i;
-					if ( eMode == INTERPRET_MODE ) {
-						if ( i+2 >= argc ) return;
-						parse_src(argv[i++]);
-						parse_rule(argv[i++]);
-					}
-				}
+				parse_mode(argv[++i]);
 			} else if ( match("-n", "--name", argv[i]) ) {
 				if ( i+1 >= argc ) return;
 				parse_name(argv[++i]);
+			} else if ( match("-r", "--rule", argv[i]) ) {
+				if ( i+1 >= argc ) return;
+				parse_rule(argv[++i]);
 			} else if ( eq("--no-norm", argv[i]) ) {
 				normFlag = false;
 			} else if ( eq("--no-memo", argv[i]) ) {
@@ -201,22 +200,27 @@ public:
 			} else break;
 		}
 
-		//parse optional input and output files
-		if ( i < argc ) {
-			parse_input(argv[i++]);
-			if ( i < argc ) {
-				parse_output(argv[i++]);
-			}
+		//parse optional input, source, and output files
+		if ( i < argc && in == nullptr )  parse_input(argv[i++]);
+		if ( eMode == INTERPRET_MODE ) {
+			if ( i < argc && rName.empty() )  parse_rule(argv[i++]);
+			if ( i < argc && src == nullptr ) parse_source(argv[i++]);
 		}
+		if ( i < argc && out == nullptr ) parse_output(argv[i++]);
 	}
 
 	~args() {
-		if ( in != 0 ) in->close();
+		if ( in != nullptr ) in->close();
+		if ( out != nullptr ) out->close();
+		if ( src != nullptr ) src->close();
 	}
 
 	std::istream& input() { if ( in ) return *in; else return std::cin; }
 	std::ostream& output() { if ( out ) return *out; else return std::cout; }
 	std::istream& source() { if ( src ) return *src; else return std::cin; }
+	std::string inputFile() { return in ? inName : "<STDIN>"; }
+	std::string outputFile() { return out ? outName : "<STDOUT>"; }
+	std::string sourceFile() { return src ? srcName : "<STDIN>"; }
 	std::string name() { return pName; }
 	std::string rule() { return rName; }
 	bool norm() { return normFlag; }
@@ -224,16 +228,19 @@ public:
 	egg_mode mode() { return eMode; }
 
 private:
-	int i;				 /**< next unparsed value */
-	std::ifstream* in;	 /**< pointer to input stream (0 for stdin) */
-	std::ofstream* out;	 /**< pointer to output stream (0 for stdout) */
-	std::ifstream* src;  /**< pointer to the sourcefile input stream (0 for none) */
-	std::string pName;	 /**< the name of the parser (empty if none) */
-	std::string rName;   /**< the name of the rule to interpret (empty if none) */
-	bool nameFlag;		 /**< has the parser name been explicitly set? */
-	bool normFlag;       /**< should egg do grammar normalization? */
-	bool memoFlag;       /**< should the generated grammar do memoization? */
-	egg_mode eMode;		 /**< compiler mode to use */
+	int i;				  /**< next unparsed value */
+	std::ifstream* in;	  /**< pointer to input stream (0 for stdin) */
+	std::ofstream* out;	  /**< pointer to output stream (0 for stdout) */
+	std::ifstream* src;   /**< pointer to the interpreted source file (0 for stdin) */
+	std::string inName;   /**< Name of the input file (empty if none) */
+	std::string outName;  /**< Name of the output file (empty if none) */
+	std::string srcName;  /**< Name of the interpreted source file (empty if none) */
+	std::string pName; 	  /**< the name of the parser (empty if none) */
+	std::string rName;    /**< the name of the rule to interpret (empty if none) */
+	bool nameFlag;		  /**< has the parser name been explicitly set? */
+	bool normFlag;        /**< should egg do grammar normalization? */
+	bool memoFlag;        /**< should the generated grammar do memoization? */
+	egg_mode eMode;		  /**< compiler mode to use */
 };
 
 /** Command line interface
@@ -268,6 +275,13 @@ int main(int argc, char** argv) {
 		return 0;
 	default: break;
 	}
+	
+std::cout << "DBG mode:`" << a.mode()
+          << "` source:`" << a.sourceFile() 
+          << "` rule:`" << a.rule()
+          << "` in:`" << a.inputFile()
+          << "` out:`" << a.outputFile()
+          << "`" << std::endl;
 
 	parser::state ps(a.input());
 	ast::grammar_ptr g;

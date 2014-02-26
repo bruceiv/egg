@@ -43,11 +43,9 @@ namespace parser {
 	
 	typedef unsigned long ind;  /**< unsigned index type */
 	
-	class state;
-	
 	/** Human-readable position type */
 	struct posn {
-	friend state;
+	friend class state;
 	private:
 		// constructor only available to state; discourages messing with posn
 		posn(ind index, ind line, ind col) : i(index), ln(line), cl(col) {}

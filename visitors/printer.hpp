@@ -114,10 +114,11 @@ namespace visitor {
 				
 				--tabs;
 			}
-			if ( m.ms.size() != 1 ) out << " )";
+			if ( m.ms.size() != 1 ) { out << " )"; }
 		}
 
 		void visit(ast::alt_matcher& m) {
+			if ( m.ms.size() != 1 ) { out << "( "; }
 			if ( ! m.ms.empty() ) {
 				std::string indent((4 * ++tabs), ' ');
 
@@ -130,6 +131,7 @@ namespace visitor {
 				
 				--tabs;
 			}
+			if ( m.ms.size() != 1 ) { out << " )"; }
 		}
 
 		void visit(ast::look_matcher& m) {

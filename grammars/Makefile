@@ -18,8 +18,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-#CXXFLAGS = -O0 -ggdb --std=c++0x
-CXXFLAGS = -O3 --std=c++0x
+CXX = clang++
+CXXFLAGS = -O0 -ggdb --std=c++0x
+#CXXFLAGS = -O3 --std=c++0x
 
 parser.hpp:  
 	ln -s ../parser.hpp .
