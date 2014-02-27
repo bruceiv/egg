@@ -17,9 +17,9 @@
 ## Bugs ##
 - Cannot include ']' in a character class - should include an escape.
 - Non-syntactic '{' and '}' characters in actions (e.g. those in comments or string literals) may break the parser if unmatched.
-- Parens in grammar pretty-printer are not entirely correct
 - Actions that modify psVal rather than assigning to it may behave differently under memoization than not
 - Should modify "many" and "some" combinators to break their loop on empty match (i.e. silently treat the language matched by their subexpression e as _L(e) \ epsilon_)
+- Reference cycle in derivative implementation of many node; should add special node type to break
 
 ## Code Cleanup ##
 - Maybe move to `unique_ptr` from `shared_ptr`
@@ -34,3 +34,4 @@
 - Maybe make Egg-based argument parsing grammar (might be more work to make input stream that inputs (argc, argv) than it's worth)
 - 1-index line numbers
 - add hash table to consolidate memoization entries for identical '*' and '+' grammars
+- Investigate templated visitor pattern which returns a value

@@ -35,6 +35,18 @@ namespace derivs {
 	/// Loads a set of derivatives from the grammar AST
 	class loader : ast::visitor {
 		
+		/// Gets the unique rule expression correspoinding to the given name
+		ptr<rule_expr> get_rule(const std::string& s) {
+			if ( rs.count(s) == 0 ) {
+				ptr<rule_expr> r 
+					= std::static_pointer_cast<rule_expr>(rule_expr::make(memo, fail_expr::make()));
+				rs./*emplace(s, r)*/insert(std::make_pair(s, r));
+				return r;
+			} else {
+				return rs.at(s);
+			}
+		}
+		
 		/// Converts an AST char range into a derivative expr. char_range
 		ptr<expr> make_char_range(const ast::char_range& r) const {
 			return ( r.from == r.to ) ? 
@@ -61,24 +73,20 @@ namespace derivs {
 			for (ptr<ast::grammar_rule> r : g.rs) {
 				rVal = nullptr;
 				r->m->accept(this);
-				rs[r->name] = rVal;
+				get_rule(r->name)->r = rVal;
 			}
 			rVal = nullptr;
-			
-			// Update rule expressions to have single rule expression
-			for (std::pair<std::string, ptr<rule_expr>> rn : rns) rn.second->r = rs[rn.first];
-			rns.clear();
 		}
 		
 		/// Gets the rules from a grammar
-		std::map<std::string, ptr<expr>>& get_rules() { return rs; }
+		std::map<std::string, ptr<rule_expr>>& get_rules() { return rs; }
 		
 		/// Gets the memoization table that goes along with them
-		memo_expr::table&                 get_memo()  { return memo; }
+		memo_expr::table& get_memo() { return memo; }
 		
-		virtual void visit(ast::char_matcher& m)  { rVal = char_expr::make(m.c); }
+		virtual void visit(ast::char_matcher& m) { rVal = char_expr::make(m.c); }
 		
-		virtual void visit(ast::str_matcher& m)   { rVal = str_expr::make(m.s); }
+		virtual void visit(ast::str_matcher& m) { rVal = str_expr::make(m.s); }
 		
 		virtual void visit(ast::range_matcher& m) {
 			// Empty alternation is a success
@@ -95,18 +103,7 @@ namespace derivs {
 			}
 		}
 		
-		virtual void visit(ast::rule_matcher& m) {
-			// Make sure all instances of the same rule matcher are actually the same object
-			if ( rns.count(m.rule) == 0 ) {
-				// Insert a new rule with a placeholder subexpression
-				rVal = rule_expr::make(memo, fail_expr::make());
-				rns/*.emplace(m.rule, rVal)*/
-					.insert(std::make_pair(m.rule, 
-					                       std::static_pointer_cast<rule_expr>(rVal)));
-			} else {
-				rVal = rns.at(m.rule);
-			}
-		}
+		virtual void visit(ast::rule_matcher& m) { rVal = get_rule(m.rule); }
 		
 		virtual void visit(ast::any_matcher& m) { rVal = any_expr::make(); }
 		
@@ -195,17 +192,16 @@ namespace derivs {
 		}
 		
 	private:
-		std::map<std::string, ptr<expr>>           rs;    ///< List of rules
-		memo_expr::table                           memo;  ///< Memoization table
-		std::map<std::string, ptr<rule_expr>>      rns;   ///< Rule nodes for subexpression update
-		ptr<expr>                                  rVal;  ///< Return value of node visits
+		std::map<std::string, ptr<rule_expr>>  rs;    ///< List of rules
+		memo_expr::table                       memo;  ///< Memoization table
+		ptr<expr>                              rVal;  ///< Return value of node visits
 	};  // class loader
 	
 	/// Derivative-based interpreter for parsing expression grammars
 	class interpreter {
 	public:
 		/// Sets up an interpreter for the given rules
-		interpreter(std::map<std::string, ptr<expr>>& rs, memo_expr::table& memo) 
+		interpreter(std::map<std::string, ptr<rule_expr>>& rs, memo_expr::table& memo) 
 			: rs(rs), memo(memo) { memo.clear(); }
 		
 		/// Loads the given grammar into the interpreter
@@ -220,7 +216,7 @@ namespace derivs {
 			// fail on no such rule
 			if ( rs.count(rule) == 0 ) return false;
 			
-			ptr<expr> e = rs[rule];
+			ptr<expr> e = rs[rule]->r;
 			
 			// Take derivatives until failure, match, or end of input
 			while ( true ) {
@@ -245,8 +241,8 @@ namespace derivs {
 		}
 		
 	private:
-		std::map<std::string, ptr<expr>>& rs;    ///< List of rules
-		memo_expr::table&                 memo;  ///< Memoization table
+		std::map<std::string, ptr<rule_expr>> rs;    ///< List of rules
+		memo_expr::table                      memo;  ///< Memoization table
 	};  // class interpreter
 	
 } // namespace derivs
