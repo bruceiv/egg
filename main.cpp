@@ -277,9 +277,9 @@ int main(int argc, char** argv) {
 	}
 	
 std::cout << "DBG mode:`" << a.mode()
-          << "` source:`" << a.sourceFile() 
-          << "` rule:`" << a.rule()
           << "` in:`" << a.inputFile()
+          << "` rule:`" << a.rule()
+          << "` source:`" << a.sourceFile() 
           << "` out:`" << a.outputFile()
           << "`" << std::endl;
 
@@ -304,7 +304,7 @@ std::cout << "DBG mode:`" << a.mode()
 			c.compile(*g);
 			break;
 		} case INTERPRET_MODE: {
-			derivs::interpreter i = derivs::interpreter::from_ast(*g);
+			derivs::interpreter i = derivs::interpreter::from_ast(*g, true);
 			parser::state in(a.source());
 			bool b = i.match(in, a.rule());
 			std::cout << "Grammar " << ( b ? "matched" : "DID NOT match" ) << std::endl;

@@ -45,6 +45,23 @@ namespace derivs {
 	template <typename T>
 	using ptr = std::shared_ptr<T>;
 	
+	// Forward declarations of expression node types
+	class fail_expr;
+	class inf_expr;
+	class eps_expr;
+	class look_expr;
+	class char_expr;
+	class range_expr;
+	class any_expr;
+	class str_expr;
+	class rule_expr;
+	class not_expr;
+	class and_expr;
+	class map_expr;
+	class alt_expr;
+	class seq_expr;
+	class back_expr;
+	
 	/// Type of expression node
 	enum expr_type {
 		fail_type,
@@ -84,6 +101,25 @@ namespace derivs {
 	/// Type of generation flags
 	using gen_flags = uint64_t;
 	
+	/// Abstract base class of all derivative visitors
+	class visitor {
+	public:
+		virtual void visit(fail_expr&)  = 0;
+		virtual void visit(inf_expr&)   = 0;
+		virtual void visit(eps_expr&)   = 0;
+		virtual void visit(look_expr&)  = 0;
+		virtual void visit(char_expr&)  = 0;
+		virtual void visit(range_expr&) = 0;
+		virtual void visit(any_expr&)   = 0;
+		virtual void visit(str_expr&)   = 0;
+		virtual void visit(rule_expr&)  = 0;
+		virtual void visit(not_expr&)   = 0;
+		virtual void visit(and_expr&)   = 0;
+		virtual void visit(map_expr&)   = 0;
+		virtual void visit(alt_expr&)   = 0;
+		virtual void visit(seq_expr&)   = 0;
+		virtual void visit(back_expr&)  = 0;
+	}; // class visitor
 	
 	/// Abstract base class for parsing expressions
 	class expr {
@@ -93,6 +129,9 @@ namespace derivs {
 	public:			
 		/// Derivative of this expression with respect to x
 		virtual ptr<expr> d(char x) const = 0;
+		
+		/// Accept visitor
+		virtual void accept(visitor*) = 0;
 		
 		/// Is this expression nullable?
 		virtual nbl_mode nbl() const = 0;
@@ -138,6 +177,8 @@ namespace derivs {
 		virtual gen_type generation() const = 0;
 		
 	public:
+		virtual void accept(visitor*) = 0;
+		
 		ptr<expr> d(char x) const final {
 			ptr<expr>& dx = memo[const_cast<memo_expr* const>(this)];
 			if ( ! dx ) dx = deriv(x);
@@ -198,28 +239,14 @@ namespace derivs {
 		} flags;                   ///< Memoization status flags
 	}; // class memo_expr
 	
-	class fail_expr;
-	class inf_expr;
-	class eps_expr;
-	class look_expr;
-	class char_expr;
-	class range_expr;
-	class any_expr;
-	class str_expr;
-	class rule_expr;
-	class not_expr;
-	class and_expr;
-	class map_expr;
-	class alt_expr;
-	class seq_expr;
-	class back_expr;
-	
 	/// A failure parsing expression
 	class fail_expr : public expr {
 		fail_expr() = default;
 	
 	public:
 		static ptr<expr> make() { return ptr<expr>(new fail_expr()); }
+		
+		void accept(visitor* v) { v->visit(*this); }
 		
 		// A failure expression can't un-fail - no strings to match with any prefix
 		virtual ptr<expr> d(char) const { return fail_expr::make(); }
@@ -237,6 +264,8 @@ namespace derivs {
 	public:
 		static ptr<expr> make() { return ptr<expr>(new inf_expr()); }
 		
+		void accept(visitor* v) { v->visit(*this); }
+		
 		// An infinite loop expression never breaks, ill defined with any prefix
 		virtual ptr<expr> d(char) const { return inf_expr::make(); }
 		
@@ -252,6 +281,8 @@ namespace derivs {
 	
 	public:
 		static ptr<expr> make() { return ptr<expr>(new eps_expr()); }
+		
+		void accept(visitor* v) { v->visit(*this); }
 		
 		// No prefixes to remove from language containing the empty string; all fail
 		virtual ptr<expr> d(char) const { return fail_expr::make(); }
@@ -274,6 +305,8 @@ namespace derivs {
 				ptr<expr>(new look_expr(g));
 		}
 		
+		void accept(visitor* v) { v->visit(*this); }
+		
 		// Lookahead success is just a marker, so persists (character will be parsed by sequel)
 		virtual ptr<expr> d(char) const { return ptr<expr>(new look_expr(g)); }
 		
@@ -291,6 +324,8 @@ namespace derivs {
 		
 	public:
 		static ptr<expr> make(char c) { return ptr<expr>(new char_expr(c)); }
+		
+		void accept(visitor* v) { v->visit(*this); }
 		
 		// Single-character expression either consumes matching character or fails
 		virtual ptr<expr> d(char x) const {
@@ -312,6 +347,8 @@ namespace derivs {
 	public:
 		static ptr<expr> make(char b, char e) { return ptr<expr>(new range_expr(b, e)); }
 		
+		void accept(visitor* v) { v->visit(*this); }
+		
 		// Character range expression either consumes matching character or fails
 		virtual ptr<expr> d(char x) const {
 			return ( b <= x && x <= e ) ? eps_expr::make() : fail_expr::make();
@@ -332,6 +369,8 @@ namespace derivs {
 		
 	public:
 		static ptr<expr> make() { return ptr<expr>(new any_expr()); }
+		
+		void accept(visitor* v) { v->visit(*this); }
 		
 		// Any-character expression consumes any character
 		virtual ptr<expr> d(char) const { return eps_expr::make(); }
@@ -404,6 +443,8 @@ namespace derivs {
 			}
 		}
 		
+		void accept(visitor* v) { v->visit(*this); }
+		
 		virtual ptr<expr> d(char x) const {
 			// Check that the first character matches
 			if ( s.c != x ) return fail_expr::make();
@@ -442,6 +483,8 @@ namespace derivs {
 			}
 		}
 		
+		void accept(visitor* v) { v->visit(*this); }
+		
 		virtual ptr<expr> d(char x) const {
 			// Check that the first character matches
 			if ( s[0] != x ) return fail_expr::make();
@@ -458,6 +501,10 @@ namespace derivs {
 		virtual gen_type  gen()  const { return gen_type(0); }
 		virtual expr_type type() const { return str_type; }
 		
+		std::string str() const { return s; }
+		unsigned long size() const { return s.size(); }
+		
+	private:
 		std::string s;
 	}; // class str_expr
 #endif
@@ -468,6 +515,7 @@ namespace derivs {
 		
 	public:
 		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> r);
+		void accept(visitor* v) { v->visit(*this); }
 		virtual ptr<expr> deriv(char x) const;
 		virtual nbl_mode  nullable() const;
 		virtual lk_mode   lookahead() const;
@@ -485,6 +533,7 @@ namespace derivs {
 		
 	public:
 		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> e);
+		void accept(visitor* v) { v->visit(*this); }
 		virtual ptr<expr> deriv(char x) const;
 		virtual nbl_mode  nullable() const;
 		virtual lk_mode   lk() const;
@@ -504,6 +553,7 @@ namespace derivs {
 		
 	public:
 		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> e);
+		void accept(visitor* v) { v->visit(*this); }
 		virtual ptr<expr> deriv(char x) const;
 		virtual nbl_mode  nullable() const;
 		virtual lk_mode   lk() const;
@@ -523,6 +573,7 @@ namespace derivs {
 		
 	public:
 		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> e, gen_flags eg);
+		void accept(visitor* v) { v->visit(*this); }
 		virtual ptr<expr> deriv(char x) const;
 		virtual nbl_mode  nullable() const;
 		virtual lk_mode   lookahead() const;
@@ -541,6 +592,7 @@ namespace derivs {
 	public:
 		/// Make an expression using the default generation rules
 		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
+		void accept(visitor* v) { v->visit(*this); }
 		virtual ptr<expr> deriv(char x) const;
 		virtual nbl_mode  nullable() const;
 		virtual lk_mode   lookahead() const;
@@ -561,6 +613,7 @@ namespace derivs {
 	
 	public:
 		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
+		void accept(visitor* v) { v->visit(*this); }
 		virtual ptr<expr> deriv(char x) const;
 		virtual nbl_mode  nullable() const;
 		virtual lk_mode   lookahead() const;
@@ -591,6 +644,7 @@ namespace derivs {
 		/// Makes an expression given the memoization table, partial lookahead expression a, 
 		/// following expression b, and lookahead-following expression b1
 		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, ptr<expr> b1);
+		void accept(visitor* v) { v->visit(*this); }
 		virtual ptr<expr> deriv(char x) const;
 		virtual nbl_mode  nullable() const;
 		virtual lk_mode   lookahead() const;

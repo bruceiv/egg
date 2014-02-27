@@ -30,6 +30,8 @@
 #include "../derivs.hpp"
 #include "../parser.hpp"
 
+#include "deriv_printer.hpp"
+
 namespace derivs {
 	
 	/// Loads a set of derivatives from the grammar AST
@@ -201,13 +203,14 @@ namespace derivs {
 	class interpreter {
 	public:
 		/// Sets up an interpreter for the given rules
-		interpreter(std::map<std::string, ptr<rule_expr>>& rs, memo_expr::table& memo) 
-			: rs(rs), memo(memo) { memo.clear(); }
+		interpreter(std::map<std::string, ptr<rule_expr>>& rs, memo_expr::table& memo, 
+		            bool dbg = false) 
+			: rs(rs), memo(memo), dbg(dbg) { memo.clear(); }
 		
 		/// Loads the given grammar into the interpreter
-		static interpreter from_ast(ast::grammar& g) {
+		static interpreter from_ast(ast::grammar& g, bool dbg = false) {
 			loader l(g);
-			interpreter i(l.get_rules(), l.get_memo());
+			interpreter i(l.get_rules(), l.get_memo(), dbg);
 			return i;
 		}
 		
@@ -220,6 +223,11 @@ namespace derivs {
 			
 			// Take derivatives until failure, match, or end of input
 			while ( true ) {
+				if ( dbg ) {
+					derivs::printer::print(std::cout, e);
+					std::cout << std::endl;
+				}
+				
 				switch ( e->type() ) {
 				case fail_type: return false;
 				case inf_type:  return false;
@@ -243,6 +251,7 @@ namespace derivs {
 	private:
 		std::map<std::string, ptr<rule_expr>> rs;    ///< List of rules
 		memo_expr::table                      memo;  ///< Memoization table
+		bool                                  dbg;   ///< Debugging flag (default false)
 	};  // class interpreter
 	
 } // namespace derivs
