@@ -708,7 +708,7 @@ namespace derivs {
 		default:        break; // do nothing
 		}
 		// return failure on subexpression success
-		if ( e->nbl() ) return fail_expr::make();
+		if ( e->nbl() == NBL ) return fail_expr::make();
 		
 		return ptr<expr>(new not_expr(memo, e));
 	}
@@ -739,7 +739,7 @@ namespace derivs {
 		default:        break; // do nothing
 		}
 		// return success on subexpression success
-		if ( e->nbl() ) return look_expr::make(1);
+		if ( e->nbl() == NBL ) return look_expr::make(1);
 		
 		return ptr<expr>(new and_expr(memo, e));
 	}
@@ -803,7 +803,7 @@ namespace derivs {
 		default:        break; // do nothing
 		}
 		// if first alternative is nullable, use first
-		if ( a->nbl() ) return a;
+		if ( a->nbl() == NBL ) return a;
 		// if second alternative fails, use first
 		if ( b->type() == fail_type ) return a;
 		
@@ -833,7 +833,7 @@ namespace derivs {
 		case inf_type:  return da; // an inf_expr
 		default:        break; // do nothing
 		}
-		if ( da->nbl() ) return map_expr::make(memo, da, ag);
+		if ( da->nbl() == NBL ) return map_expr::make(memo, da, ag);
 		
 		ptr<expr> db = b->d(x);
 		if ( db->type() == fail_type ) return map_expr::make(memo, da, ag);

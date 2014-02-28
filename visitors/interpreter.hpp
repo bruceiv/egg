@@ -76,7 +76,12 @@ namespace derivs {
 				rVal = nullptr;
 				r->m->accept(this);
 				get_rule(r->name)->r = rVal;
+				
+std::cout << "LOADED RULE `" << r->name << "`" << std::endl;
+derivs::printer::print(std::cout, rVal);
+std::cout << std::endl;
 			}
+std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 			rVal = nullptr;
 		}
 		
@@ -137,17 +142,21 @@ namespace derivs {
 			
 			// Empty sequence is a success
 			if ( m.ms.size() == 0 ) { rVal = eps_expr::make(); return; }
+//std::cout << "\tbuilding seq_expr" << std::endl;
 			
 			// Transform last option
 			auto it = m.ms.rbegin();
 			(*it)->accept(this);
+//derivs::printer::print(std::cout, rVal); std::cout << std::endl;
 			
 			// Transform remaining options
 			while ( ++it != m.ms.rend() ) {
 				ptr<expr> tVal = rVal;
 				(*it)->accept(this);
 				rVal = seq_expr::make(memo, rVal, tVal);
+//derivs::printer::print(std::cout, rVal); std::cout << std::endl;
 			}
+//std::cout << "\tdone building seq_expr\n" << std::endl;
 		}
 		
 		virtual void visit(ast::alt_matcher& m) {
@@ -155,17 +164,21 @@ namespace derivs {
 			
 			// Empty sequence is a success
 			if ( m.ms.size() == 0 ) { rVal = eps_expr::make(); return; }
+//std::cout << "\tbuilding alt_expr" << std::endl;
 			
 			// Transform last option
 			auto it = m.ms.rbegin();
 			(*it)->accept(this);
+//derivs::printer::print(std::cout, rVal); std::cout << std::endl;
 			
 			// Transform remaining options
 			while ( ++it != m.ms.rend() ) {
 				ptr<expr> tVal = rVal;
 				(*it)->accept(this);
 				rVal = alt_expr::make(memo, rVal, tVal);
+//derivs::printer::print(std::cout, rVal); std::cout << std::endl;
 			}
+//std::cout << "\tdone building alt_expr\n" << std::endl;
 		}
 		
 		virtual void visit(ast::look_matcher& m) {
@@ -174,8 +187,11 @@ namespace derivs {
 		}
 		
 		virtual void visit(ast::not_matcher& m) {
+//std::cout << "\tbuilding not_expr" << std::endl;
 			m.m->accept(this);
 			rVal = not_expr::make(memo, rVal);
+//derivs::printer::print(std::cout, rVal); std::cout << std::endl;
+//std::cout << "\tbuilding not_expr" << std::endl;
 		}
 		
 		virtual void visit(ast::capt_matcher& m) {
@@ -223,10 +239,7 @@ namespace derivs {
 			
 			// Take derivatives until failure, match, or end of input
 			while ( true ) {
-				if ( dbg ) {
-					derivs::printer::print(std::cout, e);
-					std::cout << std::endl;
-				}
+				if ( dbg ) { derivs::printer::print(std::cout, e); }
 				
 				switch ( e->type() ) {
 				case fail_type: return false;
@@ -239,6 +252,7 @@ namespace derivs {
 				
 				char x = ps();
 				if ( x == '\0' ) break;
+				if ( dbg ) { std::cout << "d(\'" << x << "\') =====>" << std::endl; }
 				
 				e = e->d(x);
 				memo.clear(); // clear memoization table after every character
