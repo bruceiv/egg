@@ -306,9 +306,10 @@ std::cout << "DBG mode:`" << a.mode()
 		} case INTERPRET_MODE: {
 visitor::printer p(a.output());
 p.print(*g); std::cout << std::endl;
-			derivs::interpreter i = derivs::interpreter::from_ast(*g, true);
+//			derivs::interpreter i = derivs::interpreter::from_ast(*g, true);
 			parser::state in(a.source());
-			bool b = i.match(in, a.rule());
+//			bool b = i.match(in, a.rule());
+			bool b = derivs::match(*g, in, a.rule(), true);
 			std::cout << "Grammar " << ( b ? "matched" : "DID NOT match" ) << std::endl;
 		} default: break;
 		}

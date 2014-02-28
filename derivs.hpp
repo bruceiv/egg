@@ -150,7 +150,7 @@ namespace derivs {
 	class memo_expr : public expr {
 	public:
 		/// Memoization table type
-		using table = std::unordered_map<expr*, ptr<expr>>;
+		using table = std::unordered_map<memo_expr*, ptr<expr>>;
 	
 	protected:
 		static const uint8_t NBL_VAL      = 0x1;  ///< value for NBL
@@ -180,9 +180,19 @@ namespace derivs {
 		virtual void accept(visitor*) = 0;
 		
 		ptr<expr> d(char x) const final {
-			ptr<expr>& dx = memo[const_cast<memo_expr* const>(this)];
-			if ( ! dx ) dx = deriv(x);
-			return dx;
+			auto ix = memo.find(const_cast<memo_expr* const>(this));
+			if ( ix == memo.end() ) {
+				// no such item; compute and storequit
+				ptr<expr> dx = deriv(x);
+				memo.insert(ix, std::make_pair(const_cast<memo_expr* const>(this), dx));
+				return dx;
+			} else {
+				// derivative found, return
+				return ix->second;
+			}
+//			ptr<expr>& dx = memo[const_cast<memo_expr* const>(this)];
+//			if ( ! dx ) dx = deriv(x);
+//			return dx;
 		}
 		
 		virtual nbl_mode nbl() const {

@@ -215,8 +215,59 @@ std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 		ptr<expr>                              rVal;  ///< Return value of node visits
 	};  // class loader
 	
+	/// Recognizes the input
+	/// @param l		Loaded derivatives
+	/// @param ps		Parser state
+	/// @param rule		Start rule
+	/// @param dbg		Print debug output? (default false)
+	/// @return true for match, false for failure
+	bool match(loader& l, parser::state& ps, std::string rule, bool dbg = false) {
+		auto& rs = l.get_rules();
+		auto& memo = l.get_memo();
+		
+		// fail on no such rule
+		if ( rs.count(rule) == 0 ) return false;
+		
+		ptr<expr> e = rs[rule]->r;
+		
+		// Take derivatives until failure, match, or end of input
+		while ( true ) {
+			if ( dbg ) { derivs::printer::print(std::cout, e); }
+			
+			switch ( e->type() ) {
+			case fail_type: return false;
+			case inf_type:  return false;
+			case eps_type:  return true;
+			case look_type: return true;
+			default:        break; // do nothing
+			}
+			if ( e->nbl() == NBL ) return true;
+			
+			char x = ps();
+			if ( x == '\0' ) break;
+			if ( dbg ) { std::cout << "d(\'" << x << "\') =====>" << std::endl; }
+			
+			e = e->d(x);
+			memo.clear(); // clear memoization table after every character
+		}
+		
+		// Match if final expression does not demand more characters
+		return ( e->nbl() != SHFT );
+	}
+	
+	/// Recognizes the input
+	/// @param g		Source grammar
+	/// @param ps		Parser state
+	/// @param rule		Start rule
+	/// @param dbg		Print debug output? (default false)
+	/// @return true for match, false for failure
+	bool match(ast::grammar& g, parser::state& ps, std::string rule, bool dbg = false) {
+		loader l(g);
+		return match(l, ps, rule, dbg);
+	}
+	
 	/// Derivative-based interpreter for parsing expression grammars
-	class interpreter {
+/*	class interpreter {
 	public:
 		/// Sets up an interpreter for the given rules
 		interpreter(std::map<std::string, ptr<rule_expr>>& rs, memo_expr::table& memo, 
@@ -230,8 +281,22 @@ std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 			return i;
 		}
 		
+		/// Sets up an interpreter given the loaded rules
+		interpreter(loader& l, bool dbg = false) : l(l), dbg(dbg) { l.get_memo().clear(); }
+		
+		/// Loads the given grammar into the interpreter
+		static interpreter from_ast(ast::grammar& g, bool dbg = false) {
+			loader l(g);
+			
+			interpreter i(l.get_rules(), l.get_memo(), dbg);
+			return i;
+		}
+				
 		/// Recognizes the input, returns true for match, false for failure
 		bool match(parser::state& ps, std::string rule) {
+			auto& rs = l.get_rules();
+			auto& memo = l.get_memo();
+			
 			// fail on no such rule
 			if ( rs.count(rule) == 0 ) return false;
 			
@@ -263,10 +328,11 @@ std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 		}
 		
 	private:
-		std::map<std::string, ptr<rule_expr>> rs;    ///< List of rules
-		memo_expr::table                      memo;  ///< Memoization table
-		bool                                  dbg;   ///< Debugging flag (default false)
+		loader& l;  ///< Rule loader
+//		std::map<std::string, ptr<rule_expr>>& rs;    ///< List of rules
+//		memo_expr::table&                      memo;  ///< Memoization table
+		bool                                   dbg;   ///< Debugging flag (default false)
 	};  // class interpreter
-	
+*/	
 } // namespace derivs
 
