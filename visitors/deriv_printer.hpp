@@ -24,6 +24,8 @@
 
 #include <iostream>
 #include <string>
+#include <map>
+#include <utility>
 
 #include "../derivs.hpp"
 #include "../utils/strings.hpp"
@@ -97,7 +99,18 @@ namespace derivs {
 		
 		void visit(str_expr& e)   { out << "\"" << strings::escape(e.str()) << "\""; }
 		
-		void visit(rule_expr& e)  { out << "{RULE}"; }
+		void visit(rule_expr& e)  {
+			auto it = rs.find(e.r.get());
+			if ( it == rs.end() ) {  // not printed this rule before
+				unsigned int i = rs.size();
+				rs.insert(std::make_pair(e.r.get(), i));
+				
+				out << "{RULE :" << i << "} ";
+				print_braced(e.r);
+			} else {  // printed this rule before
+				out << "{RULE @" << it->second << "}";
+			}
+		}
 		
 		void visit(not_expr& e)   {
 			out << "!";
@@ -150,8 +163,9 @@ namespace derivs {
 		}
 		
 	private:
-		std::ostream& out;	///< output stream
-		int tabs;			///< current number of tab stops
+		std::ostream& out;	               ///< output stream
+		int tabs;			               ///< current number of tab stops
+		std::map<expr*, unsigned int> rs;  ///< Rule identifiers
 	}; // printer
 
 }
