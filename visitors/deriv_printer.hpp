@@ -110,7 +110,7 @@ namespace derivs {
 		}
 		
 		void visit(map_expr& e) {
-			out << "{MAP:.." << e.gen() << "} ";
+			out << "{MAP:.." << (unsigned int)e.gen() << "} ";
 			print_braced(e.e);
 		}
 		
