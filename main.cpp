@@ -22,6 +22,7 @@
 
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 
 #include "egg.hpp"
@@ -36,19 +37,20 @@ static const char* VERSION = "0.3.1";
 
 /** Egg usage string */
 static const char* USAGE = 
-"[-c print|compile|interpret] [-d defn_file] [-i input_file] [-o output_file]\n\
- [-r rule_name] [--no-norm] [--no-memo] [--help] [--version] [--usage]";
+"[-c print|compile|match|match-lines] \n\
+ [-i input_file] [-r rule_name] [-s source_file] [-o output_file]\n\
+ [--no-norm] [--no-memo] [--help] [--version] [--usage]";
 
 /** Full Egg help string */
 static const char* HELP = 
 "egg [command] [flags] [input-file [output-file]]\n\
 \n\
 Supported flags are\n\
- -d --defn     grammar definition file (default stdin)\n\
  -i --input    input file (default stdin)\n\
+ -s --source   source file for interpreter match (default stdin)\n\
  -o --output   output file (default stdout)\n\
- -c --command  command - either compile, interpret, print, help, usage, or\n\
-               version (default compile, interpret takes two arguments)\n\
+ -c --command  command - either compile, match, match-lines, print, help, \n\
+               usage, or version (default compile)\n\
  -r --rule     interpreter rule name (default empty)\n\
  -n --name     grammar name - if none given, takes the longest prefix of\n\
                the input or output file name (output preferred) which is a\n\
@@ -61,12 +63,13 @@ Supported flags are\n\
 
 /** Command to run */
 enum egg_mode {
-	PRINT_MODE,      /**< Print grammar */
-	COMPILE_MODE,    /**< Compile grammar */
-	INTERPRET_MODE,  /**< Interpret grammar */
-	USAGE_MODE,      /**< Print usage */
-	HELP_MODE,       /**< Print help */
-	VERSION_MODE     /**< Print version */
+	PRINT_MODE,    ///< Print grammar
+	COMPILE_MODE,  ///< Compile grammar
+	MATCH_MODE,    ///< Interpret grammar
+	LINES_MODE,    ///< Interpret grammar line-by-line
+	USAGE_MODE,    ///< Print usage
+	HELP_MODE,     ///< Print help
+	VERSION_MODE   ///< Print version
 };
 
 class args {
@@ -108,8 +111,11 @@ private:
 		} else if ( eq("compile", s) ) {
 			eMode = COMPILE_MODE;
 			return true;
-		} else if ( eq("interpret", s) ) {
-			eMode = INTERPRET_MODE;
+		} else if ( eq("match", s) ) {
+			eMode = MATCH_MODE;
+			return true;
+		} else if ( eq("match-lines", s) ) {
+			eMode = LINES_MODE;
 			return true;
 		} else if ( eq("help", s) ) {
 			eMode = HELP_MODE;
@@ -202,7 +208,7 @@ public:
 
 		//parse optional input, source, and output files
 		if ( i < argc && in == nullptr )  parse_input(argv[i++]);
-		if ( eMode == INTERPRET_MODE ) {
+		if ( eMode == MATCH_MODE || eMode == LINES_MODE ) {
 			if ( i < argc && rName.empty() )  parse_rule(argv[i++]);
 			if ( i < argc && src == nullptr ) parse_source(argv[i++]);
 		}
@@ -228,19 +234,19 @@ public:
 	egg_mode mode() { return eMode; }
 
 private:
-	int i;				  /**< next unparsed value */
-	std::ifstream* in;	  /**< pointer to input stream (0 for stdin) */
-	std::ofstream* out;	  /**< pointer to output stream (0 for stdout) */
-	std::ifstream* src;   /**< pointer to the interpreted source file (0 for stdin) */
-	std::string inName;   /**< Name of the input file (empty if none) */
-	std::string outName;  /**< Name of the output file (empty if none) */
-	std::string srcName;  /**< Name of the interpreted source file (empty if none) */
-	std::string pName; 	  /**< the name of the parser (empty if none) */
-	std::string rName;    /**< the name of the rule to interpret (empty if none) */
-	bool nameFlag;		  /**< has the parser name been explicitly set? */
-	bool normFlag;        /**< should egg do grammar normalization? */
-	bool memoFlag;        /**< should the generated grammar do memoization? */
-	egg_mode eMode;		  /**< compiler mode to use */
+	int i;				  ///< next unparsed value
+	std::ifstream* in;	  ///< pointer to input stream (0 for stdin)
+	std::ofstream* out;	  ///< pointer to output stream (0 for stdout)
+	std::ifstream* src;   ///< pointer to the interpreted source file (0 for stdin)
+	std::string inName;   ///< Name of the input file (empty if none)
+	std::string outName;  ///< Name of the output file (empty if none)
+	std::string srcName;  ///< Name of the interpreted source file (empty if none)
+	std::string pName; 	  ///< the name of the parser (empty if none)
+	std::string rName;    ///< the name of the rule to interpret (empty if none)
+	bool nameFlag;		  ///< has the parser name been explicitly set?
+	bool normFlag;        ///< should egg do grammar normalization?
+	bool memoFlag;        ///< should the generated grammar do memoization?
+	egg_mode eMode;		  ///< compiler mode to use
 };
 
 /** Command line interface
@@ -294,23 +300,35 @@ std::cout << "DBG mode:`" << a.mode()
 		}
 
 		switch ( a.mode() ) {
-		case PRINT_MODE: {
+		case PRINT_MODE: {      // Pretty-print grammar
 			visitor::printer p(a.output());
 			p.print(*g);
 			break;
-		} case COMPILE_MODE: {
+		} case COMPILE_MODE: {  // Compile grammar
 			visitor::compiler c(a.name(), a.output());
 			c.memo(a.memo());
 			c.compile(*g);
 			break;
-		} case INTERPRET_MODE: {
-visitor::printer p(a.output());
+		} case MATCH_MODE: {    // Interpret grammar
+visitor::printer p(std::cout);
 p.print(*g); std::cout << std::endl;
-//			derivs::interpreter i = derivs::interpreter::from_ast(*g, true);
 			parser::state in(a.source());
-//			bool b = i.match(in, a.rule());
 			bool b = derivs::match(*g, in, a.rule(), true);
-			std::cout << "Grammar " << ( b ? "matched" : "DID NOT match" ) << std::endl;
+			a.output() << "Rule `" << a.rule() << "` " 
+			           << ( b ? "matched" : "DID NOT match" ) << std::endl;
+		} case LINES_MODE: {   // Interpret grammar line-by-line
+visitor::printer p(std::cout);
+p.print(*g); std::cout << std::endl;
+			std::string line;
+			derivs::loader l(*g);
+			while ( std::getline(a.source(), line) ) {
+				std::stringstream ss(line);
+				parser::state in(ss);
+				bool b = derivs::match(l, in, a.rule(), true);
+				a.output() << "Rule `" << a.rule() << "` " 
+			               << ( b ? "matched" : "DID NOT match" ) 
+			               << " \"" << line << "\"" << std::endl;
+			}
 		} default: break;
 		}
 		
