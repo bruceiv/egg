@@ -249,6 +249,7 @@ std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 			
 			e = e->d(x);
 			memo.clear(); // clear memoization table after every character
+			++ps;
 		}
 		
 		// Match if final expression does not demand more characters
