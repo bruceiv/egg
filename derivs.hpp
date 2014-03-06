@@ -83,16 +83,16 @@ namespace derivs {
 	
 	/// Nullability mode
 	enum nbl_mode {
-		NBL,    ///< Matches on all strings
-		EMPTY,  ///< Matches on empty string, but not all strings
-		SHFT    ///< Does not match on empty string
+		NBL,      ///< Matches on all strings
+		EMPTY,    ///< Matches on empty string, but not all strings
+		SHFT      ///< Does not match on empty string
 	}; // enum nbl_mode
 	
 	/// Lookahead mode
 	enum lk_mode {
-		LOOK,  ///< Lookahead expression
-		PART,  ///< Partial lookahead expression
-		READ   ///< Non-lookahead expression
+		LOOK,    ///< Lookahead expression
+		PART,    ///< Partial lookahead expression
+		READ     ///< Non-lookahead expression
 	}; // enum lk_mode
 	
 	/// Type of generation value
@@ -126,7 +126,12 @@ namespace derivs {
 	protected:
 		expr() = default;
 		
-	public:			
+	public:
+		template<typename T, typename... Args>
+		static ptr<expr> make_ptr(Args&&... args) {
+			return std::static_pointer_cast<expr>(std::make_shared<T>(args...));
+		}
+		
 		/// Derivative of this expression with respect to x
 		virtual ptr<expr> d(char x) const = 0;
 		
@@ -153,13 +158,13 @@ namespace derivs {
 		using table = std::unordered_map<memo_expr*, ptr<expr>>;
 	
 	protected:
-		static const uint8_t NBL_VAL      = 0x1;  ///< value for NBL
-		static const uint8_t EMPTY_VAL    = 0x3;  ///< value for EMPTY
-		static const uint8_t SHFT_VAL     = 0x2;  ///< value for SHFT
+		static const uint8_t  NBL_VAL   = 0x1;          ///< value for NBL
+		static const uint8_t  EMPTY_VAL = 0x3;          ///< value for EMPTY
+		static const uint8_t  SHFT_VAL  = 0x2;          ///< value for SHFT
 		
-		static const uint8_t LOOK_VAL     = 0x1;  ///< value for LOOK
-		static const uint8_t PART_VAL     = 0x3;  ///< value for PART
-		static const uint8_t READ_VAL     = 0x2;  ///< value for READ
+		static const uint8_t  LOOK_VAL  = 0x1;          ///< value for LOOK
+		static const uint8_t  PART_VAL  = 0x3;          ///< value for PART
+		static const uint8_t  READ_VAL  = 0x2;          ///< value for READ
 		
 		/// Constructor providing memoization table reference
 		memo_expr(table& memo) : memo(memo), g(0) { flags = {0,0,false}; }
@@ -179,7 +184,7 @@ namespace derivs {
 	public:
 		virtual void accept(visitor*) = 0;
 		
-		ptr<expr> d(char x) const final {
+		virtual ptr<expr> d(char x) const {
 			auto ix = memo.find(const_cast<memo_expr* const>(this));
 			if ( ix == memo.end() ) {
 				// no such item; compute and storequit
@@ -190,9 +195,6 @@ namespace derivs {
 				// derivative found, return
 				return ix->second;
 			}
-//			ptr<expr>& dx = memo[const_cast<memo_expr* const>(this)];
-//			if ( ! dx ) dx = deriv(x);
-//			return dx;
 		}
 		
 		virtual nbl_mode nbl() const {
@@ -204,9 +206,9 @@ namespace derivs {
 			default:                         // no nullability set yet
 				nbl_mode mode = nullable();  // calculate nullability
 				switch ( mode ) {            // set nullability
-				case SHFT:  flags.nbl = SHFT_VAL;  break;
-				case NBL:   flags.nbl = NBL_VAL;   break;
-				case EMPTY: flags.nbl = EMPTY_VAL; break;
+				case SHFT:    flags.nbl = SHFT_VAL;  break;
+				case NBL:     flags.nbl = NBL_VAL;   break;
+				case EMPTY:   flags.nbl = EMPTY_VAL; break;
 				}
 				return mode;
 			}
@@ -221,9 +223,9 @@ namespace derivs {
 			default:                         // no lookahead set yet
 				lk_mode mode = lookahead();  // calculate lookahead
 				switch ( mode ) {            // set nullability
-				case READ: flags.lk = READ_VAL; break;
-				case LOOK: flags.lk = LOOK_VAL; break;
-				case PART: flags.lk = PART_VAL; break;
+				case READ:   flags.lk = READ_VAL; break;
+				case LOOK:   flags.lk = LOOK_VAL; break;
+				case PART:   flags.lk = PART_VAL; break;
 				}
 				return mode;
 			}
@@ -240,21 +242,21 @@ namespace derivs {
 		}
 	
 	protected:
-		table&           memo;     ///< Memoization table for derivatives
-		mutable gen_type g;        ///< Maximum generation value
+		table&           memo;  ///< Memoization table for derivatives
+		mutable gen_type g;     ///< Maximum generation value
 		mutable struct {
 			uint8_t nbl : 2;  ///< Nullable value: one of 0 (unset), 1 (NBL), 2(SHFT), 3(EMPTY)
 			uint8_t lk  : 2;  ///< Lookahead value: one of 0 (unset), 1(LOOK), 2(READ), 3(PART)
 			bool    gen : 1;  ///< Generation set?
-		} flags;                   ///< Memoization status flags
+		} flags;                ///< Memoization status flags
 	}; // class memo_expr
 	
 	/// A failure parsing expression
 	class fail_expr : public expr {
-		fail_expr() = default;
-	
 	public:
-		static ptr<expr> make() { return ptr<expr>(new fail_expr()); }
+		fail_expr() = default;
+		
+		static ptr<expr> make() { return expr::make_ptr<fail_expr>(); }
 		
 		void accept(visitor* v) { v->visit(*this); }
 		
@@ -269,10 +271,10 @@ namespace derivs {
 	
 	/// An infinite loop failure parsing expression
 	class inf_expr : public expr {
+	public:
 		inf_expr() = default;
 		
-	public:
-		static ptr<expr> make() { return ptr<expr>(new inf_expr()); }
+		static ptr<expr> make() { return expr::make_ptr<inf_expr>(); }
 		
 		void accept(visitor* v) { v->visit(*this); }
 		
@@ -287,10 +289,10 @@ namespace derivs {
 	
 	/// An empty success parsing expression
 	class eps_expr : public expr {
+	public:
 		eps_expr() = default;
 	
-	public:
-		static ptr<expr> make() { return ptr<expr>(new eps_expr()); }
+		static ptr<expr> make() { return expr::make_ptr<eps_expr>(); }
 		
 		void accept(visitor* v) { v->visit(*this); }
 		
@@ -305,20 +307,20 @@ namespace derivs {
 	
 	/// A lookahead success parsing expression
 	class look_expr : public expr {
+	public:
 		look_expr(gen_type g = 1) : g(g) {}
 		
-	public:
 		static ptr<expr> make(gen_type g = 1) {
 			// gen-0 lookahead success is just an epsilon
 			return ( g == 0 ) ? 
 				eps_expr::make() :
-				ptr<expr>(new look_expr(g));
+				expr::make_ptr<look_expr>(g);
 		}
 		
 		void accept(visitor* v) { v->visit(*this); }
 		
 		// Lookahead success is just a marker, so persists (character will be parsed by sequel)
-		virtual ptr<expr> d(char) const { return ptr<expr>(new look_expr(g)); }
+		virtual ptr<expr> d(char) const { return expr::make_ptr<look_expr>(g); }
 		
 		virtual nbl_mode  nbl()   const { return NBL; }
 		virtual lk_mode   lk()    const { return LOOK; }
@@ -330,10 +332,10 @@ namespace derivs {
 	
 	/// A single-character parsing expression
 	class char_expr : public expr {
+	public:
 		char_expr(char c) : c(c) {}
 		
-	public:
-		static ptr<expr> make(char c) { return ptr<expr>(new char_expr(c)); }
+		static ptr<expr> make(char c) { return expr::make_ptr<char_expr>(c); }
 		
 		void accept(visitor* v) { v->visit(*this); }
 		
@@ -352,10 +354,10 @@ namespace derivs {
 	
 	/// A character range parsing expression
 	class range_expr : public expr {
+	public:
 		range_expr(char b, char e) : b(b), e(e) {}
 		
-	public:
-		static ptr<expr> make(char b, char e) { return ptr<expr>(new range_expr(b, e)); }
+		static ptr<expr> make(char b, char e) { return expr::make_ptr<range_expr>(b, e); }
 		
 		void accept(visitor* v) { v->visit(*this); }
 		
@@ -375,10 +377,10 @@ namespace derivs {
 	
 	/// A parsing expression which matches any character
 	class any_expr : public expr {
+	public:
 		any_expr() = default;
 		
-	public:
-		static ptr<expr> make() { return ptr<expr>(new any_expr()); }
+		static ptr<expr> make() { return expr::make_ptr<any_expr>(); }
 		
 		void accept(visitor* v) { v->visit(*this); }
 		
@@ -438,18 +440,18 @@ namespace derivs {
 			}
 		}; // struct str_node
 		
+	public:
 		/// Constructs a string expression from a string node and a length
 		str_expr(str_node s, unsigned long len) : s(s), len(len) {}
 		/// Constructs a string expression from a standard string (should be non-empty)
 		str_expr(std::string t) : s(t), len(t.size()) {}
 		
-	public:
 		/// Makes an appropriate expression node for the length of the string
 		static ptr<expr> make(std::string s) {
 			switch ( s.size() ) {
 			case 0:  return eps_expr::make();
 			case 1:  return char_expr::make(s[0]);
-			default: return ptr<expr>(new str_expr(s));
+			default: return expr::make_ptr<str_expr>(s);
 			}
 		}
 		
@@ -462,7 +464,7 @@ namespace derivs {
 			// Otherwise return a character or string expression, as appropriate
 			return ( len == 2 ) ? 
 				char_expr::make(s.next->c) :
-				ptr<expr>(new str_expr(*s.next, len - 1));
+				expr::make_ptr<str_expr>(*s.next, len - 1);
 		}
 		
 		virtual nbl_mode  nbl()  const { return SHFT; }
@@ -482,14 +484,14 @@ namespace derivs {
 #else
 	/// A parsing expression representing a character string
 	class str_expr : public expr {
+	public:
 		str_expr(std::string s) : s(s) {}
 		
-	public:
 		static ptr<expr> make(std::string s) {
 			switch ( t.size() ) {
 			case 0:  return eps_expr::make();
 			case 1:  return char_expr::make(s[0]);
-			default: return ptr<expr>(new str_expr(s));
+			default: return expr::make_ptr<str_expr>(s);
 			}
 		}
 		
@@ -503,7 +505,7 @@ namespace derivs {
 			if ( s.size() == 2 ) return char_expr::make(s[1]);
 			
 			std::string t(s, 1);
-			return ptr<expr>(new str_expr(t));
+			return expr::make_ptr<str_expr>(t);
 		}
 		
 		virtual nbl_mode  nbl()  const { return SHFT; }
@@ -521,10 +523,10 @@ namespace derivs {
 	
 	/// A parsing expression representing a non-terminal
 	class rule_expr : public memo_expr {
-		rule_expr(memo_expr::table& memo, ptr<expr> r) : memo_expr(memo), r(r) {}
-		
 	public:
-		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> r);
+		rule_expr(memo_expr::table& memo, ptr<expr> r = nullptr) : memo_expr(memo), r(r) {}
+		
+		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> r = nullptr);
 		void accept(visitor* v) { v->visit(*this); }
 		virtual ptr<expr> deriv(char x) const;
 		virtual nbl_mode  nullable() const;
@@ -537,19 +539,18 @@ namespace derivs {
 	
 	/// A parsing expression representing negative lookahead
 	class not_expr : public memo_expr {
-	friend and_expr;
+	public:
 		not_expr(memo_expr::table& memo, ptr<expr> e)
 			: memo_expr(memo), e(e) { g = 1; flags.gen = true; }
 		
-	public:
 		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> e);
 		void accept(visitor* v) { v->visit(*this); }
 		virtual ptr<expr> deriv(char x) const;
 		virtual nbl_mode  nullable() const;
 		virtual lk_mode   lk() const;
-		virtual lk_mode   lookahead() const { return lk(); }
+		virtual lk_mode   lookahead() const { return not_expr::lk(); }
 		virtual gen_type  gen() const;
-		virtual gen_type  generation() const { return gen(); }
+		virtual gen_type  generation() const { return not_expr::gen(); }
 		virtual expr_type type() const { return not_type; }
 		
 		ptr<expr> e;  ///< Subexpression to negatively match
@@ -557,19 +558,18 @@ namespace derivs {
 	
 	/// A parsing expression representing positive lookahead
 	class and_expr : public memo_expr {
-	friend not_expr;
+	public:
 		and_expr(memo_expr::table& memo, ptr<expr> e) 
 			: memo_expr(memo), e(e) { g = 1; flags.gen = true; }
 		
-	public:
 		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> e);
 		void accept(visitor* v) { v->visit(*this); }
 		virtual ptr<expr> deriv(char x) const;
 		virtual nbl_mode  nullable() const;
 		virtual lk_mode   lk() const;
-		virtual lk_mode   lookahead() const { return lk(); }
+		virtual lk_mode   lookahead() const { return and_expr::lk(); }
 		virtual gen_type  gen() const;
-		virtual gen_type  generation() const { return gen(); }
+		virtual gen_type  generation() const { return and_expr::gen(); }
 		virtual expr_type type() const { return and_type; }
 		
 		ptr<expr> e;  ///< Subexpression to match
@@ -577,11 +577,10 @@ namespace derivs {
 	
 	/// Maintains generation mapping from collapsed alternation expression.
 	class map_expr : public memo_expr {
-	friend alt_expr;
+	public:
 		map_expr(memo_expr::table& memo, ptr<expr> e, gen_flags eg)
 			: memo_expr(memo), e(e), eg(eg) {}
 		
-	public:
 		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> e, gen_flags eg);
 		void accept(visitor* v) { v->visit(*this); }
 		virtual ptr<expr> deriv(char x) const;
@@ -596,10 +595,11 @@ namespace derivs {
 	
 	/// A parsing expression representing the alternation of two parsing expressions
 	class alt_expr : public memo_expr {
-		alt_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, gen_flags ag, gen_flags bg)
+	public:
+		alt_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
+		         gen_flags ag = (gen_flags)0, gen_flags bg = (gen_flags)0)
 			: memo_expr(memo), a(a), b(b), ag(ag), bg(bg) {}
 		
-	public:
 		/// Make an expression using the default generation rules
 		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
 		void accept(visitor* v) { v->visit(*this); }
@@ -617,11 +617,10 @@ namespace derivs {
 	
 	/// A parsing expression representing the concatenation of two parsing expressions
 	class seq_expr : public memo_expr {
-	protected:
+	public:
 		seq_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b)
 			: memo_expr(memo), a(a), b(b) {}
 	
-	public:
 		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
 		void accept(visitor* v) { v->visit(*this); }
 		virtual ptr<expr> deriv(char x) const;
@@ -646,11 +645,9 @@ namespace derivs {
 		}; // struct look_list
 		using look_list = std::list<look_node>;
 	
-	private:
 		back_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, look_list bs) 
 			: seq_expr(memo, a, b), bs(bs) {}
 		
-	public:
 		/// Makes an expression given the memoization table, partial lookahead expression a, 
 		/// following expression b, and lookahead-following expression b1
 		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, ptr<expr> b1);
@@ -673,7 +670,7 @@ namespace derivs {
 	// rule_expr ///////////////////////////////////////////////////////////////////
 	
 	ptr<expr> rule_expr::make(memo_expr::table& memo, ptr<expr> r) {
-		return ptr<expr>(new rule_expr(memo, r));
+		return expr::make_ptr<rule_expr>(memo, r);
 	}
 	
 	ptr<expr> rule_expr::deriv(char x) const {
@@ -712,15 +709,15 @@ namespace derivs {
 		case inf_type:  return e; // an inf_expr
 		// collapse nested lookaheads
 		case not_type:
-			return ptr<expr>(new and_expr(memo, std::static_pointer_cast<not_expr>(e)->e));
+			return expr::make_ptr<and_expr>(memo, std::static_pointer_cast<not_expr>(e)->e);
 		case and_type:
-			return ptr<expr>(new not_expr(memo, std::static_pointer_cast<and_expr>(e)->e));
+			return expr::make_ptr<not_expr>(memo, std::static_pointer_cast<and_expr>(e)->e);
 		default:        break; // do nothing
 		}
 		// return failure on subexpression success
 		if ( e->nbl() == NBL ) return fail_expr::make();
 		
-		return ptr<expr>(new not_expr(memo, e));
+		return expr::make_ptr<not_expr>(memo, e);
 	}
 	
 	// Take negative lookahead of subexpression derivative
@@ -729,7 +726,10 @@ namespace derivs {
 	nbl_mode not_expr::nullable() const {
 		// not-expression generally matches on empty string, but not all strings; it will only 
 		// fail to match on the empty string if its subexpression does
-		return ( e->nbl() == EMPTY ) ? SHFT : EMPTY;
+		switch ( e->nbl() ) {
+		case EMPTY:   return SHFT;
+		default:      return EMPTY;
+		}
 	}
 	
 	lk_mode  not_expr::lk()  const { return LOOK; }
@@ -751,7 +751,7 @@ namespace derivs {
 		// return success on subexpression success
 		if ( e->nbl() == NBL ) return look_expr::make(1);
 		
-		return ptr<expr>(new and_expr(memo, e));
+		return expr::make_ptr<and_expr>(memo, e);
 	}
 	
 	// Take positive lookahead of subexpression derivative
@@ -777,7 +777,7 @@ namespace derivs {
 		default:        break; // do nothing
 		}
 		
-		return ptr<expr>(new map_expr(memo, e, eg));
+		return expr::make_ptr<map_expr>(memo, e, eg);
 	}
 	
 	ptr<expr> map_expr::deriv(char x) const {
@@ -793,7 +793,7 @@ namespace derivs {
 		default:        break; // do nothing
 		}
 		
-		return ptr<expr>(new map_expr(memo, de, eg));
+		return expr::make_ptr<map_expr>(memo, de, eg);
 	}
 	
 	nbl_mode map_expr::nullable()   const { return e->nbl(); }
@@ -831,7 +831,7 @@ namespace derivs {
 		case PART: flags::set(bg, 0); flags::set(bg, 1); break;
 		}
 		
-		return ptr<expr>(new alt_expr(memo, a, b, ag, bg));
+		return expr::make_ptr<alt_expr>(memo, a, b, ag, bg);
 	}
 	
 	ptr<expr> alt_expr::deriv(char x) const {
@@ -859,7 +859,7 @@ namespace derivs {
 			flags::set(dbg, gen()+1);
 		}
 		
-		return ptr<expr>(new alt_expr(memo, da, db, dag, dbg));
+		return expr::make_ptr<alt_expr>(memo, da, db, dag, dbg);
 	}
 	
 	nbl_mode alt_expr::nullable() const {
@@ -905,7 +905,7 @@ namespace derivs {
 		default:        break; // do nothing
 		}
 		
-		return ptr<expr>(new seq_expr(memo, a, b));
+		return expr::make_ptr<seq_expr>(memo, a, b);
 	}
 	
 	ptr<expr> seq_expr::deriv(char x) const {
@@ -1008,7 +1008,7 @@ namespace derivs {
 			bs.emplace_back(1, eg, b1);
 		}
 		
-		return ptr<expr>(new back_expr(memo, a, b, bs));
+		return expr::make_ptr<back_expr>(memo, a, b, bs);
 	}
 	
 	ptr<expr> back_expr::deriv(char x) const {
@@ -1069,7 +1069,7 @@ namespace derivs {
 			}
 		}
 		
-		return ptr<expr>(new back_expr(memo, da, bn, dbs));
+		return expr::make_ptr<back_expr>(memo, da, bn, dbs);
 	}
 	
 	nbl_mode back_expr::nullable() const {

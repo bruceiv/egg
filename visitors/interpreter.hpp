@@ -34,14 +34,107 @@
 
 namespace derivs {
 	
+	/// Rebuilds a set of derivative expressions using their smart constructors
+	class normalizer : derivs::visitor {
+	public:
+		normalizer(memo_expr::table& memo) : rVal(nullptr), memo(memo), rs() {}
+		
+		/// Converts any expression
+		ptr<expr> normalize(ptr<expr> e) {
+			e->accept(this);
+			return rVal;
+		}
+		
+		/// Conversion specialized for rule expressions
+		ptr<rule_expr> normalize(ptr<rule_expr> r) {
+			r->accept(this);
+			return std::static_pointer_cast<rule_expr>(rVal);
+		}
+		
+		void visit(fail_expr& e)  { rVal = fail_expr::make(); }
+		void visit(inf_expr& e)   { rVal = inf_expr::make(); }
+		void visit(eps_expr& e)   { rVal = eps_expr::make(); }
+		void visit(look_expr& e)  { rVal = look_expr::make(e.g); }
+		void visit(char_expr& e)  { rVal = char_expr::make(e.c); }
+		void visit(range_expr& e) { rVal = range_expr::make(e.b, e.e); }
+		void visit(any_expr& e)   { rVal = any_expr::make(); }
+		void visit(str_expr& e)   { rVal = str_expr::make(e.str()); }
+		
+		void visit(rule_expr& e) {
+			auto it = rs.find(&e);
+			if ( it == rs.end() ) {
+				// no stored rule; store one, then update its pointed to rule
+				ptr<rule_expr> r = std::make_shared<rule_expr>(memo, inf_expr::make());
+				rs./*emplace(&e, r)*/insert(std::make_pair(&e, r));
+				e.r->accept(this);
+				r->r = rVal;
+				rVal = std::static_pointer_cast<expr>(r);
+			} else {
+				rVal = std::static_pointer_cast<expr>(it->second);
+			}
+		}
+		
+		void visit(not_expr& e) {
+			e.e->accept(this);
+			rVal = not_expr::make(memo, rVal);
+		}
+		
+		void visit(and_expr& e) {
+			e.e->accept(this);
+			rVal = and_expr::make(memo, rVal);
+		}
+		
+		void visit(map_expr& e) {
+			// won't appear in un-normalized expression anyway
+			e.e->accept(this);
+			rVal = map_expr::make(memo, rVal, e.eg);
+		}
+		
+		void visit(alt_expr& e) {
+			e.a->accept(this);
+			ptr<expr> a = rVal;
+			e.b->accept(this);
+			rVal = alt_expr::make(memo, a, rVal);
+		}
+		
+		void visit(seq_expr& e) {
+			e.a->accept(this);
+			ptr<expr> a = rVal;
+			e.b->accept(this);
+			rVal = seq_expr::make(memo, a, rVal);
+		}
+		
+		void visit(back_expr& e) {
+			// won't appear in un-normalized expression anyway
+			e.a->accept(this);
+			ptr<expr> a = rVal;
+			e.b->accept(this);
+			ptr<expr> b = rVal;
+			
+			back_expr::look_list bs;
+			for (auto bi : e.bs) {
+				bi.e->accept(this);
+				/*bs.emplace_back(bi.g, bi.eg, rVal);*/
+				back_expr::look_node bn(bi.g, bi.eg, rVal);
+				bs.push_back(bn);
+			}
+			
+			rVal = expr::make_ptr<back_expr>(memo, a, b, bs);
+		}
+	
+	private:
+		ptr<expr>                            rVal;  ///< result of last read
+		memo_expr::table                     memo;  ///< Memoization table
+		std::map<rule_expr*, ptr<rule_expr>> rs;    ///< Unique transformation of rule expressions
+	};  // class normalizer
+	
 	/// Loads a set of derivatives from the grammar AST
 	class loader : ast::visitor {
 		
 		/// Gets the unique rule expression correspoinding to the given name
 		ptr<rule_expr> get_rule(const std::string& s) {
 			if ( rs.count(s) == 0 ) {
-				ptr<rule_expr> r 
-					= std::static_pointer_cast<rule_expr>(rule_expr::make(memo, fail_expr::make()));
+				ptr<rule_expr> r = std::make_shared<rule_expr>(memo, expr::make_ptr<fail_expr>());
 				rs./*emplace(s, r)*/insert(std::make_pair(s, r));
 				return r;
 			} else {
@@ -52,19 +145,19 @@ namespace derivs {
 		/// Converts an AST char range into a derivative expr. char_range
 		ptr<expr> make_char_range(const ast::char_range& r) const {
 			return ( r.from == r.to ) ? 
-				char_expr::make(r.from) : 
-				range_expr::make(r.from, r.to);
+				expr::make_ptr<char_expr>(r.from) : 
+				expr::make_ptr<range_expr>(r.from, r.to);
 		}
 		
 		/// Makes a new anonymous nonterminal for a many-expression
 		ptr<expr> make_many(ptr<expr> e) {
 			// make anonymous non-terminal R
-			ptr<expr> r = rule_expr::make(memo, fail_expr::make());
+			ptr<expr> r = expr::make_ptr<rule_expr>(memo, expr::make_ptr<fail_expr>());
 			// set non-terminal rule to e R / eps
 			std::static_pointer_cast<rule_expr>(r)->r = 
-				alt_expr::make(memo, 
-				               seq_expr::make(memo, e, r),
-				               eps_expr::make());
+				expr::make_ptr<alt_expr>(memo, 
+				                         expr::make_ptr<seq_expr>(memo, e, r),
+				                         expr::make_ptr<eps_expr>());
 			return r;
 		}
 		
@@ -83,6 +176,16 @@ std::cout << std::endl;
 			}
 std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 			rVal = nullptr;
+			
+			// Normalize rules
+			normalizer n(memo);
+			for (auto rp : rs) {
+				rp.second = n.normalize(rp.second);
+std::cout << "NORMED RULE `" << rp.first << "`" << std::endl;
+derivs::printer::print(std::cout, rp.second);
+std::cout << std::endl;
+			}
+std::cout << "***** DONE NORMING RULES  *****" << std::endl;
 		}
 		
 		/// Gets the rules from a grammar
@@ -91,13 +194,13 @@ std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 		/// Gets the memoization table that goes along with them
 		memo_expr::table& get_memo() { return memo; }
 		
-		virtual void visit(ast::char_matcher& m) { rVal = char_expr::make(m.c); }
+		virtual void visit(ast::char_matcher& m) { rVal = expr::make_ptr<char_expr>(m.c); }
 		
-		virtual void visit(ast::str_matcher& m) { rVal = str_expr::make(m.s); }
+		virtual void visit(ast::str_matcher& m) { rVal = expr::make_ptr<str_expr>(m.s); }
 		
 		virtual void visit(ast::range_matcher& m) {
 			// Empty alternation is a success
-			if ( m.rs.size() == 0 ) { rVal = eps_expr::make(); return; }
+			if ( m.rs.size() == 0 ) { rVal = expr::make_ptr<eps_expr>(); return; }
 			
 			// Transform last option
 			auto it = m.rs.rbegin();
@@ -106,25 +209,25 @@ std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 			// Transform remaining options
 			while ( ++it != m.rs.rend() ) {
 				auto tVal = make_char_range(*it);
-				rVal = alt_expr::make(memo, tVal, rVal);
+				rVal = expr::make_ptr<alt_expr>(memo, tVal, rVal);
 			}
 		}
 		
 		virtual void visit(ast::rule_matcher& m) { rVal = get_rule(m.rule); }
 		
-		virtual void visit(ast::any_matcher& m) { rVal = any_expr::make(); }
+		virtual void visit(ast::any_matcher& m) { rVal = expr::make_ptr<any_expr>(); }
 		
-		virtual void visit(ast::empty_matcher& m) { rVal = eps_expr::make(); }
+		virtual void visit(ast::empty_matcher& m) { rVal = expr::make_ptr<eps_expr>(); }
 		
 		virtual void visit(ast::action_matcher& m) {
 			//TODO actually implement this; for the moment, just return success
-			rVal = eps_expr::make();		
+			rVal = expr::make_ptr<eps_expr>();
 		}
 		
 		virtual void visit(ast::opt_matcher& m) {
 			// match subexpression or epsilon
 			m.m->accept(this);
-			rVal = alt_expr::make(memo, rVal, eps_expr::make());
+			rVal = expr::make_ptr<alt_expr>(memo, rVal, expr::make_ptr<eps_expr>());
 		}
 		
 		virtual void visit(ast::many_matcher& m) {
@@ -134,14 +237,14 @@ std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 		
 		virtual void visit(ast::some_matcher& m) {
 			m.m->accept(this);
-			rVal = seq_expr::make(memo, rVal, make_many(rVal));
+			rVal = expr::make_ptr<seq_expr>(memo, rVal, make_many(rVal));
 		}
 		
 		virtual void visit(ast::seq_matcher& m) {
 			// Convert vector in seq_matcher to cons-list in seq_expr
 			
 			// Empty sequence is a success
-			if ( m.ms.size() == 0 ) { rVal = eps_expr::make(); return; }
+			if ( m.ms.size() == 0 ) { rVal = expr::make_ptr<eps_expr>(); return; }
 //std::cout << "\tbuilding seq_expr" << std::endl;
 			
 			// Transform last option
@@ -153,7 +256,7 @@ std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 			while ( ++it != m.ms.rend() ) {
 				ptr<expr> tVal = rVal;
 				(*it)->accept(this);
-				rVal = seq_expr::make(memo, rVal, tVal);
+				rVal = expr::make_ptr<seq_expr>(memo, rVal, tVal);
 //derivs::printer::print(std::cout, rVal); std::cout << std::endl;
 			}
 //std::cout << "\tdone building seq_expr\n" << std::endl;
@@ -163,7 +266,7 @@ std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 			// Convert vector in alt_matcher to cons-list in alt_expr
 			
 			// Empty sequence is a success
-			if ( m.ms.size() == 0 ) { rVal = eps_expr::make(); return; }
+			if ( m.ms.size() == 0 ) { rVal = expr::make_ptr<eps_expr>(); return; }
 //std::cout << "\tbuilding alt_expr" << std::endl;
 			
 			// Transform last option
@@ -175,7 +278,7 @@ std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 			while ( ++it != m.ms.rend() ) {
 				ptr<expr> tVal = rVal;
 				(*it)->accept(this);
-				rVal = alt_expr::make(memo, rVal, tVal);
+				rVal = expr::make_ptr<alt_expr>(memo, rVal, tVal);
 //derivs::printer::print(std::cout, rVal); std::cout << std::endl;
 			}
 //std::cout << "\tdone building alt_expr\n" << std::endl;
@@ -183,13 +286,13 @@ std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 		
 		virtual void visit(ast::look_matcher& m) {
 			m.m->accept(this);
-			rVal = and_expr::make(memo, rVal);
+			rVal = expr::make_ptr<and_expr>(memo, rVal);
 		}
 		
 		virtual void visit(ast::not_matcher& m) {
 //std::cout << "\tbuilding not_expr" << std::endl;
 			m.m->accept(this);
-			rVal = not_expr::make(memo, rVal);
+			rVal = expr::make_ptr<not_expr>(memo, rVal);
 //derivs::printer::print(std::cout, rVal); std::cout << std::endl;
 //std::cout << "\tbuilding not_expr" << std::endl;
 		}
@@ -206,7 +309,7 @@ std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 		
 		virtual void visit(ast::fail_matcher& m) {
 			// TODO complete implementation; for the moment ignore the error message
-			rVal = fail_expr::make();
+			rVal = expr::make_ptr<fail_expr>();
 		}
 		
 	private:
