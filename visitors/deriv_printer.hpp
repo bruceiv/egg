@@ -23,6 +23,7 @@
  */
 
 #include <iostream>
+#include <list>
 #include <string>
 #include <map>
 #include <utility>
@@ -64,21 +65,64 @@ namespace derivs {
 	class printer : visitor {
 		void print_braced(ptr<expr> e) {
 			if ( is_compound(e) ) {
-				out << "( ";
+				out << "(";
 				e->accept(this);
-				out << " )";
+				out << ")";
 			} else {
 				e->accept(this);
 			}
 		}
+		
+		void print_fns(expr* e) {
+			out << "{";
+			
+			switch ( e->nbl() ) {
+			case NBL:   out << "O"; break;
+			case SHFT:  out << "."; break;
+			case EMPTY: out << "0"; break;
+			}
+			
+			switch ( e->lk() ) {
+			case LOOK:  out << "^"; break;
+			case READ:  out << "."; break;
+			case PART:  out << "?"; break;
+			}
+			
+			out << "} ";
+		}
 	public:
-		printer(std::ostream& out = std::cout, int tabs = 0) : out(out), tabs(tabs) {}
+		printer(std::ostream& out = std::cout) : out(out) {}
+		
+		void print_rule(rule_expr& e) {
+			auto it = rs.find(e.r.get());
+			if ( it == rs.end() ) {
+				out << "{RULE :??} ";
+			} else {
+				out << "{RULE :" << it->second << "} ";
+			}
+			print_braced(e.r);
+			out << std::endl;
+		}
 		
 		/// Prints the derivative expression to the given output stream
 		static void print(std::ostream& out, ptr<expr> e) {
 			printer p(out);
-			e->accept(&p);
-			out << std::endl;
+			if ( e->type() == rule_type ) {
+				rule_expr* r = static_cast<rule_expr*>(e.get());
+				p.rs.insert(std::make_pair(r->r.get(), 0));
+				p.pl.push_back(static_cast<rule_expr*>(e.get()));
+			} else {
+				e->accept(&p);
+				out << std::endl;
+			}
+			
+			auto it = p.pl.begin();
+			while ( it != p.pl.end() ) {
+				p.print_rule(**it);
+				++it;
+			}
+//			e->accept(&p);
+//			out << std::endl;
 		}
 		
 		void visit(fail_expr& e)  { out << "{FAIL}"; }
@@ -104,68 +148,61 @@ namespace derivs {
 			if ( it == rs.end() ) {  // not printed this rule before
 				unsigned int i = rs.size();
 				rs.insert(std::make_pair(e.r.get(), i));
+				pl.push_back(&e);
 				
-				out << "{RULE :" << i << "} ";
-				print_braced(e.r);
+				out << "{RULE @" << i << "}";
+//				out << "{RULE :" << i << "} ";
+//				print_braced(e.r);
 			} else {  // printed this rule before
 				out << "{RULE @" << it->second << "}";
 			}
 		}
 		
-		void visit(not_expr& e)   {
-			out << "!";
-			print_braced(e.e);
-		}
+		void visit(not_expr& e)   { out << "!"; print_braced(e.e); }
 		
-		void visit(and_expr& e)   {
-			out << "&";
-			print_braced(e.e);
-		}
+		void visit(and_expr& e)   { out << "&"; print_braced(e.e); }
 		
-		void visit(map_expr& e) {
+		void visit(map_expr& e)   {
 			out << "{MAP:.." << (unsigned int)e.gen() << "} ";
 			print_braced(e.e);
 		}
 		
-		void visit(alt_expr& e) {
-			std::string indent((4 * ++tabs), ' ');
+		void visit(alt_expr& e)  {
+			print_fns(&e);
 			print_braced(e.a);
-			out << "\n" << indent << "/ ";
+			out << " / ";
 			print_braced(e.b);
-			--tabs;
 		}
 		
 		void visit(seq_expr& e) {
-			std::string indent((4 * ++tabs), ' ');
+			print_fns(&e);
 			print_braced(e.a);
-			out << "\n" << indent;
+			out << " ";
 			print_braced(e.b);
-			--tabs;
 		}
 		
 		void visit(back_expr& e) {
-			std::string indent((4 * ++tabs), ' ');
+			print_fns(&e);
 			print_braced(e.a);
-			out << "\n" << indent << "\\ ";
+			out << " \\ ";
 			print_braced(e.b);
-			out << "\n" << indent << "<";
+			out << " <";
 			if ( ! e.bs.empty() ) {
 				auto it = e.bs.begin();
 				out << " {" << it->g << "} ";
 				print_braced(it->e);
 				while (++it != e.bs.end()) {
-					out << "\n" << indent << "| {" << it->g << "} ";
+					out << " | {" << it->g << "} ";
 					print_braced(it->e);
 				}
 			}
 			out << ">";
-			--tabs;
 		}
 		
 	private:
 		std::ostream& out;	               ///< output stream
-		int tabs;			               ///< current number of tab stops
 		std::map<expr*, unsigned int> rs;  ///< Rule identifiers
+		std::list<rule_expr*>         pl;  ///< List of rules to print
 	}; // printer
 
 }
