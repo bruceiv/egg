@@ -31,7 +31,7 @@
 void test_flags(tester& test) {
 	test.setup("flags");
 
-	uint64_t a[2];
+	uint64_t a[2] = { UINT64_C(0xDEADBEEFDEADBEEF), UINT64_C(0xDEADBEEFDEADBEEF) };
 
 	// Test that these are zeroed as expected
 	flags::clear(a, 2);
@@ -97,8 +97,13 @@ void test_flags(tester& test) {
 	test.equal(flags::first(b[4]), 59, "first(b[4])");
 	test.equal(flags::first(b[5]), -1, "first(b[5])");
 	
-	// TODO add tests for last bit function
-
+	uint64_t c[2] = { UINT64_C(0x8000000000000000), UINT64_C(0x0000000000000002) };
+	
+	// Test low bit function
+	test.equal(flags::last(c, 2), 126, "last(c)");
+	test.equal(flags::last(c[0]),   0, "last(c[0])");
+	test.equal(flags::last(c[1]),  62, "last(c[1])");
+	
 	// Test count bits
 	test.equal(flags::count(b[0]), 32, "count(b[0])");
 	test.equal(flags::count(b[1]), 28, "count(b[1])");

@@ -136,14 +136,14 @@ uint64_t next(const uint64_t* a, uint64_t n, uint64_t i) {
 static uint64_t last(uint64_t x) {
 	uint64_t t;
 	if      ( x == 0 )                     return -1;
-	else if ( (t = x &             0xff) ) return rt[t];
-	else if ( (t = x &           0xff00) ) return rt[t >>  8];
-	else if ( (t = x &         0xff0000) ) return rt[t >> 16];
-	else if ( (t = x &       0xff000000) ) return rt[t >> 24];
-	else if ( (t = x &     0xff00000000) ) return rt[t >> 32];
-	else if ( (t = x &   0xff0000000000) ) return rt[t >> 40];
-	else if ( (t = x & 0xff000000000000) ) return rt[t >> 48];
-	else                                   return rt[x >> 56];
+	else if ( (t = x &             0xff) ) return 56 + rt[t];
+	else if ( (t = x &           0xff00) ) return 48 + rt[t >>  8];
+	else if ( (t = x &         0xff0000) ) return 40 + rt[t >> 16];
+	else if ( (t = x &       0xff000000) ) return 32 + rt[t >> 24];
+	else if ( (t = x &     0xff00000000) ) return 24 + rt[t >> 32];
+	else if ( (t = x &   0xff0000000000) ) return 16 + rt[t >> 40];
+	else if ( (t = x & 0xff000000000000) ) return  8 + rt[t >> 48];
+	else                                   return      rt[x >> 56];
 }
 
 /// gets the index of the last bit of a (length n) set
