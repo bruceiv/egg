@@ -68,6 +68,7 @@ namespace derivs {
 				rs./*emplace(&e, r)*/insert(std::make_pair(&e, r));
 				e.r->accept(this);
 				r->r = rVal;
+				r->reset_memo();
 				rVal = std::static_pointer_cast<expr>(r);
 			} else {
 				rVal = std::static_pointer_cast<expr>(it->second);
@@ -124,7 +125,7 @@ namespace derivs {
 	
 	private:
 		ptr<expr>                            rVal;  ///< result of last read
-		memo_expr::table                     memo;  ///< Memoization table
+		memo_expr::table&                    memo;  ///< Memoization table
 		std::map<rule_expr*, ptr<rule_expr>> rs;    ///< Unique transformation of rule expressions
 	};  // class normalizer
 	
@@ -179,12 +180,15 @@ std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 			
 			// Normalize rules
 			normalizer n(memo);
+			std::map<std::string, ptr<rule_expr>> nrs;
 			for (auto rp : rs) {
-				rp.second = n.normalize(rp.second);
+				ptr<rule_expr> nr = n.normalize(rp.second);
+				nrs.insert(std::make_pair(rp.first, nr));
 std::cout << "NORMED RULE `" << rp.first << "`" << std::endl;
-derivs::printer::print(std::cout, rp.second);
+derivs::printer::print(std::cout, nr);
 std::cout << std::endl;
 			}
+			rs.swap(nrs);
 std::cout << "***** DONE NORMING RULES  *****" << std::endl;
 		}
 		
@@ -245,21 +249,17 @@ std::cout << "***** DONE NORMING RULES  *****" << std::endl;
 			
 			// Empty sequence is a success
 			if ( m.ms.size() == 0 ) { rVal = expr::make_ptr<eps_expr>(); return; }
-//std::cout << "\tbuilding seq_expr" << std::endl;
 			
 			// Transform last option
 			auto it = m.ms.rbegin();
 			(*it)->accept(this);
-//derivs::printer::print(std::cout, rVal); std::cout << std::endl;
 			
 			// Transform remaining options
 			while ( ++it != m.ms.rend() ) {
 				ptr<expr> tVal = rVal;
 				(*it)->accept(this);
 				rVal = expr::make_ptr<seq_expr>(memo, rVal, tVal);
-//derivs::printer::print(std::cout, rVal); std::cout << std::endl;
 			}
-//std::cout << "\tdone building seq_expr\n" << std::endl;
 		}
 		
 		virtual void visit(ast::alt_matcher& m) {
@@ -267,21 +267,17 @@ std::cout << "***** DONE NORMING RULES  *****" << std::endl;
 			
 			// Empty sequence is a success
 			if ( m.ms.size() == 0 ) { rVal = expr::make_ptr<eps_expr>(); return; }
-//std::cout << "\tbuilding alt_expr" << std::endl;
 			
 			// Transform last option
 			auto it = m.ms.rbegin();
 			(*it)->accept(this);
-//derivs::printer::print(std::cout, rVal); std::cout << std::endl;
 			
 			// Transform remaining options
 			while ( ++it != m.ms.rend() ) {
 				ptr<expr> tVal = rVal;
 				(*it)->accept(this);
 				rVal = expr::make_ptr<alt_expr>(memo, rVal, tVal);
-//derivs::printer::print(std::cout, rVal); std::cout << std::endl;
 			}
-//std::cout << "\tdone building alt_expr\n" << std::endl;
 		}
 		
 		virtual void visit(ast::look_matcher& m) {
@@ -290,11 +286,8 @@ std::cout << "***** DONE NORMING RULES  *****" << std::endl;
 		}
 		
 		virtual void visit(ast::not_matcher& m) {
-//std::cout << "\tbuilding not_expr" << std::endl;
 			m.m->accept(this);
 			rVal = expr::make_ptr<not_expr>(memo, rVal);
-//derivs::printer::print(std::cout, rVal); std::cout << std::endl;
-//std::cout << "\tbuilding not_expr" << std::endl;
 		}
 		
 		virtual void visit(ast::capt_matcher& m) {

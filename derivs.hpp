@@ -182,6 +182,9 @@ namespace derivs {
 		virtual gen_type generation() const = 0;
 		
 	public:
+		/// Resets the memoziation fields of a memoized expression
+		void reset_memo() { g = 0; flags = {0,0,false}; }
+		
 		virtual void accept(visitor*) = 0;
 		
 		virtual ptr<expr> d(char x) const {
@@ -596,8 +599,13 @@ namespace derivs {
 	/// A parsing expression representing the alternation of two parsing expressions
 	class alt_expr : public memo_expr {
 	public:
-		alt_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
-		         gen_flags ag = (gen_flags)0, gen_flags bg = (gen_flags)0)
+		alt_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b)
+			: memo_expr(memo), a(a), b(b) {
+			flags::clear(ag);
+			flags::clear(bg);
+		}
+		
+		alt_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, gen_flags ag, gen_flags bg)
 			: memo_expr(memo), a(a), b(b), ag(ag), bg(bg) {}
 		
 		/// Make an expression using the default generation rules
@@ -818,6 +826,7 @@ namespace derivs {
 		if ( b->type() == fail_type ) return a;
 		
 		gen_flags ag, bg;
+		flags::clear(ag); flags::clear(bg);
 			
 		// in both cases, 0 for READ, 1 for LOOK, 0 & 1 for PART
 		switch ( a->lk() ) {
@@ -880,6 +889,7 @@ namespace derivs {
 	
 	gen_type alt_expr::generation() const {
 		gen_flags tg;
+		flags::clear(tg);
 		flags::set_union(ag, bg, tg);      // Union generation flags into tg
 		return gen_type(flags::last(tg));  // Count set bits for maximum generation
 	}
@@ -998,6 +1008,8 @@ namespace derivs {
 		if ( b1->type() != fail_type ) {
 			// If the lookahead-follower did not fail immediately, map in its generation flags
 			gen_flags eg;
+			flags::clear(eg);
+			
 			switch ( b1->lk() ) {
 			case READ: flags::set(eg, 0);                    break;
 			case LOOK: flags::set(eg, 1);                    break;
@@ -1059,6 +1071,8 @@ namespace derivs {
 			ptr<expr> db = b->d(x);
 			if ( db->type() != fail_type ) {
 				gen_flags bg;
+				flags::clear(bg);
+				
 				switch ( db->lk() ) {
 				case READ: flags::set(bg, 0);                    break;
 				case LOOK: flags::set(bg, 1);                    break;
@@ -1097,6 +1111,7 @@ namespace derivs {
 	
 	gen_type back_expr::generation() const {
 		gen_flags tg;
+		flags::clear(tg);
 		flags::set(tg, 0);
 		
 		// Take union of all generation flags into tg

@@ -27,7 +27,8 @@ CXXFLAGS = -O0 -ggdb --std=c++0x
 #CXXFLAGS = -O3 --std=c++0x
 
 egg:  main.cpp egg.hpp parser.hpp derivs.hpp \
-      visitors/printer.hpp visitors/compiler.hpp visitors/interpreter.hpp visitors/normalizer.hpp
+      visitors/printer.hpp visitors/compiler.hpp visitors/interpreter.hpp visitors/normalizer.hpp \
+      visitors/deriv_printer.hpp
 	$(CXX) $(CXXFLAGS) -o egg main.cpp $(OBJS) $(LDFLAGS)
 
 clean:  

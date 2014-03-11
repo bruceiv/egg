@@ -74,7 +74,7 @@ namespace derivs {
 		}
 		
 		void print_fns(expr* e) {
-			out << "{";
+/*			out << "{";
 			
 			switch ( e->nbl() ) {
 			case NBL:   out << "O"; break;
@@ -89,7 +89,7 @@ namespace derivs {
 			}
 			
 			out << "} ";
-		}
+*/		}
 	public:
 		printer(std::ostream& out = std::cout) : out(out) {}
 		
@@ -121,8 +121,6 @@ namespace derivs {
 				p.print_rule(**it);
 				++it;
 			}
-//			e->accept(&p);
-//			out << std::endl;
 		}
 		
 		void visit(fail_expr& e)  { out << "{FAIL}"; }
@@ -151,8 +149,6 @@ namespace derivs {
 				pl.push_back(&e);
 				
 				out << "{RULE @" << i << "}";
-//				out << "{RULE :" << i << "} ";
-//				print_braced(e.r);
 			} else {  // printed this rule before
 				out << "{RULE @" << it->second << "}";
 			}
@@ -203,7 +199,6 @@ namespace derivs {
 		std::ostream& out;	               ///< output stream
 		std::map<expr*, unsigned int> rs;  ///< Rule identifiers
 		std::list<rule_expr*>         pl;  ///< List of rules to print
-	}; // printer
-
+	}; // class printer
 }
 
