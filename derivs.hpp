@@ -1110,6 +1110,7 @@ namespace derivs {
 			if ( b->nbl() == NBL ) return NBL;
 			// fallthrough
 		case EMPTY:
+			if ( b->nbl() != SHFT ) return EMPTY;
 			for (const look_node& bi : bs) if ( bi.e->nbl() != SHFT ) return EMPTY;
 			// fallthrough
 		case SHFT:
