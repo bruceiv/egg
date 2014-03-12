@@ -164,18 +164,21 @@ namespace derivs {
 		
 	public:
 		/// Default constructor; builds a derivative parser graph from the given PEG grammar
-		loader(ast::grammar& g) {
+		loader(ast::grammar& g, bool dbg = false) {
 			// Read in rules
 			for (ptr<ast::grammar_rule> r : g.rs) {
 				rVal = nullptr;
 				r->m->accept(this);
 				get_rule(r->name)->r = rVal;
 				
-std::cout << "LOADED RULE `" << r->name << "`" << std::endl;
-derivs::printer::print(std::cout, rVal);
-std::cout << std::endl;
+				if ( dbg ) {
+					std::cout << "LOADED RULE `" << r->name << "`" << std::endl;
+					derivs::printer::print(std::cout, rVal);
+					std::cout << std::endl;
+				}
 			}
-std::cout << "***** DONE LOADING RULES  *****" << std::endl;
+			
+			if ( dbg ) { std::cout << "***** DONE LOADING RULES  *****" << std::endl; }
 			rVal = nullptr;
 			
 			// Normalize rules
@@ -184,12 +187,15 @@ std::cout << "***** DONE LOADING RULES  *****" << std::endl;
 			for (auto rp : rs) {
 				ptr<rule_expr> nr = n.normalize(rp.second);
 				nrs.insert(std::make_pair(rp.first, nr));
-std::cout << "NORMED RULE `" << rp.first << "`" << std::endl;
-derivs::printer::print(std::cout, nr);
-std::cout << std::endl;
+				
+				if ( dbg ) {
+					std::cout << "NORMED RULE `" << rp.first << "`" << std::endl;
+					derivs::printer::print(std::cout, nr);
+					std::cout << std::endl;
+				}
 			}
 			rs.swap(nrs);
-std::cout << "***** DONE NORMING RULES  *****" << std::endl;
+			if ( dbg ) { std::cout << "***** DONE NORMING RULES  *****" << std::endl; }
 		}
 		
 		/// Gets the rules from a grammar
@@ -359,7 +365,7 @@ std::cout << "***** DONE NORMING RULES  *****" << std::endl;
 	/// @param dbg		Print debug output? (default false)
 	/// @return true for match, false for failure
 	bool match(ast::grammar& g, parser::state& ps, std::string rule, bool dbg = false) {
-		loader l(g);
+		loader l(g, dbg);
 		return match(l, ps, rule, dbg);
 	}
 	

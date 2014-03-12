@@ -39,7 +39,7 @@ static const char* VERSION = "0.3.1";
 static const char* USAGE = 
 "[-c print|compile|match|match-lines] \n\
  [-i input_file] [-r rule_name] [-s source_file] [-o output_file]\n\
- [--no-norm] [--no-memo] [--help] [--version] [--usage]";
+ [--dbg] [--no-norm] [--no-memo] [--help] [--version] [--usage]";
 
 /** Full Egg help string */
 static const char* HELP = 
@@ -55,6 +55,7 @@ Supported flags are\n\
  -n --name     grammar name - if none given, takes the longest prefix of\n\
                the input or output file name (output preferred) which is a\n\
                valid Egg identifier (default empty)\n\
+ --dbg         turn on debugging\n\
  --no-norm     turns off grammar normalization\n\
  --no-memo     turns of grammar memoization\n\
  --usage       print usage message\n\
@@ -165,7 +166,8 @@ public:
 	args(int argc, char** argv) 
 		: in(nullptr), out(nullptr), src(nullptr),
 		  inName(), outName(), srcName(), pName(), rName(),
-		  nameFlag(false), normFlag(true), memoFlag(true), eMode(COMPILE_MODE) {
+		  dbgFlag(false), nameFlag(false), normFlag(true), memoFlag(true), 
+		  eMode(COMPILE_MODE) {
 		
 		i = 1;
 		if ( argc <= 1 ) return;
@@ -193,6 +195,8 @@ public:
 			} else if ( match("-r", "--rule", argv[i]) ) {
 				if ( i+1 >= argc ) return;
 				parse_rule(argv[++i]);
+			} else if ( eq("--dbg", argv[i]) ) {
+				dbgFlag = true;
 			} else if ( eq("--no-norm", argv[i]) ) {
 				normFlag = false;
 			} else if ( eq("--no-memo", argv[i]) ) {
@@ -229,6 +233,7 @@ public:
 	std::string sourceFile() { return src ? srcName : "<STDIN>"; }
 	std::string name() { return pName; }
 	std::string rule() { return rName; }
+	bool dbg()  { return dbgFlag; }
 	bool norm() { return normFlag; }
 	bool memo() { return memoFlag; }
 	egg_mode mode() { return eMode; }
@@ -243,6 +248,7 @@ private:
 	std::string srcName;  ///< Name of the interpreted source file (empty if none)
 	std::string pName; 	  ///< the name of the parser (empty if none)
 	std::string rName;    ///< the name of the rule to interpret (empty if none)
+	bool dbgFlag;         ///< should egg print debugging information?
 	bool nameFlag;		  ///< has the parser name been explicitly set?
 	bool normFlag;        ///< should egg do grammar normalization?
 	bool memoFlag;        ///< should the generated grammar do memoization?
@@ -282,13 +288,6 @@ int main(int argc, char** argv) {
 	default: break;
 	}
 	
-std::cout << "DBG mode:`" << a.mode()
-          << "` in:`" << a.inputFile()
-          << "` rule:`" << a.rule()
-          << "` source:`" << a.sourceFile() 
-          << "` out:`" << a.outputFile()
-          << "`" << std::endl;
-
 	parser::state ps(a.input());
 	ast::grammar_ptr g;
 	
@@ -310,25 +309,35 @@ std::cout << "DBG mode:`" << a.mode()
 			c.compile(*g);
 			break;
 		} case MATCH_MODE: {    // Interpret grammar
-visitor::printer p(std::cout);
-p.print(*g); std::cout << std::endl;
+			if ( a.dbg() ) {
+				visitor::printer p(std::cout);
+				p.print(*g); 
+				std::cout << std::endl;
+			}
+			
 			parser::state in(a.source());
-			bool b = derivs::match(*g, in, a.rule(), true);
+			bool b = derivs::match(*g, in, a.rule(), a.dbg());
 			a.output() << "Rule `" << a.rule() << "` " 
 			           << ( b ? "matched" : "DID NOT match" ) << std::endl;
+			break;
 		} case LINES_MODE: {   // Interpret grammar line-by-line
-visitor::printer p(std::cout);
-p.print(*g); std::cout << std::endl;
+			if ( a.dbg() ) {
+				visitor::printer p(std::cout);
+				p.print(*g); 
+				std::cout << std::endl;
+			}
+			
 			std::string line;
 			derivs::loader l(*g);
 			while ( std::getline(a.source(), line) ) {
 				std::stringstream ss(line);
 				parser::state in(ss);
-				bool b = derivs::match(l, in, a.rule(), true);
+				bool b = derivs::match(l, in, a.rule(), a.dbg());
 				a.output() << "Rule `" << a.rule() << "` " 
 			               << ( b ? "matched" : "DID NOT match" ) 
 			               << " \"" << line << "\"" << std::endl;
 			}
+			break;
 		} default: break;
 		}
 		
