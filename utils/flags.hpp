@@ -243,6 +243,6 @@ inline void set_difference(const uint64_t& x, const uint64_t& y, uint64_t& z) { 
 inline void set_difference(const uint64_t* a, const uint64_t* b, uint64_t* c, uint64_t n) {
 	for (uint64_t i = 0; i < n; ++i) set_difference(a[i], b[i], c[i]);
 }
-	
+
 } /* namespace flags */
 

@@ -581,6 +581,10 @@ namespace derivs {
 	/// Maintains generation mapping from collapsed alternation expression.
 	class map_expr : public memo_expr {
 	public:
+		static const gen_flags READ_FLAGS = gen_flags(0x8000000000000000);
+		static const gen_flags LOOK_FLAGS = gen_flags(0x4000000000000000);
+		static const gen_flags PART_FLAGS = gen_flags(0xC000000000000000);
+		
 		map_expr(memo_expr::table& memo, ptr<expr> e, gen_flags eg)
 			: memo_expr(memo), e(e), eg(eg) {}
 		
@@ -785,6 +789,20 @@ namespace derivs {
 		default:        break; // do nothing
 		}
 		
+		// check if map isn't needed
+		switch ( eg ) {
+		case READ_FLAGS:
+			if ( e->lk() == READ ) return e;
+			break;
+		case LOOK_FLAGS:
+			if ( e->lk() == LOOK ) return e;
+			break;
+		case PART_FLAGS:
+			if ( e->lk() == PART ) return e;
+			break;
+		default: break;
+		}
+		
 		return expr::make_ptr<map_expr>(memo, e, eg);
 	}
 	
@@ -830,14 +848,14 @@ namespace derivs {
 			
 		// in both cases, 0 for READ, 1 for LOOK, 0 & 1 for PART
 		switch ( a->lk() ) {
-		case READ: flags::set(ag, 0);                    break;
-		case LOOK: flags::set(ag, 1);                    break;
-		case PART: flags::set(ag, 0); flags::set(ag, 1); break;
+		case READ: ag = map_expr::READ_FLAGS; break;
+		case LOOK: ag = map_expr::LOOK_FLAGS; break;
+		case PART: ag = map_expr::PART_FLAGS; break;
 		}
 		switch ( b->lk() ) {
-		case READ: flags::set(bg, 0);                    break;
-		case LOOK: flags::set(bg, 1);                    break;
-		case PART: flags::set(bg, 0); flags::set(bg, 1); break;
+		case READ: bg = map_expr::READ_FLAGS; break;
+		case LOOK: bg = map_expr::LOOK_FLAGS; break;
+		case PART: bg = map_expr::PART_FLAGS; break;
 		}
 		
 		return expr::make_ptr<alt_expr>(memo, a, b, ag, bg);
