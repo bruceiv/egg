@@ -915,6 +915,14 @@ namespace derivs {
 	// seq_expr ////////////////////////////////////////////////////////////////////
 	
 	ptr<expr> seq_expr::make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b) {
+		switch ( b->type() ) {
+		// empty second element leaves just first
+		case eps_type:  return a;
+		// failing second element propegates
+		case fail_type: return b; // a fail_expr
+		default:        break; // do nothing
+		}
+		
 		switch ( a->type() ) {
 		// empty first element leaves just second
 		case eps_type:  return b;
@@ -922,14 +930,6 @@ namespace derivs {
 		// failing or infinite loop first element propegates
 		case fail_type: return a; // a fail_expr
 		case inf_type:  return a; // an inf_expr
-		default:        break; // do nothing
-		}
-		
-		switch ( b->type() ) {
-		// empty second element leaves just first
-		case eps_type:  return a;
-		// failing second element propegates
-		case fail_type: return b; // a fail_expr
 		default:        break; // do nothing
 		}
 		
