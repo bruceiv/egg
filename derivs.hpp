@@ -663,6 +663,9 @@ namespace derivs {
 		/// Makes an expression given the memoization table, partial lookahead expression a, 
 		/// following expression b, and lookahead-following expression b1
 		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, ptr<expr> b1);
+		/// Makes an expression (doesn't validate bs)
+		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, look_list bs);
+		
 		void accept(visitor* v) { v->visit(*this); }
 		virtual ptr<expr> deriv(char x) const;
 		virtual nbl_mode  nullable() const;
@@ -1001,8 +1004,7 @@ namespace derivs {
 	
 	// back_expr ///////////////////////////////////////////////////////////////////
 	
-	ptr<expr> back_expr::make(memo_expr::table& memo, 
-	                                 ptr<expr> a, ptr<expr> b, ptr<expr> b1) {
+	ptr<expr> back_expr::make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, ptr<expr> b1) {
 		switch ( a->type() ) {
 		// empty first element leaves just follower
 		case eps_type:  return b;
@@ -1041,6 +1043,35 @@ namespace derivs {
 		return expr::make_ptr<back_expr>(memo, a, b, bs);
 	}
 	
+	ptr<expr> back_expr::make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, look_list bs) {
+		switch ( a->type() ) {
+		// empty first element leaves just follower
+		case eps_type:  return b;
+		// lookahead first element leaves just lookahead-follower
+		case look_type: {
+			gen_type i = a->gen();
+			for (const look_node& bi : bs) {
+				if ( bi.g == i ) return map_expr::make(memo, bi.e, bi.eg);
+				else if ( bi.g > i ) break;  // generation list is sorted
+			}
+			return fail_expr::make();  // if none found, fail
+		}
+		// failing or infinite loop first element propegates
+		case fail_type: return a; // a fail_expr
+		case inf_type:  return a; // an inf_expr
+		default:        break; // do nothing
+		}
+		
+		// break out if first element is no longer partial lookahead
+		lk_mode al = a->lk();
+		
+		if ( al == READ ) return seq_expr::make(memo, a, b);
+		
+		ptr<expr> bn = ( al == LOOK ) ? fail_expr::make() : b;
+		
+		return expr::make_ptr<back_expr>(memo, a, bn, bs);
+	}
+	
 	ptr<expr> back_expr::deriv(char x) const {
 		ptr<expr> da  = a->d(x);
 		
@@ -1055,10 +1086,14 @@ namespace derivs {
 				else if ( bi.g > i ) break;  // generation list is sorted
 			}
 			return fail_expr::make();  // if none found, fail
-		} case fail_type: { 
-			// failing or infinite loop element propegates
+		} case fail_type: {
+			// Only not a failure if previous one was nullable
+			if ( a->nbl() == NBL ) {
+				return b->d(x);
+			}
 			return da; // a fail_expr
-		} case inf_type: { 
+		} case inf_type: {
+			// infinite loop element propegates
 			return da; // an inf_expr
 		} default: break; // do nothing
 		}
@@ -1101,7 +1136,17 @@ namespace derivs {
 			}
 		}
 		
-		return expr::make_ptr<back_expr>(memo, da, bn, dbs);
+		// Derivative of this sequence
+		ptr<expr> dx = expr::make_ptr<back_expr>(memo, da, bn, dbs);
+		
+		if ( a->nbl() == NBL ) {
+			// Set up backtracking for nullable first expression
+			return alt_expr::make(memo,
+			                      dx,
+			                      seq_expr::make(memo, not_expr::make(memo, da), b->d(x)));
+		}
+		
+		return dx;
 	}
 	
 	nbl_mode back_expr::nullable() const {
