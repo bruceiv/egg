@@ -91,7 +91,12 @@ namespace derivs {
 			out << "} ";
 */		}
 	public:
-		printer(std::ostream& out = std::cout) : out(out) {}
+		/// Default printer
+		printer(std::ostream& out = std::cout) : out(out), nc(0) {}
+		
+		/// Rule name loading printer
+		printer(std::ostream& out, std::map<expr*, std::string>& rs) 
+			: out(out), rs(rs), nc(rs.size()) {}
 		
 		void print_rule(rule_expr& e) {
 			auto it = rs.find(e.r.get());
@@ -104,23 +109,38 @@ namespace derivs {
 			out << std::endl;
 		}
 		
-		/// Prints the derivative expression to the given output stream
-		static void print(std::ostream& out, ptr<expr> e) {
-			printer p(out);
+		/// Prints the expression
+		void print(ptr<expr> e) {
 			if ( e->type() == rule_type ) {
 				rule_expr* r = static_cast<rule_expr*>(e.get());
-				p.rs.insert(std::make_pair(r->r.get(), 0));
-				p.pl.push_back(static_cast<rule_expr*>(e.get()));
+				if ( rs.count(r->r.get()) == 0 ) {
+					rs.insert(std::make_pair(r->r.get(), std::to_string(rs.size() - nc)));
+				}
+				pl.push_back(r);
 			} else {
-				e->accept(&p);
+				e->accept(this);
 				out << std::endl;
 			}
 			
-			auto it = p.pl.begin();
-			while ( it != p.pl.end() ) {
-				p.print_rule(**it);
+			auto it = pl.begin();
+			while ( it != pl.end() ) {
+				print_rule(**it);
 				++it;
 			}
+			pl.clear();
+		}
+		
+		/// Prints the derivative of the expression to the given output stream 
+		//  (with the given named rules)
+		static void print(std::ostream& out, ptr<expr> e, std::map<expr*, std::string>& rs) {
+			printer p(out, rs);
+			p.print(e);
+		}
+		
+		/// Prints the derivative expression to the given output stream
+		static void print(std::ostream& out, ptr<expr> e) {
+			std::map<expr*, std::string> rs;
+			print(out, e, rs);
 		}
 		
 		void visit(fail_expr& e)  { out << "{FAIL}"; }
@@ -144,8 +164,8 @@ namespace derivs {
 		void visit(rule_expr& e)  {
 			auto it = rs.find(e.r.get());
 			if ( it == rs.end() ) {  // not printed this rule before
-				unsigned int i = rs.size();
-				rs.insert(std::make_pair(e.r.get(), i));
+				unsigned int i = rs.size() - nc;
+				rs.insert(std::make_pair(e.r.get(), std::to_string(i)));
 				pl.push_back(&e);
 				
 				out << "{RULE @" << i << "}";
@@ -196,9 +216,10 @@ namespace derivs {
 		}
 		
 	private:
-		std::ostream& out;	               ///< output stream
-		std::map<expr*, unsigned int> rs;  ///< Rule identifiers
-		std::list<rule_expr*>         pl;  ///< List of rules to print
+		std::ostream&                out;  ///< output stream
+		std::map<expr*, std::string> rs;   ///< Rule identifiers
+		unsigned int                 nc;   ///< Count of named rules
+		std::list<rule_expr*>        pl;   ///< List of rules to print
 	}; // class printer
 }
 

@@ -170,15 +170,8 @@ namespace derivs {
 				rVal = nullptr;
 				r->m->accept(this);
 				get_rule(r->name)->r = rVal;
-				
-				if ( dbg ) {
-					std::cout << "LOADED RULE `" << r->name << "`" << std::endl;
-					derivs::printer::print(std::cout, rVal);
-					std::cout << std::endl;
-				}
 			}
 			
-			if ( dbg ) { std::cout << "***** DONE LOADING RULES  *****" << std::endl; }
 			rVal = nullptr;
 			
 			// Normalize rules
@@ -187,15 +180,18 @@ namespace derivs {
 			for (auto rp : rs) {
 				ptr<rule_expr> nr = n.normalize(rp.second);
 				nrs.insert(std::make_pair(rp.first, nr));
-				
-				if ( dbg ) {
-					std::cout << "NORMED RULE `" << rp.first << "`" << std::endl;
-					derivs::printer::print(std::cout, nr);
-					std::cout << std::endl;
-				}
+				names.insert(std::make_pair(nr->r.get(), rp.first));
 			}
 			rs.swap(nrs);
-			if ( dbg ) { std::cout << "***** DONE NORMING RULES  *****" << std::endl; }
+			
+			if ( dbg ) {
+				derivs::printer p(std::cout, names);
+				for (auto rp : rs) {
+					p.print(std::static_pointer_cast<derivs::expr>(rp.second));
+				}
+				std::cout << "***** DONE LOADING RULES  *****" << std::endl;
+				
+			}
 		}
 		
 		/// Gets the rules from a grammar
@@ -203,6 +199,9 @@ namespace derivs {
 		
 		/// Gets the memoization table that goes along with them
 		memo_expr::table& get_memo() { return memo; }
+		
+		/// Gets the rule names for this grammar
+		std::map<expr*, std::string>& get_names() { return names; }
 		
 		virtual void visit(ast::char_matcher& m) { rVal = expr::make_ptr<char_expr>(m.c); }
 		
@@ -312,9 +311,10 @@ namespace derivs {
 		}
 		
 	private:
-		std::map<std::string, ptr<rule_expr>>  rs;    ///< List of rules
-		memo_expr::table                       memo;  ///< Memoization table
-		ptr<expr>                              rVal;  ///< Return value of node visits
+		std::map<std::string, ptr<rule_expr>>  rs;     ///< List of rules
+		std::map<expr*, std::string>           names;  ///< Names of rule expressions
+		memo_expr::table                       memo;   ///< Memoization table
+		ptr<expr>                              rVal;   ///< Return value of node visits
 	};  // class loader
 	
 	/// Recognizes the input
@@ -326,6 +326,7 @@ namespace derivs {
 	bool match(loader& l, parser::state& ps, std::string rule, bool dbg = false) {
 		auto& rs = l.get_rules();
 		auto& memo = l.get_memo();
+		derivs::printer p(std::cout, l.get_names());
 		
 		// fail on no such rule
 		if ( rs.count(rule) == 0 ) return false;
@@ -334,7 +335,7 @@ namespace derivs {
 		
 		// Take derivatives until failure, match, or end of input
 		while ( true ) {
-			if ( dbg ) { derivs::printer::print(std::cout, e); }
+			if ( dbg ) { p.print(e); }
 			
 			switch ( e->type() ) {
 			case fail_type: return false;

@@ -328,7 +328,7 @@ int main(int argc, char** argv) {
 			}
 			
 			std::string line;
-			derivs::loader l(*g);
+			derivs::loader l(*g, a.dbg());
 			while ( std::getline(a.source(), line) ) {
 				std::stringstream ss(line);
 				parser::state in(ss);
