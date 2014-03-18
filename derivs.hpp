@@ -990,9 +990,11 @@ namespace derivs {
 		lk_mode al = a->lk(), bl = b->lk();
 		
 		if ( al == LOOK && bl == LOOK ) return LOOK;
-		else if ( (al == READ && a->nbl() == SHFT) 
-		          || ( bl == READ && b->nbl() == SHFT ) ) return READ;
-		else return PART;
+		else if ( al == READ ) {
+			if ( bl == READ || a->nbl() == SHFT ) return READ;
+		} else if ( bl == READ && b->nbl() == SHFT ) return READ;
+		
+		return PART;
 	}
 	
 	gen_type seq_expr::generation() const {
