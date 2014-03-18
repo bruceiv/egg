@@ -189,7 +189,7 @@ namespace derivs {
 				for (auto rp : rs) {
 					p.print(std::static_pointer_cast<derivs::expr>(rp.second));
 				}
-				std::cout << "***** DONE LOADING RULES  *****" << std::endl;
+				std::cout << "\n***** DONE LOADING RULES  *****\n" << std::endl;
 				
 			}
 		}

@@ -73,23 +73,25 @@ namespace derivs {
 			}
 		}
 		
+		void print_unbraced(ptr<expr> e) {
+			e->accept(this);
+		}
+		
 		void print_fns(expr* e) {
-/*			out << "{";
+			out << "^";
 			
 			switch ( e->nbl() ) {
-			case NBL:   out << "O"; break;
+			case NBL:   out << "N"; break;
 			case SHFT:  out << "."; break;
-			case EMPTY: out << "0"; break;
+			case EMPTY: out << "E"; break;
 			}
 			
 			switch ( e->lk() ) {
-			case LOOK:  out << "^"; break;
+			case LOOK:  out << "L"; break;
 			case READ:  out << "."; break;
-			case PART:  out << "?"; break;
+			case PART:  out << "P"; break;
 			}
-			
-			out << "} ";
-*/		}
+		}
 	public:
 		/// Default printer
 		printer(std::ostream& out = std::cout) : out(out), nc(0) {}
@@ -105,7 +107,7 @@ namespace derivs {
 			} else {
 				out << "{RULE :" << it->second << "} ";
 			}
-			print_braced(e.r);
+			print_unbraced(e.r);
 			out << std::endl;
 		}
 		
@@ -179,40 +181,51 @@ namespace derivs {
 		void visit(and_expr& e)   { out << "&"; print_braced(e.e); }
 		
 		void visit(map_expr& e)   {
-			out << "{MAP:.." << (unsigned int)e.gen() << "} ";
-			print_braced(e.e);
+			out << "(map:.." << (unsigned int)e.gen();
+			print_fns(&e);
+			out << " ";
+			print_unbraced(e.e);
+			out << ")";
 		}
 		
 		void visit(alt_expr& e)  {
+			out << "(alt:";
 			print_fns(&e);
-			print_braced(e.a);
+			out << " ";
+			print_unbraced(e.a);
 			out << " / ";
-			print_braced(e.b);
+			print_unbraced(e.b);
+			out << ")";
 		}
 		
 		void visit(seq_expr& e) {
+			out << "(seq:";
 			print_fns(&e);
-			print_braced(e.a);
 			out << " ";
-			print_braced(e.b);
+			print_unbraced(e.a);
+			out << " ";
+			print_unbraced(e.b);
+			out << ")";
 		}
 		
 		void visit(back_expr& e) {
+			out << "(back:";
 			print_fns(&e);
-			print_braced(e.a);
+			out << " ";
+			print_unbraced(e.a);
 			out << " \\ ";
-			print_braced(e.b);
+			print_unbraced(e.b);
 			out << " <";
 			if ( ! e.bs.empty() ) {
 				auto it = e.bs.begin();
-				out << " {" << it->g << "} ";
-				print_braced(it->e);
+				out << " {" << (unsigned int)it->g << "} ";
+				print_unbraced(it->e);
 				while (++it != e.bs.end()) {
-					out << " | {" << it->g << "} ";
-					print_braced(it->e);
+					out << " | {" << (unsigned int)it->g << "} ";
+					print_unbraced(it->e);
 				}
 			}
-			out << ">";
+			out << ">)";
 		}
 		
 	private:
