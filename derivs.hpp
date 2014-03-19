@@ -585,10 +585,10 @@ namespace derivs {
 		static const gen_flags LOOK_FLAGS = gen_flags(0x4000000000000000);
 		static const gen_flags PART_FLAGS = gen_flags(0xC000000000000000);
 		
-		map_expr(memo_expr::table& memo, ptr<expr> e, gen_flags eg)
-			: memo_expr(memo), e(e), eg(eg) {}
+		map_expr(memo_expr::table& memo, ptr<expr> e, gen_type gm, gen_flags eg)
+			: memo_expr(memo), e(e), gm(gm), eg(eg) {}
 		
-		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> e, gen_flags eg);
+		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> e, gen_type mg, gen_flags eg);
 		void accept(visitor* v) { v->visit(*this); }
 		virtual ptr<expr> deriv(char x) const;
 		virtual nbl_mode  nullable() const;
@@ -597,6 +597,7 @@ namespace derivs {
 		virtual expr_type type() const { return map_type; }
 		
 		ptr<expr> e;   ///< Subexpression
+		gen_type  gm;  ///< Maximum generation from source expresssion
 		gen_flags eg;  ///< Generation flags for subexpression
 	}; // class map_expr
 	
@@ -782,7 +783,13 @@ namespace derivs {
 	
 	// map_expr ////////////////////////////////////////////////////////////////////
 	
-	ptr<expr> map_expr::make(memo_expr::table& memo, ptr<expr> e, gen_flags eg) {
+	ptr<expr> map_expr::make(memo_expr::table& memo, ptr<expr> e, gen_type gm, gen_flags eg) {
+		// account for unmapped generations
+		gen_type ge = e->gen();
+		while ( ge > flags::count(eg) ) {
+			flags::set(eg, ++gm);
+		}
+		
 		switch ( e->type() ) {
 		case eps_type:  return e; // an eps_expr
 		// a look expression with the generation translated
@@ -806,7 +813,7 @@ namespace derivs {
 		default: break;
 		}
 		
-		return expr::make_ptr<map_expr>(memo, e, eg);
+		return expr::make_ptr<map_expr>(memo, e, gm, eg);
 	}
 	
 	ptr<expr> map_expr::deriv(char x) const {
@@ -822,7 +829,16 @@ namespace derivs {
 		default:        break; // do nothing
 		}
 		
-		return expr::make_ptr<map_expr>(memo, de, eg);
+		// Calculate generations of new subexpressions
+		// - If we've added a lookahead generation that wasn't there before, map it into the 
+		//   generation space of the derived alternation
+		gen_flags deg = eg;
+		gen_type dgm = gm;
+		if ( de->gen() > e->gen() ) {
+			flags::set(deg, ++dgm);
+		}
+		
+		return expr::make_ptr<map_expr>(memo, de, dgm, deg);
 	}
 	
 	nbl_mode map_expr::nullable()   const { return e->nbl(); }
@@ -869,14 +885,14 @@ namespace derivs {
 		
 		// Check conditions on a before we calculate dx(b) [same as make()]
 		switch ( da->type() ) {
-		case fail_type: return map_expr::make(memo, b->d(x), bg);
+		case fail_type: return map_expr::make(memo, b->d(x), gen(), bg);
 		case inf_type:  return da; // an inf_expr
 		default:        break; // do nothing
 		}
-		if ( da->nbl() == NBL ) return map_expr::make(memo, da, ag);
+		if ( da->nbl() == NBL ) return map_expr::make(memo, da, gen(), ag);
 		
 		ptr<expr> db = b->d(x);
-		if ( db->type() == fail_type ) return map_expr::make(memo, da, ag);
+		if ( db->type() == fail_type ) return map_expr::make(memo, da, gen(), ag);
 		
 		// Calculate generations of new subexpressions
 		// - If we've added a lookahead generation that wasn't there before, map it into the 
@@ -1051,9 +1067,18 @@ namespace derivs {
 		case eps_type:  return b;
 		// lookahead first element leaves just lookahead-follower
 		case look_type: {
+			// calculate max generation for successful match
+			gen_flags tg;
+			flags::clear(tg);
+			flags::set(tg, 0);
+		
+			// Take union of all generation flags into tg
+			for (const look_node& bi : bs) { flags::set_union(tg, bi.eg, tg); }
+			gen_type gm = flags::last(tg);
+			
 			gen_type i = a->gen();
 			for (const look_node& bi : bs) {
-				if ( bi.g == i ) return map_expr::make(memo, bi.e, bi.eg);
+				if ( bi.g == i ) return map_expr::make(memo, bi.e, gm, bi.eg);
 				else if ( bi.g > i ) break;  // generation list is sorted
 			}
 			return fail_expr::make();  // if none found, fail
@@ -1084,7 +1109,7 @@ namespace derivs {
 			// lookahead success leaves appropriate lookahead follower
 			gen_type i = da->gen();
 			for (const look_node& bi : bs) {
-				if ( bi.g == i ) return map_expr::make(memo, bi.e, bi.eg);
+				if ( bi.g == i ) return map_expr::make(memo, bi.e, gen(), bi.eg);
 				else if ( bi.g > i ) break;  // generation list is sorted
 			}
 			return fail_expr::make();  // if none found, fail

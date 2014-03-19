@@ -88,7 +88,7 @@ namespace derivs {
 		void visit(map_expr& e) {
 			// won't appear in un-normalized expression anyway
 			e.e->accept(this);
-			rVal = map_expr::make(memo, rVal, e.eg);
+			rVal = map_expr::make(memo, rVal, e.gen(), e.eg);
 		}
 		
 		void visit(alt_expr& e) {
