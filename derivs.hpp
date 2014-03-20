@@ -786,7 +786,7 @@ namespace derivs {
 	ptr<expr> map_expr::make(memo_expr::table& memo, ptr<expr> e, gen_type gm, gen_flags eg) {
 		// account for unmapped generations
 		gen_type ge = e->gen();
-		while ( ge > flags::count(eg) ) {
+		while ( ge + 1 > flags::count(eg) ) {
 			flags::set(eg, ++gm);
 		}
 		
