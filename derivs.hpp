@@ -881,26 +881,34 @@ namespace derivs {
 	}
 	
 	ptr<expr> alt_expr::deriv(char x) const {
-		ptr<expr> da = a->d(x);
+		bool inc_gen = false;
+		
+		// Calculate derivative and map in new lookahead generations
+		ptr<expr> da = a->d(x); gen_flags dag = ag;
+		if ( da->gen() > a->gen() ) {
+			flags::set(dag, gen()+1);
+			inc_gen = true;
+		}
 		
 		// Check conditions on a before we calculate dx(b) [same as make()]
 		switch ( da->type() ) {
-		case fail_type: return map_expr::make(memo, b->d(x), gen(), bg);
+		case fail_type: {
+			ptr<expr> db = b->d(x); gen_flags dbg = bg;
+			if ( db->gen() > b->gen() ) {
+				flags::set(dbg, gen()+1);
+				inc_gen = true;
+			}
+			return map_expr::make(memo, db, gen() + inc_gen, dbg);
+		}
 		case inf_type:  return da; // an inf_expr
 		default:        break; // do nothing
 		}
-		if ( da->nbl() == NBL ) return map_expr::make(memo, da, gen(), ag);
+		if ( da->nbl() == NBL ) return map_expr::make(memo, da, gen() + inc_gen, dag);
 		
-		ptr<expr> db = b->d(x);
-		if ( db->type() == fail_type ) return map_expr::make(memo, da, gen(), ag);
+		// Calculate other derivative and map in new lookahead generations
+		ptr<expr> db = b->d(x); gen_flags dbg = bg;
+		if ( db->type() == fail_type ) return map_expr::make(memo, da, gen() + inc_gen, dag);
 		
-		// Calculate generations of new subexpressions
-		// - If we've added a lookahead generation that wasn't there before, map it into the 
-		//   generation space of the derived alternation
-		gen_flags dag = ag, dbg = bg;
-		if ( da->gen() > a->gen() ) {
-			flags::set(dag, gen()+1);
-		}
 		if ( db->gen() > b->gen() ) {
 			flags::set(dbg, gen()+1);
 		}
@@ -1015,7 +1023,7 @@ namespace derivs {
 	
 	gen_type seq_expr::generation() const {
 		// If either a or b is READ and SHFT, the whole expression is, otherwise we take the 
-		// generation of the second element
+		// generation of the second element TODO FIXME returns gen 0 for a PART followed by NBL
 		if ( a->lk() == READ && a->nbl() == SHFT ) return gen_type(0);
 		else return b->gen();
 	}
