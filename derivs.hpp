@@ -22,15 +22,17 @@
  * THE SOFTWARE.
  */
 
-#include <algorithm>
-#include <cstdint>
+//uncomment to disable asserts
+//#define NDEBUG
+#include <cassert>
+
 #include <list>
-#include <string>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <utility>
 
-#include "utils/flags.hpp"
+#include "utils/uint_set.hpp"
 
 /**
  * Implements derivative parsing for parsing expression grammars, according to the algorithm 
@@ -56,11 +58,9 @@ namespace derivs {
 	class str_expr;
 	class rule_expr;
 	class not_expr;
-	class and_expr;
 	class map_expr;
 	class alt_expr;
 	class seq_expr;
-	class back_expr;
 	
 	/// Type of expression node
 	enum expr_type {
@@ -74,32 +74,10 @@ namespace derivs {
 		str_type,
 		rule_type,
 		not_type,
-		and_type,
 		map_type,
 		alt_type,
-		seq_type,
-		back_type
+		seq_type
 	}; // enum expr_type
-	
-	/// Nullability mode
-	enum nbl_mode {
-		NBL,      ///< Matches on all strings
-		EMPTY,    ///< Matches on empty string, but not all strings
-		SHFT      ///< Does not match on empty string
-	}; // enum nbl_mode
-	
-	/// Lookahead mode
-	enum lk_mode {
-		LOOK,    ///< Lookahead expression
-		PART,    ///< Partial lookahead expression
-		READ     ///< Non-lookahead expression
-	}; // enum lk_mode
-	
-	/// Type of generation value
-	using gen_type = uint8_t;
-	
-	/// Type of generation flags
-	using gen_flags = uint64_t;
 	
 	/// Abstract base class of all derivative visitors
 	class visitor {
@@ -114,11 +92,9 @@ namespace derivs {
 		virtual void visit(str_expr&)   = 0;
 		virtual void visit(rule_expr&)  = 0;
 		virtual void visit(not_expr&)   = 0;
-		virtual void visit(and_expr&)   = 0;
 		virtual void visit(map_expr&)   = 0;
 		virtual void visit(alt_expr&)   = 0;
 		virtual void visit(seq_expr&)   = 0;
-		virtual void visit(back_expr&)  = 0;
 	}; // class visitor
 	
 	/// Abstract base class for parsing expressions
@@ -127,6 +103,11 @@ namespace derivs {
 		expr() = default;
 		
 	public:
+		static const utils::uint_set empty_set;
+		static const utils::uint_set zero_set;
+		static const utils::uint_set one_set;
+		static const utils::uint_set zero_one_set;
+		
 		template<typename T, typename... Args>
 		static ptr<expr> make_ptr(Args&&... args) {
 			return std::static_pointer_cast<expr>(std::make_shared<T>(args...));
@@ -138,18 +119,20 @@ namespace derivs {
 		/// Accept visitor
 		virtual void accept(visitor*) = 0;
 		
-		/// Is this expression nullable?
-		virtual nbl_mode nbl() const = 0;
+		/// At what backtracking generations does this expression match?
+		virtual utils::uint_set match() const = 0;
 		
-		/// Is this a lookahead expression?
-		virtual lk_mode lk() const = 0;
-		
-		/// Maximum lookahead generation of this expression
-		virtual gen_type gen() const = 0;
-		
+		/// What backtracking generations does this expression expose?
+		virtual utils::uint_set back() const = 0;
+				
 		/// Expression node type
 		virtual expr_type type() const = 0;
 	}; // class expr
+	
+	const utils::uint_set expr::empty_set{};
+	const utils::uint_set expr::zero_set{0};
+	const utils::uint_set expr::one_set{1};
+	const utils::uint_set expr::zero_one_set{0,1};
 	
 	/// Abstract base class for memoized parsing expressions
 	class memo_expr : public expr {
@@ -158,39 +141,28 @@ namespace derivs {
 		using table = std::unordered_map<memo_expr*, ptr<expr>>;
 	
 	protected:
-		static const uint8_t  NBL_VAL   = 0x1;          ///< value for NBL
-		static const uint8_t  EMPTY_VAL = 0x3;          ///< value for EMPTY
-		static const uint8_t  SHFT_VAL  = 0x2;          ///< value for SHFT
-		
-		static const uint8_t  LOOK_VAL  = 0x1;          ///< value for LOOK
-		static const uint8_t  PART_VAL  = 0x3;          ///< value for PART
-		static const uint8_t  READ_VAL  = 0x2;          ///< value for READ
-		
 		/// Constructor providing memoization table reference
-		memo_expr(table& memo) : memo(memo), g(0) { flags = {0,0,false}; }
+		memo_expr(table& memo) : memo(memo) { flags = {false,false}; }
 		
 		/// Actual derivative calculation
 		virtual ptr<expr> deriv(char) const = 0;
 		
-		/// Actual computation of nullability mode
-		virtual nbl_mode nullable() const = 0;
+		/// Actual computation of match set
+		virtual utils::uint_set match_set() const = 0;
 		
-		/// Actual computation of lookahead mode
-		virtual lk_mode lookahead() const = 0;
-		
-		/// Actual computation of maximum generation
-		virtual gen_type generation() const = 0;
-		
+		/// Actual computation of backtrack set
+		virtual utils::uint_set back_set() const = 0;
+				
 	public:
 		/// Resets the memoziation fields of a memoized expression
-		void reset_memo() { g = 0; flags = {0,0,false}; }
+		void reset_memo() { flags = {false,false}; }
 		
 		virtual void accept(visitor*) = 0;
 		
 		virtual ptr<expr> d(char x) const {
 			auto ix = memo.find(const_cast<memo_expr* const>(this));
 			if ( ix == memo.end() ) {
-				// no such item; compute and storequit
+				// no such item; compute and store
 				ptr<expr> dx = deriv(x);
 				memo.insert(ix, std::make_pair(const_cast<memo_expr* const>(this), dx));
 				return dx;
@@ -200,58 +172,32 @@ namespace derivs {
 			}
 		}
 		
-		virtual nbl_mode nbl() const {
-			switch ( flags.nbl ) {
-			case SHFT_VAL:  return SHFT;
-			case NBL_VAL:   return NBL;
-			case EMPTY_VAL: return EMPTY;
-			
-			default:                         // no nullability set yet
-				nbl_mode mode = nullable();  // calculate nullability
-				switch ( mode ) {            // set nullability
-				case SHFT:    flags.nbl = SHFT_VAL;  break;
-				case NBL:     flags.nbl = NBL_VAL;   break;
-				case EMPTY:   flags.nbl = EMPTY_VAL; break;
-				}
-				return mode;
+		virtual utils::uint_set match() const {
+			if ( ! flags.match ) {
+				memo_match = match_set();
+				flags.match = true;
 			}
+			
+			return memo_match;
 		}
 		
-		virtual lk_mode lk() const {
-			switch ( flags.lk ) {
-			case READ_VAL: return READ;
-			case LOOK_VAL: return LOOK;
-			case PART_VAL: return PART;
-			
-			default:                         // no lookahead set yet
-				lk_mode mode = lookahead();  // calculate lookahead
-				switch ( mode ) {            // set nullability
-				case READ:   flags.lk = READ_VAL; break;
-				case LOOK:   flags.lk = LOOK_VAL; break;
-				case PART:   flags.lk = PART_VAL; break;
-				}
-				return mode;
-			}
-		}
-		
-		virtual gen_type gen() const {
-			// Set generation value if unset
-			if ( ! flags.gen ) {
-				g = generation(); 
-				flags.gen = true;
+		virtual utils::uint_set back() const {
+			if ( ! flags.back ) {
+				memo_back = back_set();
+				flags.back = true;
 			}
 			
-			return g;
+			return memo_back;
 		}
 	
 	protected:
-		table&           memo;  ///< Memoization table for derivatives
-		mutable gen_type g;     ///< Maximum generation value
+		table&                  memo;        ///< Memoization table for derivatives
+		mutable utils::uint_set memo_match;  ///< Stored match set
+		mutable utils::uint_set memo_back;   ///< Stored backtracking set
 		mutable struct {
-			uint8_t nbl : 2;  ///< Nullable value: one of 0 (unset), 1 (NBL), 2(SHFT), 3(EMPTY)
-			uint8_t lk  : 2;  ///< Lookahead value: one of 0 (unset), 1(LOOK), 2(READ), 3(PART)
-			bool    gen : 1;  ///< Generation set?
-		} flags;                ///< Memoization status flags
+			bool match : 1; ///< Is there a match set stored?
+			bool back  : 1; ///< Is there a backtrack set stored?
+		} flags;                             ///< Memoization status flags
 	}; // class memo_expr
 	
 	/// A failure parsing expression
@@ -266,10 +212,9 @@ namespace derivs {
 		// A failure expression can't un-fail - no strings to match with any prefix
 		virtual ptr<expr> d(char) const { return fail_expr::make(); }
 		
-		virtual nbl_mode  nbl()   const { return SHFT; }
-		virtual lk_mode   lk()    const { return READ; }
-		virtual gen_type  gen()   const { return gen_type(0); }
-		virtual expr_type type()  const { return fail_type; }
+		virtual utils::uint_set match() const { return expr::empty_set; }
+		virtual utils::uint_set back()  const { return expr::zero_set; }
+		virtual expr_type       type()  const { return fail_type; }
 	}; // class fail_expr
 	
 	/// An infinite loop failure parsing expression
@@ -284,10 +229,9 @@ namespace derivs {
 		// An infinite loop expression never breaks, ill defined with any prefix
 		virtual ptr<expr> d(char) const { return inf_expr::make(); }
 		
-		virtual nbl_mode  nbl()   const { return SHFT; }
-		virtual lk_mode   lk()    const { return READ; }
-		virtual gen_type  gen()   const { return gen_type(0); }
-		virtual expr_type type()  const { return inf_type; }
+		virtual utils::uint_set match() const { return expr::empty_set; }
+		virtual utils::uint_set back()  const { return expr::zero_set; }
+		virtual expr_type       type()  const { return inf_type; }
 	}; // class inf_expr
 	
 	/// An empty success parsing expression
@@ -300,37 +244,34 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		// No prefixes to remove from language containing the empty string; all fail
-		virtual ptr<expr> d(char) const { return fail_expr::make(); }
+		virtual ptr<expr> d(char x) const {
+			return ( x == '\0' ) ? eps_expr::make() : fail_expr::make();
+		}
 		
-		virtual nbl_mode  nbl()   const { return NBL; }
-		virtual lk_mode   lk()    const { return READ; }
-		virtual gen_type  gen()   const { return gen_type(0); }
-		virtual expr_type type()  const { return eps_type; }
+		virtual utils::uint_set match() const { return expr::zero_set; }
+		virtual utils::uint_set back()  const { return expr::zero_set; }
+		virtual expr_type       type()  const { return eps_type; }
 	}; // class eps_expr
 	
-	/// A lookahead success parsing expression
+	/// An lookahead success parsing expression
 	class look_expr : public expr {
 	public:
-		look_expr(gen_type g = 1) : g(g) {}
-		
-		static ptr<expr> make(gen_type g = 1) {
-			// gen-0 lookahead success is just an epsilon
-			return ( g == 0 ) ? 
-				eps_expr::make() :
-				expr::make_ptr<look_expr>(g);
+		look_expr(utils::uint_set::value_type g = 1) : b{g} {}
+	
+		static ptr<expr> make(utils::uint_set::value_type g = 1) {
+			return (g == 0) ? expr::make_ptr<eps_expr>() : expr::make_ptr<look_expr>(g);
 		}
 		
 		void accept(visitor* v) { v->visit(*this); }
 		
-		// Lookahead success is just a marker, so persists (character will be parsed by sequel)
-		virtual ptr<expr> d(char) const { return expr::make_ptr<look_expr>(g); }
+		// No prefixes to remove from language containing the empty string; all fail
+		virtual ptr<expr> d(char x) const { return look_expr::make(b); }
 		
-		virtual nbl_mode  nbl()   const { return NBL; }
-		virtual lk_mode   lk()    const { return LOOK; }
-		virtual gen_type  gen()   const { return gen_type(g); }
-		virtual expr_type type()  const { return look_type; }
+		virtual utils::uint_set match() const { return utils::uint_set{b}; }
+		virtual utils::uint_set back()  const { return utils::uint_set{b}; }
+		virtual expr_type       type()  const { return look_type; }
 		
-		gen_type g;  ///< Lookahead generation
+		utils::uint_set::value_type b;  ///< Generation of this success match
 	}; // class look_expr
 	
 	/// A single-character parsing expression
@@ -347,10 +288,9 @@ namespace derivs {
 			return ( c == x ) ? eps_expr::make() : fail_expr::make();
 		}
 		
-		virtual nbl_mode  nbl()  const { return SHFT; }
-		virtual lk_mode   lk()   const { return READ; }
-		virtual gen_type  gen()  const { return gen_type(0); }
-		virtual expr_type type() const { return char_type; }
+		virtual utils::uint_set match() const { return expr::empty_set; }
+		virtual utils::uint_set back()  const { return expr::zero_set; }
+		virtual expr_type       type()  const { return char_type; }
 		
 		char c; ///< Character represented by the expression
 	}; // class char_expr
@@ -369,10 +309,9 @@ namespace derivs {
 			return ( b <= x && x <= e ) ? eps_expr::make() : fail_expr::make();
 		}
 		
-		virtual nbl_mode  nbl()  const { return SHFT; }
-		virtual lk_mode   lk()   const { return READ; }
-		virtual gen_type  gen()  const { return gen_type(0); }
-		virtual expr_type type() const { return range_type; }
+		virtual utils::uint_set match() const { return expr::empty_set; }
+		virtual utils::uint_set back()  const { return expr::zero_set; }
+		virtual expr_type       type()  const { return range_type; }
 		
 		char b;  ///< First character in expression range 
 		char e;  ///< Last character in expression range
@@ -388,15 +327,16 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		// Any-character expression consumes any character
-		virtual ptr<expr> d(char) const { return eps_expr::make(); }
+		virtual ptr<expr> d(char x) const {
+			return ( x == '\0' ) ? fail_expr::make() : eps_expr::make();
+		}
 		
-		virtual nbl_mode  nbl()   const { return SHFT; }
-		virtual lk_mode   lk()    const { return READ; }
-		virtual gen_type  gen()   const { return gen_type(0); }
-		virtual expr_type type()  const { return any_type; }
+		virtual utils::uint_set match() const { return expr::empty_set; }
+		virtual utils::uint_set back()  const { return expr::zero_set; }
+		virtual expr_type       type()  const { return any_type; }
 	}; // class any_expr
 
-#if 1
+#if 0
 	/// A parsing expression representing a character string
 	class str_expr : public expr {
 		/// Ref-counted cons-list representation of a string
@@ -491,7 +431,7 @@ namespace derivs {
 		str_expr(std::string s) : s(s) {}
 		
 		static ptr<expr> make(std::string s) {
-			switch ( t.size() ) {
+			switch ( s.size() ) {
 			case 0:  return eps_expr::make();
 			case 1:  return char_expr::make(s[0]);
 			default: return expr::make_ptr<str_expr>(s);
@@ -511,10 +451,9 @@ namespace derivs {
 			return expr::make_ptr<str_expr>(t);
 		}
 		
-		virtual nbl_mode  nbl()  const { return SHFT; }
-		virtual lk_mode   lk()   const { return READ; }
-		virtual gen_type  gen()  const { return gen_type(0); }
-		virtual expr_type type() const { return str_type; }
+		virtual utils::uint_set match() const { return expr::empty_set; }
+		virtual utils::uint_set back()  const { return expr::zero_set; }
+		virtual expr_type       type()  const { return str_type; }
 		
 		std::string str() const { return s; }
 		unsigned long size() const { return s.size(); }
@@ -531,11 +470,11 @@ namespace derivs {
 		
 		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> r = nullptr);
 		void accept(visitor* v) { v->visit(*this); }
-		virtual ptr<expr> deriv(char x) const;
-		virtual nbl_mode  nullable() const;
-		virtual lk_mode   lookahead() const;
-		virtual gen_type  generation() const;
-		virtual expr_type type() const { return rule_type; }
+		
+		virtual ptr<expr> deriv(char) const;
+		virtual utils::uint_set  match_set() const;
+		virtual utils::uint_set  back_set()  const;
+		virtual expr_type type()      const { return rule_type; }
 		
 		ptr<expr> r;  ///< Expression corresponding to this rule
 	}; // class rule_expr
@@ -544,138 +483,103 @@ namespace derivs {
 	class not_expr : public memo_expr {
 	public:
 		not_expr(memo_expr::table& memo, ptr<expr> e)
-			: memo_expr(memo), e(e) { g = 1; flags.gen = true; }
+			: memo_expr(memo), e(e) { flags.match = flags.back = true; }
 		
-		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> e);
+		static ptr<expr> make(memo_expr::table& memo, ptr<expr> e);
 		void accept(visitor* v) { v->visit(*this); }
-		virtual ptr<expr> deriv(char x) const;
-		virtual nbl_mode  nullable() const;
-		virtual lk_mode   lk() const;
-		virtual lk_mode   lookahead() const { return not_expr::lk(); }
-		virtual gen_type  gen() const;
-		virtual gen_type  generation() const { return not_expr::gen(); }
-		virtual expr_type type() const { return not_type; }
+		
+		virtual ptr<expr> deriv(char) const;
+		virtual utils::uint_set  match_set() const;
+		virtual utils::uint_set  back_set()  const;
+		virtual expr_type type()      const { return not_type; }
+		
+		virtual utils::uint_set match() const { return not_expr::match_set(); }
+		virtual utils::uint_set back()  const { return not_expr::back_set(); }
 		
 		ptr<expr> e;  ///< Subexpression to negatively match
 	}; // class not_expr
 	
-	/// A parsing expression representing positive lookahead
-	class and_expr : public memo_expr {
-	public:
-		and_expr(memo_expr::table& memo, ptr<expr> e) 
-			: memo_expr(memo), e(e) { g = 1; flags.gen = true; }
-		
-		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> e);
-		void accept(visitor* v) { v->visit(*this); }
-		virtual ptr<expr> deriv(char x) const;
-		virtual nbl_mode  nullable() const;
-		virtual lk_mode   lk() const;
-		virtual lk_mode   lookahead() const { return and_expr::lk(); }
-		virtual gen_type  gen() const;
-		virtual gen_type  generation() const { return and_expr::gen(); }
-		virtual expr_type type() const { return and_type; }
-		
-		ptr<expr> e;  ///< Subexpression to match
-	}; // class and_expr
-	
 	/// Maintains generation mapping from collapsed alternation expression.
 	class map_expr : public memo_expr {
 	public:
-		static const gen_flags READ_FLAGS = gen_flags(0x8000000000000000);
-		static const gen_flags LOOK_FLAGS = gen_flags(0x4000000000000000);
-		static const gen_flags PART_FLAGS = gen_flags(0xC000000000000000);
-		
-		map_expr(memo_expr::table& memo, ptr<expr> e, gen_type gm, gen_flags eg)
+		map_expr(memo_expr::table& memo, ptr<expr> e, utils::uint_set::value_type gm, utils::uint_set eg)
 			: memo_expr(memo), e(e), gm(gm), eg(eg) {}
 		
-		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> e, gen_type mg, gen_flags eg);
+		static ptr<expr> make(memo_expr::table& memo, ptr<expr> e, utils::uint_set::value_type mg, utils::uint_set eg);
 		void accept(visitor* v) { v->visit(*this); }
-		virtual ptr<expr> deriv(char x) const;
-		virtual nbl_mode  nullable() const;
-		virtual lk_mode   lookahead() const;
-		virtual gen_type  generation() const;
-		virtual expr_type type() const { return map_type; }
 		
-		ptr<expr> e;   ///< Subexpression
-		gen_type  gm;  ///< Maximum generation from source expresssion
-		gen_flags eg;  ///< Generation flags for subexpression
+		virtual ptr<expr> deriv(char) const;
+		virtual utils::uint_set  match_set() const;
+		virtual utils::uint_set  back_set()  const;
+		virtual expr_type type()      const { return map_type; }
+		
+		ptr<expr> e;              ///< Subexpression
+		utils::uint_set::value_type gm;  ///< Maximum generation from source expresssion
+		utils::uint_set             eg;  ///< Generation flags for subexpression
 	}; // class map_expr
 	
 	/// A parsing expression representing the alternation of two parsing expressions
 	class alt_expr : public memo_expr {
 	public:
-		alt_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b)
-			: memo_expr(memo), a(a), b(b) {
-			flags::clear(ag);
-			flags::clear(bg);
-		}
-		
-		alt_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, gen_flags ag, gen_flags bg)
+		alt_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
+		         utils::uint_set ag = expr::zero_set, utils::uint_set bg = expr::zero_set)
 			: memo_expr(memo), a(a), b(b), ag(ag), bg(bg) {}
 		
 		/// Make an expression using the default generation rules
-		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
+		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
+		/// Make an expression with the given generation maps
+		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
+		                      utils::uint_set ag, utils::uint_set bg);
 		void accept(visitor* v) { v->visit(*this); }
-		virtual ptr<expr> deriv(char x) const;
-		virtual nbl_mode  nullable() const;
-		virtual lk_mode   lookahead() const;
-		virtual gen_type  generation() const;
-		virtual expr_type type() const { return alt_type; }
+		
+		virtual ptr<expr> deriv(char) const;
+		virtual utils::uint_set  match_set() const;
+		virtual utils::uint_set  back_set()  const;
+		virtual expr_type type()      const { return alt_type; }
 		
 		ptr<expr> a;   ///< First subexpression
 		ptr<expr> b;   ///< Second subexpression
-		gen_flags ag;  ///< Generation flags for a
-		gen_flags bg;  ///< Generation flags for b
+		utils::uint_set ag;  ///< Generation flags for a
+		utils::uint_set bg;  ///< Generation flags for b
 	}; // class alt_expr
 	
 	/// A parsing expression representing the concatenation of two parsing expressions
 	class seq_expr : public memo_expr {
-	public:
-		seq_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b)
-			: memo_expr(memo), a(a), b(b) {}
-	
-		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
-		void accept(visitor* v) { v->visit(*this); }
-		virtual ptr<expr> deriv(char x) const;
-		virtual nbl_mode  nullable() const;
-		virtual lk_mode   lookahead() const;
-		virtual gen_type  generation() const;
-		virtual expr_type type() const { return seq_type; }
-		
-		ptr<expr> a;  ///< First subexpression
-		ptr<expr> b;  ///< Second subexpression
-	}; // class seq_expr
-	
-	/// A parsing expression to backtrack from a partial lookahead first sequence element
-	class back_expr : public seq_expr {
+	private:
+		// Calculates the backtrack map for b
+		utils::uint_set bg() const;
 	public:
 		struct look_node {
-			look_node(gen_type g, gen_flags eg, ptr<expr> e) : g(g), eg(eg), e(e) {}
+			look_node(utils::uint_set::value_type g, utils::uint_set eg, ptr<expr> e) : g(g), eg(eg), e(e) {}
 			
-			gen_type  g;   ///< Generation of lookahead this derivation corresponds to
-			gen_flags eg;  ///< Map of generations from this node to the containing node
-			ptr<expr> e;   ///< Following expression for this lookahead generation
+			utils::uint_set::value_type g;   ///< Backtrack generation this follower corresponds to
+			utils::uint_set             eg;  ///< Map of generations from this node to the containing node
+			ptr<expr> e;              ///< Follower expression for this lookahead generation
 		}; // struct look_list
 		using look_list = std::list<look_node>;
+		
+		seq_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b)
+			: memo_expr(memo), a(a), b(b), bs(), c(fail_expr::make()), cg(expr::zero_set), gm(0) {}
+		
+		seq_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, look_list bs, 
+		         ptr<expr> c, utils::uint_set cg, utils::uint_set::value_type gm)
+			: memo_expr(memo), a(a), b(b), bs(bs), c(c), cg(cg), gm(gm) {}
 	
-		back_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, look_list bs) 
-			: seq_expr(memo, a, b), bs(bs) {}
-		
-		/// Makes an expression given the memoization table, partial lookahead expression a, 
-		/// following expression b, and lookahead-following expression b1
-		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, ptr<expr> b1);
-		/// Makes an expression (doesn't validate bs)
-		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, look_list bs);
-		
+		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
 		void accept(visitor* v) { v->visit(*this); }
-		virtual ptr<expr> deriv(char x) const;
-		virtual nbl_mode  nullable() const;
-		virtual lk_mode   lookahead() const;
-		virtual gen_type  generation() const;
-		virtual expr_type type() const { return back_type; }
 		
-		look_list bs;  ///< List of following subexpressions for each lookahead generation
-	}; // class back_expr
+		virtual ptr<expr> deriv(char) const;
+		virtual utils::uint_set  match_set() const;
+		virtual utils::uint_set  back_set()  const;
+		virtual expr_type type()      const { return seq_type; }
+		
+		ptr<expr> a;   ///< First subexpression
+		ptr<expr> b;   ///< Gen-zero follower
+		look_list bs;  ///< List of following subexpressions for each backtrack generation
+		ptr<expr> c;   ///< Matching backtrack value
+		utils::uint_set  cg;  ///< Backtrack map for c
+		utils::uint_set::value_type gm;  ///< Maximum backtrack generation
+	}; // class seq_expr
 	
 	////////////////////////////////////////////////////////////////////////////////
 	//
@@ -696,42 +600,35 @@ namespace derivs {
 		return r->d(x);
 	}
 	
-	nbl_mode rule_expr::nullable() const {
+	utils::uint_set rule_expr::match_set() const {
 		// Stop this from infinitely recursing
-		flags.nbl = SHFT_VAL;
-		// Calculate nullability
-		return r->nbl();
+		flags.match = true;
+		memo_match = expr::empty_set;
+		
+		// Calculate match set
+		return r->match();
 	}
 	
-	lk_mode rule_expr::lookahead() const {
+	utils::uint_set rule_expr::back_set() const {
 		// Stop this from infinitely recursing
-		flags.lk = READ_VAL;
-		// Calculate lookahead
-		return r->lk();
-	}
-	
-	gen_type rule_expr::generation() const {
-		// Statically defined, can't have lookahead generation greater than 1
-		return gen_type(lk() == READ ? 0 : 1);
+		flags.back = true;
+		memo_back = expr::zero_set;
+		
+		// Calculate backtrack set
+		return r->back();
 	}
 	
 	// not_expr ////////////////////////////////////////////////////////////////////
 	
 	ptr<expr> not_expr::make(memo_expr::table& memo, ptr<expr> e) {
 		switch ( e->type() ) {
-		// return match on subexpression failure
-		case fail_type: return look_expr::make(1);
-		// propegate infinite loop
-		case inf_type:  return e; // an inf_expr
-		// collapse nested lookaheads
-		case not_type:
-			return expr::make_ptr<and_expr>(memo, std::static_pointer_cast<not_expr>(e)->e);
-		case and_type:
-			return expr::make_ptr<not_expr>(memo, std::static_pointer_cast<and_expr>(e)->e);
-		default:        break; // do nothing
+		case fail_type: return look_expr::make(1);  // return match on subexpression failure
+		case inf_type:  return e;                   // propegate infinite loop
+		default:        break;
 		}
+		
 		// return failure on subexpression success
-		if ( e->nbl() == NBL ) return fail_expr::make();
+		if ( ! e->match().empty() ) return fail_expr::make();
 		
 		return expr::make_ptr<not_expr>(memo, e);
 	}
@@ -739,79 +636,30 @@ namespace derivs {
 	// Take negative lookahead of subexpression derivative
 	ptr<expr> not_expr::deriv(char x) const { return not_expr::make(memo, e->d(x)); }
 	
-	nbl_mode not_expr::nullable() const {
-		// not-expression generally matches on empty string, but not all strings; it will only 
-		// fail to match on the empty string if its subexpression does
-		switch ( e->nbl() ) {
-		case EMPTY:   return SHFT;
-		default:      return EMPTY;
-		}
-	}
+	utils::uint_set not_expr::match_set() const { return expr::empty_set; }
 	
-	lk_mode  not_expr::lk()  const { return LOOK; }
-	gen_type not_expr::gen() const { return gen_type(1); }
-	
-	// and_expr ////////////////////////////////////////////////////////////////////
-	
-	ptr<expr> and_expr::make(memo_expr::table& memo, ptr<expr> e) {
-		switch ( e->type() ) {
-		// return failure on subexpression failure
-		case fail_type: return e; // a fail_expr
-		// propegate infinite loop
-		case inf_type:  return e; // an inf_expr
-		// collapse nested lookaheads
-		case not_type:  return e; // a not_expr wrapping e->e
-		case and_type:  return e; // an and_expr wrapping e->e
-		default:        break; // do nothing
-		}
-		// return success on subexpression success
-		if ( e->nbl() == NBL ) return look_expr::make(1);
-		
-		return expr::make_ptr<and_expr>(memo, e);
-	}
-	
-	// Take positive lookahead of subexpression derivative
-	ptr<expr> and_expr::deriv(char x) const { return and_expr::make(memo, e->d(x)); }
-	
-	nbl_mode and_expr::nullable() const {
-		// and-expression matches on the same set as its subexpression
-		return e->nbl();
-	}
-	
-	lk_mode  and_expr::lk()  const { return LOOK; }
-	gen_type and_expr::gen() const { return gen_type(1); }
+	utils::uint_set not_expr::back_set() const { return expr::one_set; }
 	
 	// map_expr ////////////////////////////////////////////////////////////////////
 	
-	ptr<expr> map_expr::make(memo_expr::table& memo, ptr<expr> e, gen_type gm, gen_flags eg) {
+	ptr<expr> map_expr::make(memo_expr::table& memo, ptr<expr> e, 
+	                         utils::uint_set::value_type gm, utils::uint_set eg) {
 		// account for unmapped generations
-		gen_type ge = e->gen();
-		while ( ge + 1 > flags::count(eg) ) {
-			flags::set(eg, ++gm);
-		}
+		auto n = eg.count();
+		for (auto i = e->back().max() + 1; i < n; ++i) eg |= ++gm;
 		
 		switch ( e->type() ) {
-		case eps_type:  return e; // an eps_expr
-		// a look expression with the generation translated
-		case look_type: return look_expr::make(flags::select(eg, e->gen()));
+		// Map expression match generation into exit generation
+		case eps_type:  return look_expr::make(eg(0));
+		case look_type: return look_expr::make(eg(e->match().max()));
+		// Propegate fail and infinity errors
 		case fail_type: return e; // a fail_expr
 		case inf_type:  return e; // an inf_expr
 		default:        break; // do nothing
 		}
 		
-		// check if map isn't needed
-		switch ( eg ) {
-		case READ_FLAGS:
-			if ( e->lk() == READ ) return e;
-			break;
-		case LOOK_FLAGS:
-			if ( e->lk() == LOOK ) return e;
-			break;
-		case PART_FLAGS:
-			if ( e->lk() == PART ) return e;
-			break;
-		default: break;
-		}
+		// check if map isn't needed (identity map)
+		if ( gm == eg.count() ) return e;
 		
 		return expr::make_ptr<map_expr>(memo, e, gm, eg);
 	}
@@ -820,32 +668,32 @@ namespace derivs {
 		ptr<expr> de = e->d(x);
 		
 		// Check conditions on de [same as make]
-		switch ( de->type() ) {
-		case eps_type:  return de; // an eps_expr
-		// a look expression with the generation translated
-		case look_type: return look_expr::make(flags::select(eg, de->gen()));
-		case fail_type: return de; // a fail_expr
-		case inf_type:  return de; // an inf_expr
+		switch ( e->type() ) {
+		// Map expression match generation into exit generation
+		case eps_type:  return look_expr::make(eg(0));
+		case look_type: return look_expr::make(eg(e->match().max()));
+		// Propegate fail and infinity errors
+		case fail_type: return e; // a fail_expr
+		case inf_type:  return e; // an inf_expr
 		default:        break; // do nothing
 		}
 		
 		// Calculate generations of new subexpressions
 		// - If we've added a lookahead generation that wasn't there before, map it into the 
 		//   generation space of the derived alternation
-		gen_flags deg = eg;
-		gen_type dgm = gm;
-		if ( de->gen() > e->gen() ) {
-			flags::set(deg, ++dgm);
+		utils::uint_set             deg = eg;
+		utils::uint_set::value_type dgm = gm;
+		if ( de->back().max() > e->back().max() ) {
+			assert((de->back().max() == e->back().max() + 1) && "gen only grows by 1");
+			deg |= ++dgm;
 		}
 		
 		return expr::make_ptr<map_expr>(memo, de, dgm, deg);
 	}
 	
-	nbl_mode map_expr::nullable()   const { return e->nbl(); }
-	lk_mode  map_expr::lookahead()  const { return e->lk(); }
-	gen_type map_expr::generation() const {
-		return gen_type(flags::last(eg));  // Last bit is highest generation present
-	}
+	utils::uint_set map_expr::match_set() const { return eg(e->match()); }
+	
+	utils::uint_set map_expr::back_set() const { return eg(e->back()); }
 	
 	// alt_expr ////////////////////////////////////////////////////////////////////
 	
@@ -857,366 +705,308 @@ namespace derivs {
 		case inf_type:  return a; // an inf_expr
 		default:        break; // do nothing
 		}
-		// if first alternative is nullable, use first
-		if ( a->nbl() == NBL ) return a;
-		// if second alternative fails, use first
-		if ( b->type() == fail_type ) return a;
 		
-		gen_flags ag, bg;
-		flags::clear(ag); flags::clear(bg);
-			
-		// in both cases, 0 for READ, 1 for LOOK, 0 & 1 for PART
-		switch ( a->lk() ) {
-		case READ: ag = map_expr::READ_FLAGS; break;
-		case LOOK: ag = map_expr::LOOK_FLAGS; break;
-		case PART: ag = map_expr::PART_FLAGS; break;
-		}
-		switch ( b->lk() ) {
-		case READ: bg = map_expr::READ_FLAGS; break;
-		case LOOK: bg = map_expr::LOOK_FLAGS; break;
-		case PART: bg = map_expr::PART_FLAGS; break;
+		// if first alternative matches or second alternative fails, use first
+		if ( b->type() == fail_type || ! a->match().empty() ) return a;
+		
+		return expr::make_ptr<alt_expr>(memo, a, b, a->back(), b->back());
+	}
+	
+	ptr<expr> alt_expr::make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
+	                         utils::uint_set ag, utils::uint_set bg) {
+		switch ( a->type() ) {
+		// if first alternative fails, use second
+		case fail_type: return map_expr::make(memo, b, std::max(ag.max(), bg.max()), bg);
+		// if first alternative is infinite loop, propegate
+		case inf_type:  return a; // an inf_expr
+		default:        break; // do nothing
 		}
 		
-		return expr::make_ptr<alt_expr>(memo, a, b, ag, bg);
+		// if first alternative matches or second alternative fails, use first
+		if ( b->type() == fail_type || ! a->match().empty() ) {
+			return map_expr::make(memo, a, std::max(ag.max(), bg.max()), ag);
+		}
+		
+		return expr::make_ptr<alt_expr>(memo, a, b, a->back(), b->back());
 	}
 	
 	ptr<expr> alt_expr::deriv(char x) const {
-		bool inc_gen = false;
+		utils::uint_set::value_type gm = std::max(ag.max(), bg.max());
+		bool did_inc = false;
 		
 		// Calculate derivative and map in new lookahead generations
-		ptr<expr> da = a->d(x); gen_flags dag = ag;
-		if ( da->gen() > a->gen() ) {
-			flags::set(dag, gen()+1);
-			inc_gen = true;
+		ptr<expr> da = a->d(x); utils::uint_set dag = ag;
+		if ( da->back().max() > a->back().max() ) {
+			assert((da->back().max() == a->back().max() + 1) && "gen only grows by 1");
+			dag |= gm + 1;
+			did_inc = true;
 		}
-		
+				
 		// Check conditions on a before we calculate dx(b) [same as make()]
 		switch ( da->type() ) {
 		case fail_type: {
-			ptr<expr> db = b->d(x); gen_flags dbg = bg;
-			if ( db->gen() > b->gen() ) {
-				flags::set(dbg, gen()+1);
-				inc_gen = true;
+			ptr<expr> db = b->d(x); utils::uint_set dbg = bg;
+			if ( db->back().max() > b->back().max() ) {
+				assert((db->back().max() == b->back().max() + 1) && "gen only grows by 1");
+				dbg |= gm + 1;
+				did_inc = true;
 			}
-			return map_expr::make(memo, db, gen() + inc_gen, dbg);
+			return map_expr::make(memo, db, gm + did_inc, dbg);
 		}
 		case inf_type:  return da; // an inf_expr
 		default:        break; // do nothing
 		}
-		if ( da->nbl() == NBL ) return map_expr::make(memo, da, gen() + inc_gen, dag);
+		if ( ! da->match().empty() ) {
+			return map_expr::make(memo, da, gm + did_inc, dag);
+		}
 		
 		// Calculate other derivative and map in new lookahead generations
-		ptr<expr> db = b->d(x); gen_flags dbg = bg;
-		if ( db->type() == fail_type ) return map_expr::make(memo, da, gen() + inc_gen, dag);
+		ptr<expr> db = b->d(x); utils::uint_set dbg = bg;
+		if ( db->type() == fail_type ) return map_expr::make(memo, da, gm + did_inc, dag);
 		
-		if ( db->gen() > b->gen() ) {
-			flags::set(dbg, gen()+1);
+		if ( db->back().max() > b->back().max() ) {
+			dbg |= gm + 1;
 		}
 		
 		return expr::make_ptr<alt_expr>(memo, da, db, dag, dbg);
 	}
 	
-	nbl_mode alt_expr::nullable() const {
-		nbl_mode an = a->nbl(), bn = b->nbl();
-		
-		if ( an == NBL || bn == NBL ) return NBL;
-		else if ( an == EMPTY || bn == EMPTY ) return EMPTY;
-		else return SHFT;
-	}
+	utils::uint_set alt_expr::match_set() const { return ag(a->match()) | bg(b->match()); }
 	
-	lk_mode alt_expr::lookahead() const {
-		lk_mode al = a->lk(), bl = b->lk();
-		
-		if ( al == LOOK && bl == LOOK ) return LOOK;
-		else if ( al == READ && bl == READ ) return READ;
-		else return PART;
-	}
-	
-	gen_type alt_expr::generation() const {
-		gen_flags tg;
-		flags::clear(tg);
-		flags::set_union(ag, bg, tg);      // Union generation flags into tg
-		return gen_type(flags::last(tg));  // Count set bits for maximum generation
-	}
+	utils::uint_set alt_expr::back_set() const { return ag(a->back()) | bg(b->back()); }
 	
 	// seq_expr ////////////////////////////////////////////////////////////////////
 	
+	utils::uint_set seq_expr::bg() const {
+		utils::uint_set x = expr::zero_set;
+		utils::uint_set bb = b->back();
+		assert(!bb.empty() && "backtrack set is always non-empty");
+		if ( bb.max() > 0 ) {
+			x |= gm;
+			assert(bb.max() == 1 && "follower has static gen <= 1");
+		}
+		return x;
+	}
+	
 	ptr<expr> seq_expr::make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b) {
 		switch ( b->type() ) {
-		// empty second element leaves just first
+		// empty second element just leaves first
 		case eps_type:  return a;
 		// failing second element propegates
-		case fail_type: return b; // a fail_expr
-		default:        break; // do nothing
+		case fail_type: return b;
+		default: break;  // do nothing
 		}
 		
 		switch ( a->type() ) {
-		// empty first element leaves just second
-		case eps_type:  return b;
-		case look_type: return b;
-		// failing or infinite loop first element propegates
-		case fail_type: return a; // a fail_expr
-		case inf_type:  return a; // an inf_expr
-		default:        break; // do nothing
+		// empty first element just leaves follower
+		case eps_type:
+			return b;
+		// lookahead success first element gives the second if it was first-gen, 
+		//   otherwise it fails for lack of successor
+		case look_type: 
+			return ( std::static_pointer_cast<look_expr>(a)->b == 1 ) ? b : fail_expr::make();
+		// failure or infinite loop propegates
+		case fail_type:
+		case inf_type:
+			return a;
+		default: break;  // do nothing
 		}
 		
-		return expr::make_ptr<seq_expr>(memo, a, b);
+		// set up lookahead generations
+		utils::uint_set::value_type gm = 0;
+		utils::uint_set ab = a->back();
+		assert(!ab.empty() && "backtrack set is always non-empty");
+		
+		// Set up follower if first expression isn't lookahead
+		ptr<expr> bn;
+		if ( ab.min() == 0 ) {
+			bn = b;
+			utils::uint_set bb = b->back();
+			assert(!bb.empty() && "backtrack set is always non-empty");
+			if ( bb.max() > 0 ) {
+				assert(bb.max() == 1 && "static backtrack gen <= 1");
+				gm = 1;
+			}
+		} else {
+			bn = fail_expr::make();
+		}
+		
+		// Set up lookahead follower if first expression is lookahead
+		look_list bs;
+		if ( ab.max() > 0 ) {
+			assert(ab.max() == 1 && "static backtrack gen <= 1");
+			bs.emplace_back(1, b->back(), b);
+			gm = 1;
+		}
+		
+		// set up match follower
+		ptr<expr> c = fail_expr::make();
+		utils::uint_set cg = expr::zero_set;
+		
+		// return constructed expression
+		return expr::make_ptr<seq_expr>(memo, a, bn, bs, c, cg, gm);
 	}
 	
 	ptr<expr> seq_expr::deriv(char x) const {
+		bool did_inc = false;
+	
 		ptr<expr> da = a->d(x);
-		lk_mode al = a->lk();
 		
-		if ( al == LOOK ) {
-			// Precludes nullability; only nullable lookahead expression is look_expr, and that 
-			// one can't be `a` by the make rules. Therefore match both in sequence
-			return seq_expr::make(memo, da, b->d(x));
-		}
-		
-		if ( al == PART ) {
-			ptr<expr> db = b->d(x);
-			
-			// Track the lookahead generations of this sequence
-			ptr<expr> dx = back_expr::make(memo, da, b, db);
-			
-			if ( a->nbl() == NBL ) {
-				// Set up backtracking for nullable first expression
-				return alt_expr::make(memo, 
-				                      dx, 
-				                      seq_expr::make(memo, not_expr::make(memo, da), db));
-			} else {
-				return dx;
-			}
-		}
-		
-		// Derivative of this sequence
-		ptr<expr> dx = seq_expr::make(memo, da, b);
-		
-		if ( a->nbl() == NBL ) {
-			// Set up backtracking for nullable first expression
-			return alt_expr::make(memo,
-			                      dx,
-			                      seq_expr::make(memo, not_expr::make(memo, da), b->d(x)));
-		}
-		
-		return dx;
-	}
-	
-	nbl_mode seq_expr::nullable() const {
-		nbl_mode an = a->nbl(), bn = b->nbl();
-		
-		if ( an == SHFT || bn == SHFT ) return SHFT;
-		else if ( an == NBL && bn == NBL ) return NBL;
-		else return EMPTY;
-	}
-	
-	lk_mode seq_expr::lookahead() const {
-		lk_mode al = a->lk(), bl = b->lk();
-		
-		if ( al == LOOK && bl == LOOK ) return LOOK;
-		else if ( al == READ ) {
-			if ( bl == READ || a->nbl() == SHFT ) return READ;
-		} else if ( bl == READ && b->nbl() == SHFT ) return READ;
-		
-		return PART;
-	}
-	
-	gen_type seq_expr::generation() const {
-		// If either a or b is READ and SHFT, the whole expression is, otherwise we take the 
-		// generation of the second element TODO FIXME returns gen 0 for a PART followed by NBL
-		if ( a->lk() == READ && a->nbl() == SHFT ) return gen_type(0);
-		else return b->gen();
-	}
-	
-	// back_expr ///////////////////////////////////////////////////////////////////
-	
-	ptr<expr> back_expr::make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, ptr<expr> b1) {
-		switch ( a->type() ) {
-		// empty first element leaves just follower
-		case eps_type:  return b;
-		// lookahead first element leaves just lookahead-follower
-		case look_type: return b1;
-		// failing or infinite loop first element propegates
-		case fail_type: return a; // a fail_expr
-		case inf_type:  return a; // an inf_expr
-		default:        break; // do nothing
-		}
-		
-		// If a is no longer a partial lookahead expression, form the appropriate sequence
-		switch ( a->lk() ) {
-		case READ: return seq_expr::make(memo, a, b);
-		case LOOK: return seq_expr::make(memo, a, b1);
-		default:   break; // do nothing
-		}
-		
-		look_list bs;
-		
-		if ( b1->type() != fail_type ) {
-			// If the lookahead-follower did not fail immediately, map in its generation flags
-			gen_flags eg;
-			flags::clear(eg);
-			
-			switch ( b1->lk() ) {
-			case READ: flags::set(eg, 0);                    break;
-			case LOOK: flags::set(eg, 1);                    break;
-			case PART: flags::set(eg, 0); flags::set(eg, 1); break;
-			}
-			
-			// Add the lookahead generation to the list
-			bs.emplace_back(1, eg, b1);
-		}
-		
-		return expr::make_ptr<back_expr>(memo, a, b, bs);
-	}
-	
-	ptr<expr> back_expr::make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, look_list bs) {
-		switch ( a->type() ) {
-		// empty first element leaves just follower
-		case eps_type:  return b;
-		// lookahead first element leaves just lookahead-follower
-		case look_type: {
-			// calculate max generation for successful match
-			gen_flags tg;
-			flags::clear(tg);
-			flags::set(tg, 0);
-		
-			// Take union of all generation flags into tg
-			for (const look_node& bi : bs) { flags::set_union(tg, bi.eg, tg); }
-			gen_type gm = flags::last(tg);
-			
-			gen_type i = a->gen();
+		switch ( da->type() ) {
+		case eps_type: {
+			return map_expr::make(memo, b, gm, bg());
+		} case look_type: { 
+			// lookahead success leaves appropriate lookahead follower
+			auto i = std::static_pointer_cast<look_expr>(da)->b;
 			for (const look_node& bi : bs) {
 				if ( bi.g == i ) return map_expr::make(memo, bi.e, gm, bi.eg);
 				else if ( bi.g > i ) break;  // generation list is sorted
 			}
 			return fail_expr::make();  // if none found, fail
-		}
-		// failing or infinite loop first element propegates
-		case fail_type: return a; // a fail_expr
-		case inf_type:  return a; // an inf_expr
-		default:        break; // do nothing
-		}
-		
-		// break out if first element is no longer partial lookahead
-		lk_mode al = a->lk();
-		
-		if ( al == READ ) return seq_expr::make(memo, a, b);
-		
-		ptr<expr> bn = ( al == LOOK ) ? fail_expr::make() : b;
-		
-		return expr::make_ptr<back_expr>(memo, a, bn, bs);
-	}
-	
-	ptr<expr> back_expr::deriv(char x) const {
-		ptr<expr> da  = a->d(x);
-		
-		switch ( da->type() ) {
-		case eps_type: { 
-			return b; // non-lookahead success leaves just follower
-		} case look_type: { 
-			// lookahead success leaves appropriate lookahead follower
-			gen_type i = da->gen();
-			for (const look_node& bi : bs) {
-				if ( bi.g == i ) return map_expr::make(memo, bi.e, gen(), bi.eg);
-				else if ( bi.g > i ) break;  // generation list is sorted
-			}
-			return fail_expr::make();  // if none found, fail
-		} case fail_type: {
-			// Only not a failure if previous one was nullable
-			if ( a->nbl() == NBL ) {
-				return b->d(x);
-			}
-			return da; // a fail_expr
 		} case inf_type: {
 			// infinite loop element propegates
 			return da; // an inf_expr
 		} default: break; // do nothing
 		}
 		
-		lk_mode   dal = da->lk();
+		// Match backtrack comes from b if a matches, or the previous match backtrack otherwise
+		ptr<expr> dc;
+		utils::uint_set dcg;
 		
-		// Fall back to regular sequence expression if first expression ceases to be lookahead
-		if ( dal == READ ) return seq_expr::make(memo, da, b);
+		utils::uint_set am = a->match();
+		if ( am.empty() || am.min() > 0 ) {
+			// no new match, so continue parsing previous match's backtrack
+			dc = c->d(x); dcg = cg;
+			if ( dc->back().max() > c->back().max() ) {
+				assert((dc->back().max() == c->back().max() + 1) && "gen only grows by 1");
+				dcg |= gm + 1;
+				did_inc = true;
+			}
+		} else {
+			// new match, start new backtrack
+			dc = b->d(x); dcg = bg();
+			
+			if ( dc->back().max() > b->back().max() ) {
+				assert((dc->back().max() == b->back().max() + 1) && "gen only grows by 1");
+				dcg |= gm + 1;
+				did_inc = true;
+			}
+		}
 		
-		// Free storage for sequential follower if first expression is all lookahead
-		ptr<expr> bn = ( dal == LOOK ) ? fail_expr::make() : b;
+		// break out here if d(a) failed and just use the calculated failure successor
+		if ( da->type() == fail_type ) return map_expr::make(memo, dc, gm + did_inc, dcg);
 		
-		// Take derivative of all lookahead options
+		// Build derivatives of lookahead backtracks
 		look_list dbs;
-		for (const look_node& bi : bs) {
+		auto bit = bs.begin();
+		utils::uint_set dab = da->back();
+		auto dat = dab.begin();
+		
+		while ( dat != dab.end() && bit != bs.end() ) {
+			auto dai = *dat;
+			
+			// Find matching backtrack list element
+			auto bi = *bit;
+			while ( bi.g < dai ) {
+				++bit;
+				if ( bit == bs.end() ) goto bsdone; //labelled break
+				bi = *bit;
+			}
+			assert(bi.g = dai && "backtrack list includes back items");
+			
+			// Take derivative
 			ptr<expr> dbi = bi.e->d(x);
 			if ( dbi->type() != fail_type ) {
 				// Map new lookahead generations into the space of the backtracking expression
-				gen_flags dbig = bi.eg;
-				if ( dbi->gen() > bi.e->gen() ) flags::set(dbig, gen()+1);
+				utils::uint_set dbig = bi.eg;
+				
+				if ( dbi->back().max() > bi.e->back().max() ) {
+					assert((dbi->back().max() == bi.e->back().max() + 1) && "gen only grows by 1");
+					dbig |= gm + 1;
+					did_inc = true;
+				}
+				
 				dbs.emplace_back(bi.g, dbig, dbi);
 			}
 		}
 		
-		// Add any new lookahead generations to the list
-		gen_type dag = da->gen();
-		if ( dag > a->gen() ) {
-			ptr<expr> db = b->d(x);
-			if ( db->type() != fail_type ) {
-				gen_flags bg;
-				flags::clear(bg);
+		// add new lookahead backtrack
+bsdone:	if ( dat != dab.end() ) {
+			auto dai = *dat;
+			
+			ptr<expr> dbi = b->d(x);
+			if ( dbi->type() != fail_type ) {
+				utils::uint_set dbig = bg();	
 				
-				switch ( db->lk() ) {
-				case READ: flags::set(bg, 0);                    break;
-				case LOOK: flags::set(bg, 1);                    break;
-				case PART: flags::set(bg, 0); flags::set(bg, 1); break;
+				if ( dbi->back().max() > b->back().max() ) {
+					assert((dbi->back().max() == b->back().max() + 1) && "gen only grows by 1");
+					dbig |= gm + 1;
+					did_inc = true;
 				}
 				
-				dbs.emplace_back(dag, bg, db);
+				dbs.emplace_back(dai, dbig, dbi);
 			}
+			
+			assert(++dat == dab.end() && "Only one new lookahead generation");
 		}
 		
-		// Derivative of this sequence
-		ptr<expr> dx = expr::make_ptr<back_expr>(memo, da, bn, dbs);
-		
-		if ( a->nbl() == NBL ) {
-			// Set up backtracking for nullable first expression
-			return alt_expr::make(memo,
-			                      dx,
-			                      seq_expr::make(memo, not_expr::make(memo, da), b->d(x)));
-		}
-		
-		return dx;
+		// return constructed expression
+		return expr::make_ptr<seq_expr>(memo, da, b, dbs, dc, dcg, gm + did_inc);
 	}
 	
-	nbl_mode back_expr::nullable() const {
-		switch ( a->nbl() ) {
-		case NBL:
-			if ( b->nbl() == NBL ) return NBL;
-			// fallthrough
-		case EMPTY:
-			if ( b->nbl() != SHFT ) return EMPTY;
-			for (const look_node& bi : bs) if ( bi.e->nbl() != SHFT ) return EMPTY;
-			// fallthrough
-		case SHFT:
-			return SHFT;
+	utils::uint_set seq_expr::match_set() const {
+		utils::uint_set x;
+		
+		utils::uint_set am = a->match();
+		auto at = am.begin();
+		
+		// If a's match set is empty, return match set from backtrack
+		if ( at == am.end() ) return cg(c->match());
+		
+		auto ai = *at;
+		if ( ai == 0 ) {  // Matches on generation 0, look at b's matches
+			x |= bg()(b->match());
+			++at;
+		} else {  // No match on generation 0, look at c's matches
+			x |= cg(c->match());
 		}
+		
+		auto bit = bs.begin();
+		while (at != am.end()) {
+			ai = *at;
+			
+			assert(bit != bs.end() && "match set subset of backtrack list");
+			auto bi = *bit;
+			while ( bi.g < ai ) {
+				++bit; 
+				assert(bit != bs.end() && "match set subset of backtrack list");
+				bi = *bit;
+			}
+			assert(bi.g == ai && "backtrack list includes match items");
+			
+			x |= bi.eg(bi.e->match());
+			
+			++at;
+		}
+		
+		return x;
 	}
 	
-	lk_mode back_expr::lookahead() const {
-		// Scan the b_i for followers that don't always consume characters - PART if so
-		if ( b->nbl() != SHFT || b->lk() != READ ) return PART;
-		for (const look_node& bi : bs) {
-			if ( bi.e->nbl() != SHFT || bi.e->lk() != READ ) return PART;
+	utils::uint_set seq_expr::back_set() const {
+		utils::uint_set x;
+		
+		utils::uint_set am = a->match();
+		
+		// If zero not included in match set, add backtracking from c
+		if ( am.empty() || am.min() > 0 ) { x |= cg(c->back()); }
+		// otherwise include backtracking from b
+		else { x |= bg()(b->back()); }
+		
+		for (auto& bi : bs) {
+			x |= bi.eg(bi.e->back());
 		}
-		// READ otherwise
-		return READ;
-	}
-	
-	gen_type back_expr::generation() const {
-		gen_flags tg;
-		flags::clear(tg);
-		flags::set(tg, 0);
 		
-		// Take union of all generation flags into tg
-		for (const look_node& bi : bs) { flags::set_union(tg, bi.eg, tg); }
-		
-		return gen_type(flags::last(tg));  // Count set bits for maximum generation
+		return x;
 	}
 	
 } // namespace derivs

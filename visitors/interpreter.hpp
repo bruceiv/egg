@@ -29,6 +29,7 @@
 #include "../ast.hpp"
 #include "../derivs.hpp"
 #include "../parser.hpp"
+#include "../utils/uint_set.hpp"
 
 #include "deriv_printer.hpp"
 
@@ -54,7 +55,7 @@ namespace derivs {
 		void visit(fail_expr& e)  { rVal = fail_expr::make(); }
 		void visit(inf_expr& e)   { rVal = inf_expr::make(); }
 		void visit(eps_expr& e)   { rVal = eps_expr::make(); }
-		void visit(look_expr& e)  { rVal = look_expr::make(e.g); }
+		void visit(look_expr& e)  { rVal = look_expr::make(e.b); }
 		void visit(char_expr& e)  { rVal = char_expr::make(e.c); }
 		void visit(range_expr& e) { rVal = range_expr::make(e.b, e.e); }
 		void visit(any_expr& e)   { rVal = any_expr::make(); }
@@ -80,15 +81,10 @@ namespace derivs {
 			rVal = not_expr::make(memo, rVal);
 		}
 		
-		void visit(and_expr& e) {
-			e.e->accept(this);
-			rVal = and_expr::make(memo, rVal);
-		}
-		
 		void visit(map_expr& e) {
 			// won't appear in un-normalized expression anyway
 			e.e->accept(this);
-			rVal = map_expr::make(memo, rVal, e.gen(), e.eg);
+			rVal = map_expr::make(memo, rVal, e.gm, e.eg);
 		}
 		
 		void visit(alt_expr& e) {
@@ -103,24 +99,6 @@ namespace derivs {
 			ptr<expr> a = rVal;
 			e.b->accept(this);
 			rVal = seq_expr::make(memo, a, rVal);
-		}
-		
-		void visit(back_expr& e) {
-			// won't appear in un-normalized expression anyway
-			e.a->accept(this);
-			ptr<expr> a = rVal;
-			e.b->accept(this);
-			ptr<expr> b = rVal;
-			
-			back_expr::look_list bs;
-			for (auto bi : e.bs) {
-				bi.e->accept(this);
-				/*bs.emplace_back(bi.g, bi.eg, rVal);*/
-				back_expr::look_node bn(bi.g, bi.eg, rVal);
-				bs.push_back(bn);
-			}
-			
-			rVal = expr::make_ptr<back_expr>(memo, a, b, bs);
 		}
 	
 	private:
@@ -287,7 +265,7 @@ namespace derivs {
 		
 		virtual void visit(ast::look_matcher& m) {
 			m.m->accept(this);
-			rVal = expr::make_ptr<and_expr>(memo, rVal);
+			rVal = expr::make_ptr<not_expr>(memo, expr::make_ptr<not_expr>(memo, rVal));
 		}
 		
 		virtual void visit(ast::not_matcher& m) {
@@ -344,19 +322,22 @@ namespace derivs {
 			case look_type: return true;
 			default:        break; // do nothing
 			}
-			if ( e->nbl() == NBL ) return true;
+			
+			// Break on a match
+			if ( ! e->match().empty() ) return true;
 			
 			char x = ps();
-			if ( x == '\0' ) break;
 			if ( dbg ) { std::cout << "d(\'" << x << "\') =====>" << std::endl; }
 			
 			e = e->d(x);
 			memo.clear(); // clear memoization table after every character
+			
+			if ( x == '\0' ) break;
 			++ps;
 		}
 		
-		// Match if final expression does not demand more characters
-		return ( e->nbl() != SHFT );
+		// Match if final expression matched on terminator char
+		return ! e->match().empty();
 	}
 	
 	/// Recognizes the input

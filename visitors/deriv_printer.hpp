@@ -51,11 +51,9 @@ namespace derivs {
 		void visit(str_expr& e)   { compound = false; }
 		void visit(rule_expr& e)  { compound = false; }
 		void visit(not_expr& e)   { compound = false; }
-		void visit(and_expr& e)   { compound = false; }
 		void visit(map_expr& e)   { compound = false; }
 		void visit(alt_expr& e)   { compound = true; }
 		void visit(seq_expr& e)   { compound = true; }
-		void visit(back_expr& e)  { compound = true; }
 		
 	private:
 		bool compound;  ///< Is the node a compound node
@@ -78,7 +76,7 @@ namespace derivs {
 		}
 		
 		void print_fns(expr* e) {
-			out << "^";
+/*			out << "^";
 			
 			switch ( e->nbl() ) {
 			case NBL:   out << "N"; break;
@@ -91,7 +89,7 @@ namespace derivs {
 			case READ:  out << "."; break;
 			case PART:  out << "P"; break;
 			}
-		}
+*/		}
 	public:
 		/// Default printer
 		printer(std::ostream& out = std::cout) : out(out), nc(0) {}
@@ -151,7 +149,7 @@ namespace derivs {
 		
 		void visit(eps_expr& e)   { out << "{EPS}"; }
 		
-		void visit(look_expr& e)  { out << "{LOOK:" << e.g << "}"; }
+		void visit(look_expr& e)  { out << "{LOOK:" << e.b << "}"; }
 		
 		void visit(char_expr& e)  { out << "\'" << strings::escape(e.c) << "\'"; }
 		
@@ -178,10 +176,8 @@ namespace derivs {
 		
 		void visit(not_expr& e)   { out << "!"; print_braced(e.e); }
 		
-		void visit(and_expr& e)   { out << "&"; print_braced(e.e); }
-		
 		void visit(map_expr& e)   {
-			out << "(map:.." << (unsigned int)e.gen();
+			out << "(map:.." << e.back().max();
 			print_fns(&e);
 			out << " ";
 			print_unbraced(e.e);
@@ -203,17 +199,7 @@ namespace derivs {
 			print_fns(&e);
 			out << " ";
 			print_unbraced(e.a);
-			out << " ";
-			print_unbraced(e.b);
-			out << ")";
-		}
-		
-		void visit(back_expr& e) {
-			out << "(back:";
-			print_fns(&e);
-			out << " ";
-			print_unbraced(e.a);
-			out << " \\ ";
+			out << " ++ ";
 			print_unbraced(e.b);
 			out << " <";
 			if ( ! e.bs.empty() ) {
@@ -225,7 +211,9 @@ namespace derivs {
 					print_unbraced(it->e);
 				}
 			}
-			out << ">)";
+			out << "> \\\\ ";
+			print_unbraced(e.c);
+			out << ")";
 		}
 		
 	private:
