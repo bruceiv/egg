@@ -850,7 +850,7 @@ namespace derivs {
 	
 	ptr<expr> seq_expr::deriv(char x) const {
 		bool did_inc = false;
-	
+		
 		ptr<expr> da = a->d(x);
 		
 		switch ( da->type() ) {
@@ -929,6 +929,8 @@ namespace derivs {
 				
 				dbs.emplace_back(bi.g, dbig, dbi);
 			}
+			
+			++dat;
 		}
 		
 		// add new lookahead backtrack
