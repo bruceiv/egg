@@ -860,8 +860,21 @@ namespace derivs {
 			// lookahead success leaves appropriate lookahead follower
 			auto i = std::static_pointer_cast<look_expr>(da)->b;
 			for (const look_node& bi : bs) {
-				if ( bi.g == i ) return map_expr::make(memo, bi.e, gm, bi.eg);
-				else if ( bi.g > i ) break;  // generation list is sorted
+				if ( bi.g < i ) continue;
+				if ( bi.g > i ) break;  // generation list is sorted
+				
+				// Found the proper lookahead follower; return derivative
+				ptr<expr> dbi = bi.e->d(x);
+				if ( dbi->type() == fail_type ) return dbi;
+			
+				// Map new lookahead generations into the space of the backtracking expression
+				utils::uint_set dbig = bi.eg;
+				if ( dbi->back().max() > bi.e->back().max() ) {
+					assert((dbi->back().max() == bi.e->back().max() + 1) && "gen only grows by 1");
+					dbig |= gm + 1;
+					did_inc = true;
+				}
+				return map_expr::make(memo, dbi, gm + did_inc, dbig);
 			}
 			return fail_expr::make();  // if none found, fail
 		} case inf_type: {

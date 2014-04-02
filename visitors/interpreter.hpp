@@ -340,6 +340,7 @@ namespace derivs {
 			if ( x == '\0' ) break;
 			++ps;
 		}
+		if ( dbg ) { p.print(e); }
 		
 		// Match if final expression matched on terminator char
 		return ! e->match().empty();
