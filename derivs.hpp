@@ -916,6 +916,10 @@ namespace derivs {
 		utils::uint_set dab = da->back();
 		auto dat = dab.begin();
 		
+		// skip backtrack gen zero
+		assert(dat != dab.end() && "backtrack gen list never empty");
+		if ( *dat == 0 ) { ++dat; }
+		
 		while ( dat != dab.end() && bit != bs.end() ) {
 			auto dai = *dat;
 			
