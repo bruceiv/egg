@@ -75,21 +75,26 @@ namespace derivs {
 			e->accept(this);
 		}
 		
+		void print_uint_set(const utils::uint_set& s) {
+			out << "[";
+			auto st = s.begin();
+			if ( st != s.end() ) {
+				out << *st;
+				++st;
+				while ( st != s.end() ) {
+					out << "," << *st;
+					++st;
+				}
+			}
+			out << "]";
+		}
+		
 		void print_fns(expr* e) {
-/*			out << "^";
-			
-			switch ( e->nbl() ) {
-			case NBL:   out << "N"; break;
-			case SHFT:  out << "."; break;
-			case EMPTY: out << "E"; break;
-			}
-			
-			switch ( e->lk() ) {
-			case LOOK:  out << "L"; break;
-			case READ:  out << "."; break;
-			case PART:  out << "P"; break;
-			}
-*/		}
+			out << "^b";
+			print_uint_set(e->back());
+			out << "m";
+			print_uint_set(e->match());
+		}
 	public:
 		/// Default printer
 		printer(std::ostream& out = std::cout) : out(out), nc(0) {}
