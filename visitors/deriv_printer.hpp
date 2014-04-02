@@ -201,8 +201,8 @@ namespace derivs {
 			print_unbraced(e.a);
 			out << " ++ ";
 			print_unbraced(e.b);
-			out << " <";
 			if ( ! e.bs.empty() ) {
+				out << " <";
 				auto it = e.bs.begin();
 				out << " {" << (unsigned int)it->g << "} ";
 				print_unbraced(it->e);
@@ -210,9 +210,12 @@ namespace derivs {
 					out << " | {" << (unsigned int)it->g << "} ";
 					print_unbraced(it->e);
 				}
+				out << ">";
 			}
-			out << "> \\\\ ";
-			print_unbraced(e.c);
+			if ( e.c->type() != fail_type ) {
+				out << " \\\\ ";
+				print_unbraced(e.c);
+			}
 			out << ")";
 		}
 		
