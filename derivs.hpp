@@ -645,8 +645,9 @@ namespace derivs {
 	ptr<expr> map_expr::make(memo_expr::table& memo, ptr<expr> e, 
 	                         utils::uint_set::value_type gm, utils::uint_set eg) {
 		// account for unmapped generations
-		auto n = eg.count();
-		for (auto i = e->back().max() + 1; i < n; ++i) eg |= ++gm;
+		assert(e->back().max() + 1 >= eg.count() && "no unmapped generations");
+//		auto n = eg.count();
+//		for (auto i = e->back().max() + 1; i < n; ++i) eg |= ++gm;
 		
 		switch ( e->type() ) {
 		// Map expression match generation into exit generation
@@ -659,7 +660,7 @@ namespace derivs {
 		}
 		
 		// check if map isn't needed (identity map)
-		if ( gm == eg.count() ) return e;
+		if ( gm + 1 == eg.count() ) return e;
 		
 		return expr::make_ptr<map_expr>(memo, e, gm, eg);
 	}

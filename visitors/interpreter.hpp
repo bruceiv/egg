@@ -327,7 +327,12 @@ namespace derivs {
 			if ( ! e->match().empty() ) return true;
 			
 			char x = ps();
-			if ( dbg ) { std::cout << "d(\'" << x << "\') =====>" << std::endl; }
+			if ( dbg ) {
+				std::cout << "d(\'"; 
+				if ( x == '\0' ) { std::cout << "\\0"; }
+				else { std::cout << x; }
+				std::cout << "\') =====>" << std::endl;
+			}
 			
 			e = e->d(x);
 			memo.clear(); // clear memoization table after every character
