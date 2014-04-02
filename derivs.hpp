@@ -975,25 +975,18 @@ bsdone:	if ( dat != dab.end() ) {
 	}
 	
 	utils::uint_set seq_expr::match_set() const {
-		utils::uint_set x;
+		utils::uint_set x = cg(c->match());
 		
 		utils::uint_set am = a->match();
 		auto at = am.begin();
-		
-		// If a's match set is empty, return match set from backtrack
-		if ( at == am.end() ) return cg(c->match());
-		
-		auto ai = *at;
-		if ( ai == 0 ) {  // Matches on generation 0, look at b's matches
+		if ( at != am.end() && *at == 0 ) {
 			x |= bg()(b->match());
 			++at;
-		} else {  // No match on generation 0, look at c's matches
-			x |= cg(c->match());
 		}
 		
 		auto bit = bs.begin();
 		while (at != am.end()) {
-			ai = *at;
+			auto ai = *at;
 			
 			assert(bit != bs.end() && "match set subset of backtrack list");
 			auto bi = *bit;
@@ -1013,14 +1006,10 @@ bsdone:	if ( dat != dab.end() ) {
 	}
 	
 	utils::uint_set seq_expr::back_set() const {
-		utils::uint_set x;
+		utils::uint_set x = cg(c->back());
 		
 		utils::uint_set am = a->match();
-		
-		// If zero not included in match set, add backtracking from c
-		if ( am.empty() || am.min() > 0 ) { x |= cg(c->back()); }
-		// otherwise include backtracking from b
-		else { x |= bg()(b->back()); }
+		if ( !am.empty() && am.min() == 0 ) { x |= bg()(b->back()); }
 		
 		for (auto& bi : bs) {
 			x |= bi.eg(bi.e->back());
