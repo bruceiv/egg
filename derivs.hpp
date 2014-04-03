@@ -975,42 +975,49 @@ bsdone:	if ( dat != dab.end() ) {
 	}
 	
 	utils::uint_set seq_expr::match_set() const {
+		// include failure backtrack matches
 		utils::uint_set x = cg(c->match());
 		
 		utils::uint_set am = a->match();
 		auto at = am.begin();
+		
+		// include follower matches if first matches
 		if ( at != am.end() && *at == 0 ) {
 			x |= bg()(b->match());
 			++at;
 		}
 		
+		// include lookahead backtrack matches for matching generations
+		// lookahead followers can fail, so there won't always be a follower for each generation
 		auto bit = bs.begin();
-		while (at != am.end()) {
+		for ( ; at != am.end(); ++at) {
 			auto ai = *at;
 			
-			assert(bit != bs.end() && "match set subset of backtrack list");
+			if ( bit == bs.end() ) return x;
+			
 			auto bi = *bit;
 			while ( bi.g < ai ) {
 				++bit; 
-				assert(bit != bs.end() && "match set subset of backtrack list");
+				if ( bit == bs.end() ) return x;
 				bi = *bit;
 			}
-			assert(bi.g == ai && "backtrack list includes match items");
+			if ( bi.g > ai ) continue;
 			
 			x |= bi.eg(bi.e->match());
-			
-			++at;
 		}
 		
 		return x;
 	}
 	
 	utils::uint_set seq_expr::back_set() const {
+		// include failure backtrack
 		utils::uint_set x = cg(c->back());
 		
+		// include follower if first matches
 		utils::uint_set am = a->match();
 		if ( !am.empty() && am.min() == 0 ) { x |= bg()(b->back()); }
 		
+		// include lookahead backtracks
 		for (auto& bi : bs) {
 			x |= bi.eg(bi.e->back());
 		}
