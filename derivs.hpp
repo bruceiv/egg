@@ -645,7 +645,7 @@ namespace derivs {
 	ptr<expr> map_expr::make(memo_expr::table& memo, ptr<expr> e, 
 	                         utils::uint_set::value_type gm, utils::uint_set eg) {
 		// account for unmapped generations
-		assert(e->back().max() + 1 >= eg.count() && "no unmapped generations");
+		assert(e->back().max() < eg.count() && "no unmapped generations");
 //		auto n = eg.count();
 //		for (auto i = e->back().max() + 1; i < n; ++i) eg |= ++gm;
 		

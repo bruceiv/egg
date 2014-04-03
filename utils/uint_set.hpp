@@ -84,9 +84,6 @@ public:
 		return ms;
 	}
 	
-	/// True iff not empty
-	///inline operator bool() { return ! xs.empty(); }
-	
 	/// Deep equality check for two nodes
 	bool operator== (const uint_set& o) const {
 		if ( xs.size() != o.xs.size() ) return false;
