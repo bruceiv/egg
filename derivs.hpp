@@ -265,7 +265,10 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		// No prefixes to remove from language containing the empty string; all fail
-		virtual ptr<expr> d(char x) const { return look_expr::make(b); }
+//		virtual ptr<expr> d(char x) const { return look_expr::make(b); }
+		virtual ptr<expr> d(char x) const {  
+			return ( x == '\0' ) ? look_expr::make(b) : fail_expr::make();
+		}
 		
 		virtual utils::uint_set match() const { return utils::uint_set{b}; }
 		virtual utils::uint_set back()  const { return utils::uint_set{b}; }
@@ -550,11 +553,13 @@ namespace derivs {
 		utils::uint_set bg() const;
 	public:
 		struct look_node {
-			look_node(utils::uint_set::value_type g, utils::uint_set eg, ptr<expr> e) : g(g), eg(eg), e(e) {}
+			look_node(utils::uint_set::value_type g, utils::uint_set eg, ptr<expr> e, bool m = false) 
+				: g(g), eg(eg), e(e), m(m) {}
 			
 			utils::uint_set::value_type g;   ///< Backtrack generation this follower corresponds to
 			utils::uint_set             eg;  ///< Map of generations from this node to the containing node
 			ptr<expr> e;              ///< Follower expression for this lookahead generation
+			bool      m;              ///< Did the predecessor expression previously match?
 		}; // struct look_list
 		using look_list = std::list<look_node>;
 		
@@ -580,7 +585,7 @@ namespace derivs {
 		utils::uint_set  cg;  ///< Backtrack map for c
 		utils::uint_set::value_type gm;  ///< Maximum backtrack generation
 	}; // class seq_expr
-	
+		
 	////////////////////////////////////////////////////////////////////////////////
 	//
 	//  Implementations
@@ -710,7 +715,30 @@ namespace derivs {
 		// if first alternative matches or second alternative fails, use first
 		if ( b->type() == fail_type || ! a->match().empty() ) return a;
 		
-		return expr::make_ptr<alt_expr>(memo, a, b, a->back(), b->back());
+//std::cerr << "\talt_expr::make - a.back["; 
+//for (auto i : a->back()) std::cerr << " " << i;
+//std::cerr << " ] b.back[";
+//for (auto i : b->back()) std::cerr << " " << i;
+//std::cerr << " ]" << std::endl;
+		utils::uint_set ag, bg;
+		
+		assert(!a->back().empty() && "backtrack set non-empty");
+		if ( a->back().max() > 0 ) {
+			assert(a->back().max() == 1 && "static backtrack gen <= 1");
+			ag = expr::zero_one_set;
+		} else {
+			ag = expr::zero_set;
+		}
+		
+		assert(!b->back().empty() && "backtrack set non-empty");
+		if ( b->back().max() > 0 ) {
+			assert(b->back().max() == 1 && "static backtrack gen <= 1");
+			bg = expr::zero_one_set;
+		} else {
+			bg = expr::zero_set;
+		}
+		
+		return expr::make_ptr<alt_expr>(memo, a, b, ag, bg);
 	}
 	
 	ptr<expr> alt_expr::make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
@@ -728,7 +756,7 @@ namespace derivs {
 			return map_expr::make(memo, a, std::max(ag.max(), bg.max()), ag);
 		}
 		
-		return expr::make_ptr<alt_expr>(memo, a, b, a->back(), b->back());
+		return expr::make_ptr<alt_expr>(memo, a, b, ag, bg);
 	}
 	
 	ptr<expr> alt_expr::deriv(char x) const {
@@ -833,16 +861,26 @@ namespace derivs {
 		}
 		
 		// Set up lookahead follower if first expression is lookahead
+		utils::uint_set am = a->match();
 		look_list bs;
 		if ( ab.max() > 0 ) {
 			assert(ab.max() == 1 && "static backtrack gen <= 1");
-			bs.emplace_back(1, b->back(), b);
+			
+			bool matches = !am.empty() && am.max() == 1;
+			bs.emplace_back(1, b->back(), b, matches);
 			gm = 1;
 		}
 		
 		// set up match follower
-		ptr<expr> c = fail_expr::make();
-		utils::uint_set cg = expr::zero_set;
+		ptr<expr> c;
+		utils::uint_set cg;
+//		if ( !am.empty() && am.min() == 0 ) {
+//			c = b;
+//			cg = b->back();
+//		} else {
+			c = fail_expr::make();
+			cg = expr::zero_set;
+//		}
 		
 		// return constructed expression
 		return expr::make_ptr<seq_expr>(memo, a, bn, bs, c, cg, gm);
@@ -914,13 +952,114 @@ namespace derivs {
 		look_list dbs;
 		auto bit = bs.begin();
 		utils::uint_set dab = da->back();
-		auto dat = dab.begin();
+		auto dabt = dab.begin();
+		utils::uint_set dam = da->match();
+		auto damt = dam.begin();
 		
 		// skip backtrack gen zero
-		assert(dat != dab.end() && "backtrack gen list never empty");
-		if ( *dat == 0 ) { ++dat; }
+		assert(dabt != dab.end() && "backtrack gen list never empty");
+		if ( *dabt == 0 ) { ++dabt; }
 		
-		while ( dat != dab.end() && bit != bs.end() ) {
+		// Calculate backtracks from previous match and current backtrack set
+		while ( bit != bs.end() && dabt != dab.end() ) {
+			auto& bi = *bit;
+			
+			// skip non-matching lookahead generations that aren't in the backtrack set
+			if ( ! bi.m && bi.g < *dabt ) {
+				++bit;
+				continue;
+			}
+			
+			// take derivative
+			ptr<expr> dbi = bi.e->d(x);
+			
+			// check if match bit gets set
+			bool dbim = bi.m;
+			if ( damt != dam.end() && bi.g == *damt ) {
+				dbim = true;
+				++damt;
+			}
+			
+			// keep the derivative so long as it doesn't fail
+			if ( dbi->type() != fail_type ) {
+				// Map new lookahead generations into the space of the backtracking expression
+				utils::uint_set dbig = bi.eg;
+				
+				if ( dbi->back().max() > bi.e->back().max() ) {
+					assert((dbi->back().max() == bi.e->back().max() + 1) && "gen only grows by 1");
+					dbig |= gm + 1;
+					did_inc = true;
+				}
+				
+				dbs.emplace_back(bi.g, dbig, dbi, dbim);
+			}
+			
+			// increment counters
+			if ( bi.g == *dabt ) { ++dabt; }
+			else assert(bi.m && bi.g < *dabt 
+			            && "Only keeps non-backtrack successors if previous match");
+			
+			++bit;
+		}
+		
+		// Add in any remaining previous matches
+		while ( bit != bs.end() ) {
+			auto& bi = *bit;
+			
+			// skip non-matching generations
+			if ( ! bi.m ) {
+				++bit;
+				continue;
+			}
+			
+			// take derivative and keep so long as it doesn't fail
+			ptr<expr> dbi = bi.e->d(x);
+			if ( dbi->type() != fail_type ) {
+				// Map new lookahead generations into the space of the backtracking expression
+				utils::uint_set dbig = bi.eg;
+				
+				if ( dbi->back().max() > bi.e->back().max() ) {
+					assert((dbi->back().max() == bi.e->back().max() + 1) && "gen only grows by 1");
+					dbig |= gm + 1;
+					did_inc = true;
+				}
+				
+				dbs.emplace_back(bi.g, dbig, dbi, true);
+			}
+			
+			++bit;
+		}
+		
+		// add new lookahead backtrack
+		if ( dabt != dab.end() ) {
+			auto dai = *dabt;
+			
+			// Take derivative
+			ptr<expr> dbi = b->d(x);
+			
+			// Check if match bit set
+			bool dbim = false;
+			if ( damt != dam.end() && dai == *damt ) {
+				dbim = true;
+				assert(++damt == dam.end() && "Only one new match generation");
+			}
+			
+			if ( dbi->type() != fail_type ) {
+				utils::uint_set dbig = bg();	
+				
+				if ( dbi->back().max() > b->back().max() ) {
+					assert((dbi->back().max() == b->back().max() + 1) && "gen only grows by 1");
+					dbig |= gm + 1;
+					did_inc = true;
+				}
+				
+				dbs.emplace_back(dai, dbig, dbi, dbim);
+			}
+			
+			assert(++dabt == dab.end() && "Only one new lookahead generation");
+		}
+		
+/*		while ( dat != dab.end() && bit != bs.end() ) {
 			auto dai = *dat;
 			
 			// Find matching backtrack list element
@@ -969,7 +1108,7 @@ bsdone:	if ( dat != dab.end() ) {
 			
 			assert(++dat == dab.end() && "Only one new lookahead generation");
 		}
-		
+*/		
 		// return constructed expression
 		return expr::make_ptr<seq_expr>(memo, da, b, dbs, dc, dcg, gm + did_inc);
 	}
@@ -987,7 +1126,47 @@ bsdone:	if ( dat != dab.end() ) {
 			++at;
 		}
 		
-		// include lookahead backtrack matches for matching generations
+		// include lookahead backtrack matches for matching and previously matching generations
+		// lookahead followers can fail, so there won't always be a follower for each generation
+		auto bit = bs.begin();
+		while ( bit != bs.end() && at != am.end() ) {
+			auto& bi = *bit;
+			auto  ai = *at;
+			
+			// skip non-matching lookahead generations that aren't in the match set
+			if ( ! bi.m ) {
+				if ( bi.g < ai ) {
+					++bit;
+					continue;
+				} else if ( bi.g > ai ) {
+					++at;
+					continue;
+				}
+			}
+			
+			// add follower matches to the match set
+			x |= bi.eg(bi.e->match());
+			
+			// increment counters
+			if ( bi.g == ai ) { ++at; }
+			else assert(bi.m && bi.g < ai 
+			            && "Only looks at non-matching successors if previous match");
+			
+			++bit;
+		}
+		
+		// include lookahead followers for any leftover previously matching generations
+		while ( bit != bs.end() ) {
+			auto& bi = *bit;
+			
+			if ( bi.m ) {
+				x |= bi.eg(bi.e->match());
+			}
+			
+			++bit;
+		}
+		
+/*		// include lookahead backtrack matches for matching generations
 		// lookahead followers can fail, so there won't always be a follower for each generation
 		auto bit = bs.begin();
 		for ( ; at != am.end(); ++at) {
@@ -1005,10 +1184,25 @@ bsdone:	if ( dat != dab.end() ) {
 			
 			x |= bi.eg(bi.e->match());
 		}
-		
+*/		
 		return x;
 	}
-	
+/*	utils::uint_set seq_expr::match_set() const {
+		utils::uint_set am = a->match();
+		auto at = am.begin();
+		auto bit = bs.begin();
+		
+		// Add in matches for everything in the match set
+		for ( ; at != am.end(); ++at ) {
+		
+		}
+		
+		for (auto bit = bs.begin(); bit != bs.end(); ++bit) {
+			auto& bi = *bit;
+			
+		}
+	}
+*/		
 	utils::uint_set seq_expr::back_set() const {
 		// include failure backtrack
 		utils::uint_set x = cg(c->back());
@@ -1024,6 +1218,32 @@ bsdone:	if ( dat != dab.end() ) {
 		
 		return x;
 	}
-	
+/*	utils::uint_set seq_expr::back_set() const {
+		utils::uint_set x;
+		
+		auto bit = bs.begin();
+		assert(bit != bs.end() && "sequence follower list non-empty");
+		
+		auto& bi = *bit;
+		if ( bi.g == 0 ) {  // treat read-follower differently from lookahead followers
+			// Include success backtrack only if predecessor matches at gen 0
+			utils::uint_set am = a->match();
+			if ( !am.empty() && am.min() == 0 ) { x |= bi.eg(bi.e->back()); }
+			// Include failure backtrack in any case
+			x |= bi.fg(bi.f->back());
+			
+			++bit;
+		}
+		
+		while ( bit != bs.end() ) {
+			bi = *bit;
+			// Include both success and failure backtracks
+			x |= bi.eg(bi.e->back()) | bi.fg(bi.f->back());
+			++bit;
+		}
+		
+		return x;
+	}
+*/		
 } // namespace derivs
 

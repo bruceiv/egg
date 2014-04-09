@@ -90,7 +90,7 @@ namespace derivs {
 		}
 		
 		void print_fns(expr* e) {
-			out << "^b";
+			out << "b";
 			print_uint_set(e->back());
 			out << "m";
 			print_uint_set(e->match());
@@ -180,9 +180,16 @@ namespace derivs {
 		}
 		
 		void visit(not_expr& e)   { out << "!"; print_braced(e.e); }
-		
+/*		void visit(not_expr& e)   {
+			out << "(not:";
+			print_fns(&e);
+			out << " ";
+			print_unbraced(e.e);
+			out << ")";
+		}
+*/		
 		void visit(map_expr& e)   {
-			out << "(map:.." << e.back().max();
+			out << "(map.." << e.back().max() << ":";
 			print_fns(&e);
 			out << " ";
 			print_unbraced(e.e);
