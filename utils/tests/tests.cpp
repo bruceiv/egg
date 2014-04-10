@@ -27,6 +27,7 @@
 #include "test.hpp"
 
 #include "../flags.hpp"
+#include "../uint_set.hpp"
 
 void test_flags(tester& test) {
 	test.setup("flags");
@@ -140,10 +141,34 @@ void test_flags(tester& test) {
 	test.cleanup();
 }
 
+void test_uint_set(tester& test) {
+	test.setup("uint_set");
+	
+	utils::uint_set x{1,3}, y{1,2,3};
+	
+	test.check(x != y, "sets start unequal");
+	test.equal(x.min(), 1, "x.min == 1");
+	test.equal(x.max(), 3, "x.max == 3");
+	test.equal(y.min(), 1, "y.min == 1");
+	test.equal(y.max(), 3, "y.max == 3");
+	test.equal(x.count(), 2, "|x| == 2");
+	test.equal(y.count(), 3, "|y| == 3");
+	
+	x |= 2;
+	
+	test.equal(x.count(), 3, "new |x| == 3");
+	test.check(x == y, "sets end equal");
+	
+	// TODO better test coverage
+	
+	test.cleanup();
+}
+
 int main(int argc, char** argv) {
 	tester test;
 
 	test_flags(test);
+	test_uint_set(test);
 	
 	return test.success() ? 0 : 1;
 }

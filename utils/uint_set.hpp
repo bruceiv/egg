@@ -53,7 +53,22 @@ public:
 	
 	/// Adds a value to the set (values must be added in increasing order)
 	inline uint_set& operator|= (value_type x) {
-		if ( xs.back() < x ) { xs.push_back(x); }
+		if ( xs.empty() ) {
+			xs.push_back(x);
+		} else {
+			auto i = xs.back();
+			if ( i < x ) { xs.push_back(x); }
+			else if ( i != x ){
+				for (auto it = ++(xs.rbegin()); it != xs.rend(); ++it) {
+					i = *it;
+					if ( i == x ) break;
+					if ( i < x ) {
+						xs.insert(it.base(), x);
+						break;
+					}
+				}
+			}
+		}
 		return *this;
 	}
 	
@@ -94,6 +109,9 @@ public:
 		
 		return true;
 	}
+	
+	/// Deep inequality check for two nodes
+	inline bool operator!= (const uint_set& o) const { return ! operator==(o); }
 	
 	/// Number of elements
 	inline size_type count() const { return xs.size(); }

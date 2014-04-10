@@ -18,8 +18,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-CXXFLAGS = -O2 --std=c++0x -Wno-format
-#CXXFLAGS = -O0 -ggdb --std=c++0x -Wno-format
+CXX = clang++
+
+#CXXFLAGS = -O2 --std=c++0x -Wno-format
+CXXFLAGS = -O0 -ggdb --std=c++0x -Wno-format
 
 test:
 	@$(CXX) $(CXXFLAGS) -o tests tests.cpp $(OBJS) $(LDFLAGS)
