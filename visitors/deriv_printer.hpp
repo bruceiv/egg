@@ -209,6 +209,7 @@ namespace derivs {
 		void visit(seq_expr& e) {
 			out << "(seq:";
 			print_fns(&e);
+			out << "g" << (unsigned int)e.gm;
 			out << " ";
 			print_unbraced(e.a);
 			out << " ++ ";
@@ -216,7 +217,10 @@ namespace derivs {
 			if ( ! e.bs.empty() ) {
 				out << " <";
 				auto it = e.bs.begin();
-				out << " {" << (unsigned int)it->g << "} ";
+				out << " {" << (unsigned int)it->g;
+				if ( it->m ) { out << "m"; }
+				if ( it->gl > 0 ) { out << "g" << (unsigned int)it->gl; }
+				out << "} ";
 				print_unbraced(it->e);
 				while (++it != e.bs.end()) {
 					out << " | {" << (unsigned int)it->g << "} ";

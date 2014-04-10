@@ -102,6 +102,18 @@ namespace derivs {
 	protected:
 		expr() = default;
 		
+		/// Gets the default backtracking map for an expression 
+		///   (zero_set if no lookahead gens, zero_one_set otherwise)
+		static utils::uint_set default_back_map(ptr<expr> e) {
+			assert(!e->back().empty() && "backtracking map never empty");
+			if ( e->back().max() > 0 ) {
+				assert(e->back().max() == 1 && "static lookahead gen <= 1");
+				return zero_one_set;
+			} else {
+				return zero_set;
+			}
+		}
+		
 	public:
 		static const utils::uint_set empty_set;
 		static const utils::uint_set zero_set;
@@ -553,13 +565,15 @@ namespace derivs {
 		utils::uint_set bg() const;
 	public:
 		struct look_node {
-			look_node(utils::uint_set::value_type g, utils::uint_set eg, ptr<expr> e, bool m = false) 
-				: g(g), eg(eg), e(e), m(m) {}
+			look_node(utils::uint_set::value_type g, utils::uint_set eg, ptr<expr> e, 
+			          bool m = false, utils::uint_set::value_type gl = 0) 
+				: g(g), eg(eg), e(e), m(m), gl(gl) {}
 			
 			utils::uint_set::value_type g;   ///< Backtrack generation this follower corresponds to
 			utils::uint_set             eg;  ///< Map of generations from this node to the containing node
 			ptr<expr> e;              ///< Follower expression for this lookahead generation
 			bool      m;              ///< Did the predecessor expression previously match?
+			utils::uint_set::value_type gl;  ///< Generation of last match
 		}; // struct look_list
 		using look_list = std::list<look_node>;
 		
@@ -715,30 +729,8 @@ namespace derivs {
 		// if first alternative matches or second alternative fails, use first
 		if ( b->type() == fail_type || ! a->match().empty() ) return a;
 		
-//std::cerr << "\talt_expr::make - a.back["; 
-//for (auto i : a->back()) std::cerr << " " << i;
-//std::cerr << " ] b.back[";
-//for (auto i : b->back()) std::cerr << " " << i;
-//std::cerr << " ]" << std::endl;
-		utils::uint_set ag, bg;
-		
-		assert(!a->back().empty() && "backtrack set non-empty");
-		if ( a->back().max() > 0 ) {
-			assert(a->back().max() == 1 && "static backtrack gen <= 1");
-			ag = expr::zero_one_set;
-		} else {
-			ag = expr::zero_set;
-		}
-		
-		assert(!b->back().empty() && "backtrack set non-empty");
-		if ( b->back().max() > 0 ) {
-			assert(b->back().max() == 1 && "static backtrack gen <= 1");
-			bg = expr::zero_one_set;
-		} else {
-			bg = expr::zero_set;
-		}
-		
-		return expr::make_ptr<alt_expr>(memo, a, b, ag, bg);
+		return expr::make_ptr<alt_expr>(memo, a, b, 
+		                                expr::default_back_map(a), expr::default_back_map(b));
 	}
 	
 	ptr<expr> alt_expr::make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
@@ -808,11 +800,10 @@ namespace derivs {
 	
 	utils::uint_set seq_expr::bg() const {
 		utils::uint_set x = expr::zero_set;
-		utils::uint_set bb = b->back();
-		assert(!bb.empty() && "backtrack set is always non-empty");
-		if ( bb.max() > 0 ) {
+		assert(!b->back().empty() && "backtrack set is always non-empty");
+		if ( b->back().max() > 0 ) {
+			assert(b->back().max() == 1 && "follower has static gen <= 1");
 			x |= gm;
-			assert(bb.max() == 1 && "follower has static gen <= 1");
 		}
 		return x;
 	}
@@ -850,10 +841,9 @@ namespace derivs {
 		ptr<expr> bn;
 		if ( ab.min() == 0 ) {
 			bn = b;
-			utils::uint_set bb = b->back();
-			assert(!bb.empty() && "backtrack set is always non-empty");
-			if ( bb.max() > 0 ) {
-				assert(bb.max() == 1 && "static backtrack gen <= 1");
+			assert(!b->back().empty() && "backtrack set is always non-empty");
+			if ( b->back().max() > 0 ) {
+				assert(b->back().max() == 1 && "static backtrack gen <= 1");
 				gm = 1;
 			}
 		} else {
@@ -867,8 +857,12 @@ namespace derivs {
 			assert(ab.max() == 1 && "static backtrack gen <= 1");
 			
 			bool matches = !am.empty() && am.max() == 1;
-			bs.emplace_back(1, b->back(), b, matches);
-			gm = 1;
+			utils::uint_set::value_type gl = 0;
+			if ( ! b->match().empty() ) {
+				gl = 1;
+				gm = 1;
+			}
+			bs.emplace_back(1, expr::default_back_map(b), b, matches, gl);
 		}
 		
 		// set up match follower
@@ -876,7 +870,7 @@ namespace derivs {
 		utils::uint_set cg;
 //		if ( !am.empty() && am.min() == 0 ) {
 //			c = b;
-//			cg = b->back();
+//			cg = expr::default_back_set(b);
 //		} else {
 			c = fail_expr::make();
 			cg = expr::zero_set;
@@ -912,6 +906,9 @@ namespace derivs {
 					dbig |= gm + 1;
 					did_inc = true;
 				}
+				
+				// TODO does gl need to be factored in here?
+				
 				return map_expr::make(memo, dbi, gm + did_inc, dbig);
 			}
 			return fail_expr::make();  // if none found, fail
@@ -991,7 +988,14 @@ namespace derivs {
 					did_inc = true;
 				}
 				
-				dbs.emplace_back(bi.g, dbig, dbi, dbim);
+				// Update generation of last match
+				utils::uint_set::value_type dgl = bi.gl; 
+				if ( ! dbi->match().empty() ) {
+					dgl = gm + 1;
+					did_inc = true;
+				}
+				
+				dbs.emplace_back(bi.g, dbig, dbi, dbim, dgl);
 			}
 			
 			// increment counters
@@ -1024,7 +1028,14 @@ namespace derivs {
 					did_inc = true;
 				}
 				
-				dbs.emplace_back(bi.g, dbig, dbi, true);
+				// Update generation of last match
+				utils::uint_set::value_type dgl = bi.gl; 
+				if ( ! dbi->match().empty() ) {
+					dgl = gm + 1;
+					did_inc = true;
+				}
+				
+				dbs.emplace_back(bi.g, dbig, dbi, true, dgl);
 			}
 			
 			++bit;
@@ -1035,7 +1046,8 @@ namespace derivs {
 			auto dai = *dabt;
 			
 			// Take derivative
-			ptr<expr> dbi = b->d(x);
+//			ptr<expr> dbi = b->d(x);
+			ptr<expr> dbi = b;
 			
 			// Check if match bit set
 			bool dbim = false;
@@ -1047,13 +1059,20 @@ namespace derivs {
 			if ( dbi->type() != fail_type ) {
 				utils::uint_set dbig = bg();	
 				
-				if ( dbi->back().max() > b->back().max() ) {
-					assert((dbi->back().max() == b->back().max() + 1) && "gen only grows by 1");
-					dbig |= gm + 1;
+//				if ( dbi->back().max() > b->back().max() ) {
+//					assert((dbi->back().max() == b->back().max() + 1) && "gen only grows by 1");
+//					dbig |= gm + 1;
+//					did_inc = true;
+//				}
+				
+				// Update generation of last match
+				utils::uint_set::value_type dgl = 0; 
+				if ( ! dbi->match().empty() ) {
+					dgl = gm + 1;
 					did_inc = true;
 				}
 				
-				dbs.emplace_back(dai, dbig, dbi, dbim);
+				dbs.emplace_back(dai, dbig, dbi, dbim, dgl);
 			}
 			
 			assert(++dabt == dab.end() && "Only one new lookahead generation");
@@ -1146,6 +1165,7 @@ bsdone:	if ( dat != dab.end() ) {
 			
 			// add follower matches to the match set
 			x |= bi.eg(bi.e->match());
+			if ( bi.gl > 0 ) x |= bi.gl;
 			
 			// increment counters
 			if ( bi.g == ai ) { ++at; }
@@ -1161,6 +1181,7 @@ bsdone:	if ( dat != dab.end() ) {
 			
 			if ( bi.m ) {
 				x |= bi.eg(bi.e->match());
+				if ( bi.gl > 0 ) x |= bi.gl;
 			}
 			
 			++bit;
@@ -1214,6 +1235,7 @@ bsdone:	if ( dat != dab.end() ) {
 		// include lookahead backtracks
 		for (auto& bi : bs) {
 			x |= bi.eg(bi.e->back());
+			if ( bi.gl > 0 ) x |= bi.gl;
 		}
 		
 		return x;
