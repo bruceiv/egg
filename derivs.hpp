@@ -105,13 +105,40 @@ namespace derivs {
 		/// Gets the default backtracking map for an expression 
 		///   (zero_set if no lookahead gens, zero_one_set otherwise)
 		static utils::uint_set default_back_map(ptr<expr> e) {
-			assert(!e->back().empty() && "backtracking map never empty");
+			assert(!e->back().empty() && "backtrack set never empty");
 			if ( e->back().max() > 0 ) {
 				assert(e->back().max() == 1 && "static lookahead gen <= 1");
 				return zero_one_set;
 			} else {
 				return zero_set;
 			}
+		}
+		
+		/// Gets an updated backtrack map
+		/// @param e        The original expression
+		/// @param de		The derivative of the expression to produce the new backtrack map for
+		/// @param eg		The backtrack map for e
+		/// @param gm		The current maximum generation
+		/// @param did_inc	Set to true if this operation involved a new backtrack gen
+		/// @return The backtrack map for de
+		static utils::uint_set update_back_map(ptr<expr> e, ptr<expr> de, utils::uint_set eg, 
+		                                       utils::uint_set::value_type gm, bool& did_inc) {
+			assert(!e->back().empty() && !de->back().empty() && "backtrack set never empty");
+			
+			utils::uint_set deg = eg;
+			if ( de->back().max() > e->back().max() ) {
+				assert(de->back().max() == e->back().max() + 1 && "gen only grows by 1");
+				deg |= gm+1;
+				did_inc = true;
+			}
+			
+			return deg;
+		}
+		
+		static inline utils::uint_set update_back_map(ptr<expr> e, ptr<expr> de, utils::uint_set eg, 
+		                                              utils::uint_set::value_type gm) {
+			bool did_inc = true;
+			return update_back_map(e, de, eg, gm, did_inc);
 		}
 		
 	public:
@@ -688,27 +715,22 @@ namespace derivs {
 		ptr<expr> de = e->d(x);
 		
 		// Check conditions on de [same as make]
-		switch ( e->type() ) {
+		switch ( de->type() ) {
 		// Map expression match generation into exit generation
 		case eps_type:  return look_expr::make(eg(0));
-		case look_type: return look_expr::make(eg(e->match().max()));
+		case look_type: return look_expr::make(eg(de->match().max()));
 		// Propegate fail and infinity errors
-		case fail_type: return e; // a fail_expr
-		case inf_type:  return e; // an inf_expr
+		case fail_type: return de; // a fail_expr
+		case inf_type:  return de; // an inf_expr
 		default:        break; // do nothing
 		}
 		
 		// Calculate generations of new subexpressions
 		// - If we've added a lookahead generation that wasn't there before, map it into the 
 		//   generation space of the derived alternation
-		utils::uint_set             deg = eg;
-		utils::uint_set::value_type dgm = gm;
-		if ( de->back().max() > e->back().max() ) {
-			assert((de->back().max() == e->back().max() + 1) && "gen only grows by 1");
-			deg |= ++dgm;
-		}
-		
-		return expr::make_ptr<map_expr>(memo, de, dgm, deg);
+		bool did_inc = false;
+		utils::uint_set deg = expr::update_back_map(e, de, eg, gm, did_inc);
+		return expr::make_ptr<map_expr>(memo, de, gm + did_inc, deg);
 	}
 	
 	utils::uint_set map_expr::match_set() const { return eg(e->match()); }
@@ -756,39 +778,31 @@ namespace derivs {
 		bool did_inc = false;
 		
 		// Calculate derivative and map in new lookahead generations
-		ptr<expr> da = a->d(x); utils::uint_set dag = ag;
-		if ( da->back().max() > a->back().max() ) {
-			assert((da->back().max() == a->back().max() + 1) && "gen only grows by 1");
-			dag |= gm + 1;
-			did_inc = true;
-		}
-				
+		ptr<expr> da = a->d(x);
+		
 		// Check conditions on a before we calculate dx(b) [same as make()]
 		switch ( da->type() ) {
 		case fail_type: {
-			ptr<expr> db = b->d(x); utils::uint_set dbg = bg;
-			if ( db->back().max() > b->back().max() ) {
-				assert((db->back().max() == b->back().max() + 1) && "gen only grows by 1");
-				dbg |= gm + 1;
-				did_inc = true;
-			}
+			ptr<expr> db = b->d(x);
+			utils::uint_set dbg = expr::update_back_map(b, db, bg, gm, did_inc);
 			return map_expr::make(memo, db, gm + did_inc, dbg);
 		}
 		case inf_type:  return da; // an inf_expr
 		default:        break; // do nothing
 		}
+		
+		// Map in new lookahead generations for derivative
+		utils::uint_set dag = expr::update_back_map(a, da, ag, gm, did_inc);
+		
 		if ( ! da->match().empty() ) {
 			return map_expr::make(memo, da, gm + did_inc, dag);
 		}
 		
 		// Calculate other derivative and map in new lookahead generations
-		ptr<expr> db = b->d(x); utils::uint_set dbg = bg;
+		ptr<expr> db = b->d(x);
 		if ( db->type() == fail_type ) return map_expr::make(memo, da, gm + did_inc, dag);
-		
-		if ( db->back().max() > b->back().max() ) {
-			dbg |= gm + 1;
-		}
-		
+		utils::uint_set dbg = expr::update_back_map(b, db, bg, gm, did_inc);
+				
 		return expr::make_ptr<alt_expr>(memo, da, db, dag, dbg);
 	}
 	
@@ -842,6 +856,7 @@ namespace derivs {
 		if ( ab.min() == 0 ) {
 			bn = b;
 			assert(!b->back().empty() && "backtrack set is always non-empty");
+			
 			if ( b->back().max() > 0 ) {
 				assert(b->back().max() == 1 && "static backtrack gen <= 1");
 				gm = 1;
@@ -900,12 +915,7 @@ namespace derivs {
 				if ( dbi->type() == fail_type ) return dbi;
 			
 				// Map new lookahead generations into the space of the backtracking expression
-				utils::uint_set dbig = bi.eg;
-				if ( dbi->back().max() > bi.e->back().max() ) {
-					assert((dbi->back().max() == bi.e->back().max() + 1) && "gen only grows by 1");
-					dbig |= gm + 1;
-					did_inc = true;
-				}
+				utils::uint_set dbig = expr::update_back_map(bi.e, dbi, bi.eg, gm, did_inc);
 				
 				// TODO does gl need to be factored in here?
 				
@@ -925,21 +935,12 @@ namespace derivs {
 		utils::uint_set am = a->match();
 		if ( am.empty() || am.min() > 0 ) {
 			// no new match, so continue parsing previous match's backtrack
-			dc = c->d(x); dcg = cg;
-			if ( dc->back().max() > c->back().max() ) {
-				assert((dc->back().max() == c->back().max() + 1) && "gen only grows by 1");
-				dcg |= gm + 1;
-				did_inc = true;
-			}
+			dc = c->d(x);
+			dcg = expr::update_back_map(c, dc, cg, gm, did_inc);
 		} else {
 			// new match, start new backtrack
-			dc = b->d(x); dcg = bg();
-			
-			if ( dc->back().max() > b->back().max() ) {
-				assert((dc->back().max() == b->back().max() + 1) && "gen only grows by 1");
-				dcg |= gm + 1;
-				did_inc = true;
-			}
+			dc = b->d(x);
+			dcg = expr::update_back_map(b, dc, bg(), gm, did_inc);
 		}
 		
 		// break out here if d(a) failed and just use the calculated failure successor
@@ -980,13 +981,7 @@ namespace derivs {
 			// keep the derivative so long as it doesn't fail
 			if ( dbi->type() != fail_type ) {
 				// Map new lookahead generations into the space of the backtracking expression
-				utils::uint_set dbig = bi.eg;
-				
-				if ( dbi->back().max() > bi.e->back().max() ) {
-					assert((dbi->back().max() == bi.e->back().max() + 1) && "gen only grows by 1");
-					dbig |= gm + 1;
-					did_inc = true;
-				}
+				utils::uint_set dbig = expr::update_back_map(bi.e, dbi, bi.eg, gm, did_inc);
 				
 				// Update generation of last match
 				utils::uint_set::value_type dgl = bi.gl; 
@@ -1020,13 +1015,7 @@ namespace derivs {
 			ptr<expr> dbi = bi.e->d(x);
 			if ( dbi->type() != fail_type ) {
 				// Map new lookahead generations into the space of the backtracking expression
-				utils::uint_set dbig = bi.eg;
-				
-				if ( dbi->back().max() > bi.e->back().max() ) {
-					assert((dbi->back().max() == bi.e->back().max() + 1) && "gen only grows by 1");
-					dbig |= gm + 1;
-					did_inc = true;
-				}
+				utils::uint_set dbig = expr::update_back_map(bi.e, dbi, bi.eg, gm, did_inc);
 				
 				// Update generation of last match
 				utils::uint_set::value_type dgl = bi.gl; 
