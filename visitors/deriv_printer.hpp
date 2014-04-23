@@ -218,7 +218,6 @@ namespace derivs {
 				out << " <";
 				auto it = e.bs.begin();
 				out << " {" << (unsigned int)it->g;
-				if ( it->m ) { out << "m"; }
 				if ( it->gl > 0 ) { out << "g" << (unsigned int)it->gl; }
 				out << "} ";
 				print_unbraced(it->e);
