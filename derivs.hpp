@@ -897,6 +897,9 @@ namespace derivs {
 		// Handle empty or failure results from predecessor derivative
 		switch ( da->type() ) {
 		case eps_type: {
+			// If end of string, return however follower handles end-of-string
+			if ( x == '\0' ) return b->d('\0');
+			
 			// Return follower, but with any lookahead gens mapped to their proper generation
 			gen_set bg = expr::new_back_map(b, gm, did_inc);
 			return map_expr::make(memo, b, gm + did_inc, bg);
