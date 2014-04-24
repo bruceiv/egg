@@ -110,19 +110,7 @@ namespace derivs {
 		expr() = default;
 		
 		/// Creates a new backtrack map to map an expression into a generation space
-		static gen_set new_back_map(ptr<expr> e, gen_type gm, bool& did_inc) {
-			assert(!e->back().empty() && "backtrack set never empty");
-			
-			gen_set eg = zero_set;
-			if ( e->back().max() > 0 ) {
-				assert(e->back().max() == 1 && "static lookahead gen <= 1");
-				did_inc = true;
-				eg |= gm + 1;
-			}
-			
-			return eg;
-		}
-		
+		static gen_set new_back_map(ptr<expr> e, gen_type gm, bool& did_inc);
 		static inline gen_set new_back_map(ptr<expr> e, gen_type gm) {
 			bool did_inc = true;
 			return new_back_map(e, gm, did_inc);
@@ -130,17 +118,7 @@ namespace derivs {
 		
 		/// Gets the default backtracking map for an expression 
 		///   (zero_set if no lookahead gens, zero_one_set otherwise)
-		static gen_set default_back_map(ptr<expr> e, bool& did_inc) {
-			assert(!e->back().empty() && "backtrack set never empty");
-			if ( e->back().max() > 0 ) {
-				assert(e->back().max() == 1 && "static lookahead gen <= 1");
-				did_inc = true;
-				return zero_one_set;
-			} else {
-				return zero_set;
-			}
-		}
-		
+		static gen_set default_back_map(ptr<expr> e, bool& did_inc);
 		static inline gen_set default_back_map(ptr<expr> e) {
 			bool did_inc = true;
 			return default_back_map(e, did_inc);
@@ -154,19 +132,7 @@ namespace derivs {
 		/// @param did_inc	Set to true if this operation involved a new backtrack gen
 		/// @return The backtrack map for de
 		static gen_set update_back_map(ptr<expr> e, ptr<expr> de, gen_set eg, 
-		                               gen_type gm, bool& did_inc) {
-			assert(!e->back().empty() && !de->back().empty() && "backtrack set never empty");
-			
-			gen_set deg = eg;
-			if ( de->back().max() > e->back().max() ) {
-				assert(de->back().max() == e->back().max() + 1 && "gen only grows by 1");
-				deg |= gm+1;
-				did_inc = true;
-			}
-			
-			return deg;
-		}
-		
+		                               gen_type gm, bool& did_inc);
 		static inline gen_set update_back_map(ptr<expr> e, ptr<expr> de, gen_set eg, gen_type gm) {
 			bool did_inc = true;
 			return update_back_map(e, de, eg, gm, did_inc);
@@ -199,11 +165,6 @@ namespace derivs {
 		virtual expr_type type() const = 0;
 	}; // class expr
 	
-	const gen_set expr::empty_set{};
-	const gen_set expr::zero_set{0};
-	const gen_set expr::one_set{1};
-	const gen_set expr::zero_one_set{0,1};
-	
 	/// Abstract base class for memoized parsing expressions
 	class memo_expr : public expr {
 	public:
@@ -225,44 +186,13 @@ namespace derivs {
 				
 	public:
 		/// Resets the memoziation fields of a memoized expression
-		void reset_memo() {
-			memo_match = expr::empty_set;
-			memo_back = expr::empty_set;
-			flags = {false,false};
-		}
+		void reset_memo();
 		
 		virtual void accept(visitor*) = 0;
 		
-		virtual ptr<expr> d(char x) const {
-			auto ix = memo.find(const_cast<memo_expr* const>(this));
-			if ( ix == memo.end() ) {
-				// no such item; compute and store
-				ptr<expr> dx = deriv(x);
-				memo.insert(ix, std::make_pair(const_cast<memo_expr* const>(this), dx));
-				return dx;
-			} else {
-				// derivative found, return
-				return ix->second;
-			}
-		}
-		
-		virtual gen_set match() const {
-			if ( ! flags.match ) {
-				memo_match = match_set();
-				flags.match = true;
-			}
-			
-			return memo_match;
-		}
-		
-		virtual gen_set back() const {
-			if ( ! flags.back ) {
-				memo_back = back_set();
-				flags.back = true;
-			}
-			
-			return memo_back;
-		}
+		virtual ptr<expr> d(char x) const;
+		virtual gen_set   match()   const;
+		virtual gen_set   back()    const;
 	
 	protected:
 		table&          memo;        ///< Memoization table for derivatives
@@ -279,20 +209,13 @@ namespace derivs {
 	public:
 		fail_expr() = default;
 		
-		static ptr<expr> make() { return expr::make_ptr<fail_expr>(); }
-		
+		static ptr<expr> make();
 		void accept(visitor* v) { v->visit(*this); }
 		
-		// A failure expression can't un-fail - no strings to match with any prefix
-		virtual ptr<expr> d(char) const { return fail_expr::make(); }
-		
-		virtual gen_set   match() const { return expr::empty_set; }
-		virtual gen_set   back()  const { return expr::zero_set; }
-		
-		virtual ptr<expr> deriv(char) const;
-		virtual gen_set   match()     const;
-		virtual gen_set   back()      const;
-		virtual expr_type type()      const { return fail_type; }
+		virtual ptr<expr> d(char) const;
+		virtual gen_set   match() const;
+		virtual gen_set   back()  const;
+		virtual expr_type type()  const { return fail_type; }
 	}; // class fail_expr
 	
 	/// An infinite loop failure parsing expression
@@ -300,20 +223,13 @@ namespace derivs {
 	public:
 		inf_expr() = default;
 		
-		static ptr<expr> make() { return expr::make_ptr<inf_expr>(); }
-		
+		static ptr<expr> make();
 		void accept(visitor* v) { v->visit(*this); }
 		
-		// An infinite loop expression never breaks, ill defined with any prefix
-		virtual ptr<expr> d(char) const { return inf_expr::make(); }
-		
-		virtual gen_set   match() const { return expr::empty_set; }
-		virtual gen_set   back()  const { return expr::zero_set; }
-		
-		virtual ptr<expr> deriv(char) const;
-		virtual gen_set   match()     const;
-		virtual gen_set   back()      const;
-		virtual expr_type type()      const { return inf_type; }
+		virtual ptr<expr> d(char) const;
+		virtual gen_set   match() const;
+		virtual gen_set   back()  const;
+		virtual expr_type type()  const { return inf_type; }
 	}; // class inf_expr
 	
 	/// An empty success parsing expression
@@ -321,22 +237,13 @@ namespace derivs {
 	public:
 		eps_expr() = default;
 	
-		static ptr<expr> make() { return expr::make_ptr<eps_expr>(); }
-		
+		static ptr<expr> make();
 		void accept(visitor* v) { v->visit(*this); }
 		
-		// No prefixes to remove from language containing the empty string; all fail
-		virtual ptr<expr> d(char x) const {
-			return ( x == '\0' ) ? eps_expr::make() : fail_expr::make();
-		}
-		
-		virtual gen_set   match() const { return expr::zero_set; }
-		virtual gen_set   back()  const { return expr::zero_set; }
-		
-		virtual ptr<expr> deriv(char) const;
-		virtual gen_set   match()     const;
-		virtual gen_set   back()      const;
-		virtual expr_type type()      const { return eps_type; }
+		virtual ptr<expr> d(char) const;
+		virtual gen_set   match() const;
+		virtual gen_set   back()  const;
+		virtual expr_type type()  const { return eps_type; }
 	}; // class eps_expr
 	
 	/// An lookahead success parsing expression
@@ -344,25 +251,13 @@ namespace derivs {
 	public:
 		look_expr(gen_type g = 1) : b{g} {}
 	
-		static ptr<expr> make(gen_type g = 1) {
-			return (g == 0) ? expr::make_ptr<eps_expr>() : expr::make_ptr<look_expr>(g);
-		}
-		
+		static ptr<expr> make(gen_type g = 1);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		// No prefixes to remove from language containing the empty string; all fail
-//		virtual ptr<expr> d(char x) const { return look_expr::make(b); }
-		virtual ptr<expr> d(char x) const {  
-			return ( x == '\0' ) ? look_expr::make(b) : fail_expr::make();
-		}
-		
-		virtual gen_set   match() const { return gen_set{b}; }
-		virtual gen_set   back()  const { return gen_set{b}; }
-		
-		virtual ptr<expr> deriv(char) const;
-		virtual gen_set   match()     const;
-		virtual gen_set   back()      const;
-		virtual expr_type type()      const { return look_type; }
+		virtual ptr<expr> d(char) const;
+		virtual gen_set   match() const;
+		virtual gen_set   back()  const;
+		virtual expr_type type()  const { return look_type; }
 		
 		gen_type b;  ///< Generation of this success match
 	}; // class look_expr
@@ -372,22 +267,13 @@ namespace derivs {
 	public:
 		char_expr(char c) : c(c) {}
 		
-		static ptr<expr> make(char c) { return expr::make_ptr<char_expr>(c); }
-		
+		static ptr<expr> make(char c);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		// Single-character expression either consumes matching character or fails
-		virtual ptr<expr> d(char x) const {
-			return ( c == x ) ? eps_expr::make() : fail_expr::make();
-		}
-		
-		virtual gen_set   match() const { return expr::empty_set; }
-		virtual gen_set   back()  const { return expr::zero_set; }
-		
-		virtual ptr<expr> deriv(char) const;
-		virtual gen_set   match()     const;
-		virtual gen_set   back()      const;
-		virtual expr_type type()      const { return char_type; }
+		virtual ptr<expr> d(char) const;
+		virtual gen_set   match() const;
+		virtual gen_set   back()  const;
+		virtual expr_type type()  const { return char_type; }
 		
 		char c; ///< Character represented by the expression
 	}; // class char_expr
@@ -397,22 +283,13 @@ namespace derivs {
 	public:
 		range_expr(char b, char e) : b(b), e(e) {}
 		
-		static ptr<expr> make(char b, char e) { return expr::make_ptr<range_expr>(b, e); }
-		
+		static ptr<expr> make(char b, char e);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		// Character range expression either consumes matching character or fails
-		virtual ptr<expr> d(char x) const {
-			return ( b <= x && x <= e ) ? eps_expr::make() : fail_expr::make();
-		}
-		
-		virtual gen_set   match() const { return expr::empty_set; }
-		virtual gen_set   back()  const { return expr::zero_set; }
-		
-		virtual ptr<expr> deriv(char) const;
-		virtual gen_set   match()     const;
-		virtual gen_set   back()      const;
-		virtual expr_type type()      const { return range_type; }
+		virtual ptr<expr> d(char) const;
+		virtual gen_set   match() const;
+		virtual gen_set   back()  const;
+		virtual expr_type type()  const { return range_type; }
 		
 		char b;  ///< First character in expression range 
 		char e;  ///< Last character in expression range
@@ -423,22 +300,13 @@ namespace derivs {
 	public:
 		any_expr() = default;
 		
-		static ptr<expr> make() { return expr::make_ptr<any_expr>(); }
-		
+		static ptr<expr> make();
 		void accept(visitor* v) { v->visit(*this); }
 		
-		// Any-character expression consumes any character
-		virtual ptr<expr> d(char x) const {
-			return ( x == '\0' ) ? fail_expr::make() : eps_expr::make();
-		}
-		
-		virtual gen_set   match() const { return expr::empty_set; }
-		virtual gen_set   back()  const { return expr::zero_set; }
-		
-		virtual ptr<expr> deriv(char) const;
-		virtual gen_set   match()     const;
-		virtual gen_set   back()      const;
-		virtual expr_type type()      const { return any_type; }
+		virtual ptr<expr> d(char) const;
+		virtual gen_set   match() const;
+		virtual gen_set   back()  const;
+		virtual expr_type type()  const { return any_type; }
 	}; // class any_expr
 
 #if 0
@@ -535,34 +403,13 @@ namespace derivs {
 	public:
 		str_expr(std::string s) : s(s) {}
 		
-		static ptr<expr> make(std::string s) {
-			switch ( s.size() ) {
-			case 0:  return eps_expr::make();
-			case 1:  return char_expr::make(s[0]);
-			default: return expr::make_ptr<str_expr>(s);
-			}
-		}
-		
+		static ptr<expr> make(std::string s);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> d(char x) const {
-			// Check that the first character matches
-			if ( s[0] != x ) return fail_expr::make();
-			
-			// Otherwise return a character or string expression, as appropriate
-			if ( s.size() == 2 ) return char_expr::make(s[1]);
-			
-			std::string t(s, 1);
-			return expr::make_ptr<str_expr>(t);
-		}
-		
-		virtual gen_set   match() const { return expr::empty_set; }
-		virtual gen_set   back()  const { return expr::zero_set; }
-		
-		virtual ptr<expr> deriv(char) const;
-		virtual gen_set   match()     const;
-		virtual gen_set   back()      const;
-		virtual expr_type type()      const { return str_type; }
+		virtual ptr<expr> d(char) const;
+		virtual gen_set   match() const;
+		virtual gen_set   back()  const;
+		virtual expr_type type()  const { return str_type; }
 		
 		std::string str() const { return s; }
 		unsigned long size() const { return s.size(); }
@@ -577,7 +424,7 @@ namespace derivs {
 	public:
 		rule_expr(memo_expr::table& memo, ptr<expr> r = nullptr) : memo_expr(memo), r(r) {}
 		
-		static  ptr<expr> make(memo_expr::table& memo, ptr<expr> r = nullptr);
+		static ptr<expr> make(memo_expr::table& memo, ptr<expr> r = nullptr);
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char) const;
