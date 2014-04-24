@@ -220,16 +220,22 @@ namespace derivs {
 				out << " {" << (unsigned int)it->g;
 				if ( it->gl > 0 ) { out << "g" << (unsigned int)it->gl; }
 				out << "} ";
-				print_unbraced(it->e);
+				if ( it->e != e.b ) print_unbraced(it->e);
+				else out << "''''";
+				
 				while (++it != e.bs.end()) {
-					out << " | {" << (unsigned int)it->g << "} ";
-					print_unbraced(it->e);
+					out << " | {" << (unsigned int)it->g;
+					if ( it->gl > 0 ) { out << "g" << (unsigned int)it->gl; }
+					out << "} ";
+					if ( it->e != e.b ) print_unbraced(it->e);
+					else out << "''''";
 				}
 				out << ">";
 			}
 			if ( e.c->type() != fail_type ) {
 				out << " \\\\ ";
-				print_unbraced(e.c);
+				if ( e.c != e.b ) print_unbraced(e.c);
+				else out << "''''";
 			}
 			out << ")";
 		}
