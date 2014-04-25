@@ -29,6 +29,7 @@
 #include "../ast.hpp"
 #include "../derivs.hpp"
 #include "../parser.hpp"
+#include "../utils/strings.hpp"
 #include "../utils/uint_set.hpp"
 
 #include "deriv_printer.hpp"
@@ -328,10 +329,8 @@ namespace derivs {
 			
 			char x = ps();
 			if ( dbg ) {
-				std::cout << "d(\'"; 
-				if ( x == '\0' ) { std::cout << "\\0"; }
-				else { std::cout << x; }
-				std::cout << "\') =====>" << std::endl;
+				std::cout << "d(\'" << (x == '\0' ? "\\0" : strings::escape(x)) << "\') =====>" 
+				          << std::endl;
 			}
 			
 			e = e->d(x);
