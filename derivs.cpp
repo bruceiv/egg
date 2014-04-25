@@ -1,5 +1,8 @@
 #include "derivs.hpp"
 
+#include <iostream>
+#include "visitors/deriv_printer.hpp"
+
 namespace derivs {
 	
 	// expr ////////////////////////////////////////////////////////////////////////
@@ -211,7 +214,10 @@ namespace derivs {
 		// signal infinite loop if we try to take this derivative again
 		memo[const_cast<rule_expr* const>(this)] = inf_expr::make();
 		// calculate derivative
-		return r->d(x);
+		ptr<expr> rVal = r->d(x);
+		// clear infinite loop signal and return
+		memo.erase(const_cast<rule_expr* const>(this));
+		return rVal;
 	}
 	
 	gen_set rule_expr::match_set() const {
