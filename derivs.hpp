@@ -478,14 +478,14 @@ namespace derivs {
 	class alt_expr : public memo_expr {
 	public:
 		alt_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
-		         gen_set ag = expr::zero_set, gen_set bg = expr::zero_set)
-			: memo_expr(memo), a(a), b(b), ag(ag), bg(bg) {}
+		         gen_set ag = expr::zero_set, gen_set bg = expr::zero_set, gen_type gm = 0)
+			: memo_expr(memo), a(a), b(b), ag(ag), bg(bg), gm(gm) {}
 		
 		/// Make an expression using the default generation rules
 		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
 		/// Make an expression with the given generation maps
 		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
-		                      gen_set ag, gen_set bg);
+		                      gen_set ag, gen_set bg, gen_type gm);
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char) const;
@@ -497,6 +497,7 @@ namespace derivs {
 		ptr<expr> b;   ///< Second subexpression
 		gen_set   ag;  ///< Generation flags for a
 		gen_set   bg;  ///< Generation flags for b
+		gen_type  gm;  ///< Maximum generation
 	}; // class alt_expr
 	
 	/// A parsing expression representing the concatenation of two parsing expressions

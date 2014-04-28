@@ -37,7 +37,7 @@ namespace derivs {
 		
 		gen_set deg = eg;
 		if ( de->back().max() > e->back().max() ) {
-			assert(de->back().max() == e->back().max() + 1 && "gen only grows by 1");
+//			assert(de->back().max() == e->back().max() + 1 && "gen only grows by 1");
 			deg |= gm+1;
 			did_inc = true;
 		}
@@ -324,15 +324,20 @@ namespace derivs {
 		// if first alternative matches or second alternative fails, use first
 		if ( b->type() == fail_type || ! a->match().empty() ) return a;
 		
-		return expr::make_ptr<alt_expr>(memo, a, b, 
-		                                expr::default_back_map(a), expr::default_back_map(b));
+		bool did_inc = false;
+		gen_set ag = expr::default_back_map(a, did_inc);
+		gen_set bg = expr::default_back_map(b, did_inc);
+		return expr::make_ptr<alt_expr>(memo, a, b, ag, bg, 0 + did_inc);
 	}
 	
 	ptr<expr> alt_expr::make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
-	                         gen_set ag, gen_set bg) {
+	                         gen_set ag, gen_set bg, gen_type gm) {
+	    assert(!(ag.empty() || bg.empty()) && "backtrack maps non-empty");
+	    assert(gm >= ag.max() && gm >= bg.max() && "gm is actual maximum");
+	    
 		switch ( a->type() ) {
 		// if first alternative fails, use second
-		case fail_type: return map_expr::make(memo, b, std::max(ag.max(), bg.max()), bg);
+		case fail_type: return map_expr::make(memo, b, gm, bg);
 		// if first alternative is infinite loop, propegate
 		case inf_type:  return a; // an inf_expr
 		default:        break; // do nothing
@@ -340,14 +345,13 @@ namespace derivs {
 		
 		// if first alternative matches or second alternative fails, use first
 		if ( b->type() == fail_type || ! a->match().empty() ) {
-			return map_expr::make(memo, a, std::max(ag.max(), bg.max()), ag);
+			return map_expr::make(memo, a, gm, ag);
 		}
 		
-		return expr::make_ptr<alt_expr>(memo, a, b, ag, bg);
+		return expr::make_ptr<alt_expr>(memo, a, b, ag, bg, gm);
 	}
 	
 	ptr<expr> alt_expr::deriv(char x) const {
-		gen_type gm = std::max(ag.max(), bg.max());
 		bool did_inc = false;
 		
 		// Calculate derivative and map in new lookahead generations
@@ -376,7 +380,7 @@ namespace derivs {
 		if ( db->type() == fail_type ) return map_expr::make(memo, da, gm + did_inc, dag);
 		gen_set dbg = expr::update_back_map(b, db, bg, gm, did_inc);
 				
-		return expr::make_ptr<alt_expr>(memo, da, db, dag, dbg);
+		return expr::make_ptr<alt_expr>(memo, da, db, dag, dbg, gm + did_inc);
 	}
 	
 	gen_set alt_expr::match_set() const { return ag(a->match()) | bg(b->match()); }
@@ -480,13 +484,15 @@ namespace derivs {
 				}
 				
 				// Otherwise return alt-expr of this lookahead and its failure backtrack
-				return alt_expr::make(memo,
+				return alt_expr::make(memo, dbi, look_expr::make(),
+				                      dbig, gen_set{0,bi.gl}, gm + did_inc);
+/*				return alt_expr::make(memo,
 				                      dbi, 
 				                      seq_expr::make(memo, 
 				                                     not_expr::make(memo, dbi), 
 				                                     look_expr::make()), 
 	                                  dbig, gen_set{0,bi.gl});
-			}
+*/			}
 			return fail_expr::make(); // if lookahead follower not found, fail
 		} case fail_type: {
 			// Return match-fail follower
@@ -531,7 +537,7 @@ namespace derivs {
 		// Add new lookahead backtrack if needed
 		gen_type dabm = da->back().max();
 		if ( dabm > a->back().max() ) {
-			assert(dabm == a->back().max() + 1 && "backtrack gen only grows by 1");
+//			assert(dabm == a->back().max() + 1 && "backtrack gen only grows by 1");
 			gen_type gl = 0;
 			gen_set bm = b->match();
 			if ( ! bm.empty() && bm.min() == 0 ) {  // set new match-fail backtrack if needed

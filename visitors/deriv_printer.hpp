@@ -199,6 +199,7 @@ namespace derivs {
 		void visit(alt_expr& e)  {
 			out << "(alt:";
 			print_fns(&e);
+			out << "g" << (unsigned int)e.gm;
 			out << " ";
 			print_unbraced(e.a);
 			out << " / ";
