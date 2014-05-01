@@ -67,6 +67,8 @@ test-interpret: egg
 	diff tests/calc.dout.txt tests/calc.test.txt
 	../egg match-lines eggr.egg grammar tests/egg.in.txt > tests/egg.test.txt
 	diff tests/egg.dout.txt tests/egg.test.txt
+	../egg match eggr.egg grammar eggr.egg > tests/eggr.test.txt
+	diff tests/eggr.dout.txt tests/eggr.test.txt
 	rm tests/*.test.txt
 	@echo
 	@echo INTERPRETED TESTS PASSED
