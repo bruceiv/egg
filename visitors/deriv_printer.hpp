@@ -179,7 +179,7 @@ namespace derivs {
 			}
 		}
 		
-		void visit(not_expr& e)   { out << "!"; print_braced(e.e); }
+		void visit(not_expr& e)   { out << "!"; print_unbraced(e.e); }
 /*		void visit(not_expr& e)   {
 			out << "(not:";
 			print_fns(&e);
@@ -189,8 +189,11 @@ namespace derivs {
 		}
 */		
 		void visit(map_expr& e)   {
-			out << "(map.." << e.back().max() << ":";
+			out << "(map:";
 			print_fns(&e);
+			out << "g" << (unsigned int)e.gm;
+			out << " ";
+			print_uint_set(e.eg);
 			out << " ";
 			print_unbraced(e.e);
 			out << ")";
@@ -201,8 +204,12 @@ namespace derivs {
 			print_fns(&e);
 			out << "g" << (unsigned int)e.gm;
 			out << " ";
+			print_uint_set(e.ag);
+			out << " ";
 			print_unbraced(e.a);
 			out << " / ";
+			print_uint_set(e.bg);
+			out << " ";
 			print_unbraced(e.b);
 			out << ")";
 		}
@@ -219,15 +226,19 @@ namespace derivs {
 				out << " <";
 				auto it = e.bs.begin();
 				out << " {" << (unsigned int)it->g;
-				if ( it->gl > 0 ) { out << "g" << (unsigned int)it->gl; }
+				if ( it->gl > 0 ) { out << "." << (unsigned int)it->gl; }
 				out << "} ";
+				print_uint_set(it->eg);
+				out << " ";
 				if ( it->e != e.b ) print_unbraced(it->e);
 				else out << "''''";
 				
 				while (++it != e.bs.end()) {
 					out << " | {" << (unsigned int)it->g;
-					if ( it->gl > 0 ) { out << "g" << (unsigned int)it->gl; }
+					if ( it->gl > 0 ) { out << "." << (unsigned int)it->gl; }
 					out << "} ";
+					print_uint_set(it->eg);
+					out << " ";
 					if ( it->e != e.b ) print_unbraced(it->e);
 					else out << "''''";
 				}
@@ -235,6 +246,8 @@ namespace derivs {
 			}
 			if ( e.c->type() != fail_type ) {
 				out << " \\\\ ";
+				print_uint_set(e.cg);
+				out << " ";
 				if ( e.c != e.b ) print_unbraced(e.c);
 				else out << "''''";
 			}

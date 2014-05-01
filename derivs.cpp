@@ -115,7 +115,7 @@ namespace derivs {
 	
 	ptr<expr> eps_expr::make() { return expr::make_ptr<eps_expr>(); }
 	
-	// No prefixes to remove from language containing the empty string; all fail
+	// Only succeeds if string is empty
 	ptr<expr> eps_expr::d(char x) const {
 		return ( x == '\0' ) ? eps_expr::make() : fail_expr::make();
 	}
@@ -451,18 +451,25 @@ namespace derivs {
 		// Handle empty or failure results from predecessor derivative
 		switch ( da->type() ) {
 		case eps_type: {
-			// If end of string, return how the follower handles end-of-string
-			if ( x == '\0' ) return b->d('\0');
+			// Take follower (or follower's end-of-string derivative on end-of-string)
+			ptr<expr> bn = ( x == '\0' ) ? b->d('\0') : b;
+			gen_set bng = expr::new_back_map(bn, gm, did_inc);
+			return map_expr::make(memo, bn, gm + did_inc, bng);
+/*			// If end of string, return how the follower handles end-of-string
+			if ( x == '\0' ) {
+				return b->d('\0');
+			}
 			
 			// Return follower, but with any lookahead gens mapped to their proper generation
 			gen_set bg = expr::new_back_map(b, gm, did_inc);
 			return map_expr::make(memo, b, gm + did_inc, bg);
-		} case look_type: {
+*/		} case look_type: {
 			// Lookahead follower (or lookahead follower match-fail)
 			auto i = std::static_pointer_cast<look_expr>(da)->b;
 			for (const look_node& bi : bs) {
 				if ( bi.g < i ) continue;
-				if ( bi.g > i ) break;  // generation list is sorted
+//				if ( bi.g > i ) break;  // generation list is sorted
+				if ( bi.g > i ) return fail_expr::make();  // generation list is sorted
 				
 				ptr<expr> dbi = bi.e->d(x);  // found element, take derivative
 				
@@ -493,6 +500,12 @@ namespace derivs {
 				                                     look_expr::make()), 
 	                                  dbig, gen_set{0,bi.gl});
 */			}
+			// end-of-string is only case where we can get a lookahead success for an unseen gen
+			if ( x == '\0' ) {
+				ptr<expr> bn = b->d('\0');
+				gen_set bng = expr::new_back_map(bn, gm, did_inc);
+				return map_expr::make(memo, bn, gm + did_inc, bng);
+			}
 			return fail_expr::make(); // if lookahead follower not found, fail
 		} case fail_type: {
 			// Return match-fail follower
