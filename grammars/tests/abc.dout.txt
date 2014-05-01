@@ -1,0 +1,13 @@
+DONE PARSING
+Rule `g1` DID NOT match ""
+Rule `g1` matched "abc"
+Rule `g1` matched "c"
+Rule `g1` matched "ac"
+Rule `g1` matched "aac"
+Rule `g1` matched "aaac"
+Rule `g1` DID NOT match "bbc"
+Rule `g1` DID NOT match "bc"
+Rule `g1` DID NOT match "x"
+Rule `g1` DID NOT match "abcc"
+Rule `g1` DID NOT match "abbc"
+Rule `g1` DID NOT match "aabc"

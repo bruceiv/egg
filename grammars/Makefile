@@ -45,7 +45,7 @@ clean:
 	-rm anbncn anbncn.cpp 
 	-rm calc calc.cpp
 
-test: egg abc anbncn calc
+test-compile: egg abc anbncn calc
 	@echo
 	./abc < tests/abc.in.txt > tests/abc.test.txt
 	diff tests/abc.out.txt tests/abc.test.txt
@@ -55,4 +55,21 @@ test: egg abc anbncn calc
 	diff tests/calc.out.txt tests/calc.test.txt
 	rm tests/*.test.txt
 	@echo
-	@echo TESTS PASSED
+	@echo COMPILED TESTS PASSED
+
+test-interpret: egg
+	@echo
+	../egg match-lines abc.egg g1 tests/abc.in.txt > tests/abc.test.txt
+	diff tests/abc.dout.txt tests/abc.test.txt
+	../egg match-lines anbncn.egg G tests/anbncn.in.txt > tests/anbncn.test.txt
+	diff tests/anbncn.dout.txt tests/anbncn.test.txt
+	../egg match-lines calc.egg expr tests/calc.in.txt > tests/calc.test.txt
+	diff tests/calc.dout.txt tests/calc.test.txt
+	../egg match-lines eggr.egg grammar tests/egg.in.txt > tests/egg.test.txt
+	diff tests/egg.dout.txt tests/egg.test.txt
+	rm tests/*.test.txt
+	@echo
+	@echo INTERPRETED TESTS PASSED
+
+test: test-compile test-interpret
+

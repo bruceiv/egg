@@ -1,0 +1,37 @@
+grammar      = _ rule+ end_of_file
+rule         = identifier EQUAL choice
+identifier   = [A-Za-z_][A-Za-z_0-9]* _
+choice       = sequence ( PIPE sequence )*
+sequence     = expression+
+expression   = AND primary
+             | NOT primary
+             | primary ( OPT | STAR | PLUS )?
+primary      = identifier !EQUAL # do not match next rule def'n
+             | OPEN choice CLOSE
+             | char_literal
+             | str_literal
+             | char_class
+             | ANY
+             | EMPTY
+char_literal = '\'' character '\'' _
+str_literal  = '\"' character* '\"' _
+char_class   = '[' (!']' character)* ']' _
+character    = '\\' [nrt\'\"\\] | ![\'\"\\] .
+
+EQUAL        = '=' _
+PIPE         = '|' _
+AND          = '&' _
+NOT          = '!' _
+OPT          = '?' _
+STAR         = '*' _
+PLUS         = '+' _
+OPEN         = '(' _
+CLOSE        = ')' _
+ANY          = '.' _
+EMPTY        = ';' _
+
+_            = ( space | comment )*
+space        = ' ' | '\t' | end_of_line
+comment      = '#' ( !end_of_line . )* end_of_line
+end_of_line  = "\r\n" | '\n' | '\r'
+end_of_file  = !.
