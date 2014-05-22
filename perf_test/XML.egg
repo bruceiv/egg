@@ -20,10 +20,10 @@ ENTITY_REF     = "&" NAME ";"
 CHAR_REF 	     = "&#x" [0-9a-fA-F]+ ";" | "&#" [0-9]+ ";"
 REFERENCE 	   = 	ENTITY_REF | CHAR_REF
 EOT            = !.
-COMMENT 	     = "<!--" (!'-' | "-" !'-')* "-->"
-ATT_VALUE 	   = "\"" (![<&\"] | REFERENCE)* "\""
-			         | "\'"  (![<&\'] | REFERENCE)* "\'"
-CHAR_DATA 	   = (![<&])+
+COMMENT 	     = "<!--" (!'-' . | "-" !'-' .)* "-->"
+ATT_VALUE 	   = "\"" (![<&\"] . | REFERENCE)* "\""
+			         | "\'"  (![<&\'] . | REFERENCE)* "\'"
+CHAR_DATA 	   = (![<&] .)+
 Attribute      = NAME S? "=" S? ATT_VALUE
 Element        = "<" NAME (S Attribute)* S? (
                    ">" Content  "</" NAME S? ">" 
