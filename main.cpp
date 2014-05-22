@@ -20,6 +20,8 @@
  * THE SOFTWARE.
  */
 
+#include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -62,7 +64,7 @@ Supported flags are\n\
  --help        print full help message\n\
  --version     print version string\n";
 
-/** Command to run */
+/// Command to run
 enum egg_mode {
 	PRINT_MODE,    ///< Print grammar
 	COMPILE_MODE,  ///< Compile grammar
@@ -71,6 +73,14 @@ enum egg_mode {
 	USAGE_MODE,    ///< Print usage
 	HELP_MODE,     ///< Print help
 	VERSION_MODE   ///< Print version
+};
+
+/// Type of output file
+enum file_type {
+	STREAM_TYPE,  ///< Output stream (unknown filetype)
+	CPP_HEADER,   ///< C++ header file
+	CPP_SOURCE,   ///< C++ source file
+	UNKNOWN_TYPE  ///< Unable to determine
 };
 
 class args {
@@ -103,6 +113,21 @@ private:
 		}
 
 		return std::string(s, len);
+	}
+	
+	file_type suffix_type(char* s) {
+		std::string t(s);
+		std::string::size_type dot = t.rfind('.');
+		
+		if ( dot == std::string::npos ) return UNKNOWN_TYPE;
+		
+		std::string ext(t, dot+1);
+		for (std::string::size_type i = 0; i < ext.size(); ++i) { ext[i] = std::tolower(ext[i]); }
+		
+		if ( ext == "hpp" || ext == "hxx" || ext == "hh" || ext == "h" ) return CPP_HEADER;
+		else if ( ext == "cpp" || ext == "cxx" || ext == "cc" || ext == "c" ) return CPP_SOURCE;
+		
+		return UNKNOWN_TYPE;
 	}
 
 	bool parse_mode(char* s) {
@@ -143,6 +168,7 @@ private:
 	void parse_output(char* s) {
 		out = new std::ofstream(s);
 		outName = s;
+		outType = suffix_type(s);
 		if ( !nameFlag ) {
 			pName = id_prefix(s);
 		}
@@ -165,7 +191,7 @@ private:
 public:
 	args(int argc, char** argv) 
 		: in(nullptr), out(nullptr), src(nullptr),
-		  inName(), outName(), srcName(), pName(), rName(),
+		  inName(), outName(), srcName(), outType(STREAM_TYPE), pName(), rName(),
 		  dbgFlag(false), nameFlag(false), normFlag(true), memoFlag(true), 
 		  eMode(COMPILE_MODE) {
 		
@@ -231,6 +257,7 @@ public:
 	std::string inputFile() { return in ? inName : "<STDIN>"; }
 	std::string outputFile() { return out ? outName : "<STDOUT>"; }
 	std::string sourceFile() { return src ? srcName : "<STDIN>"; }
+	file_type outputType() { return outType; }
 	std::string name() { return pName; }
 	std::string rule() { return rName; }
 	bool dbg()  { return dbgFlag; }
@@ -246,6 +273,7 @@ private:
 	std::string inName;   ///< Name of the input file (empty if none)
 	std::string outName;  ///< Name of the output file (empty if none)
 	std::string srcName;  ///< Name of the interpreted source file (empty if none)
+	file_type outType;    ///< Type of output type (default STREAM_TYPE)
 	std::string pName; 	  ///< the name of the parser (empty if none)
 	std::string rName;    ///< the name of the rule to interpret (empty if none)
 	bool dbgFlag;         ///< should egg print debugging information?
@@ -304,7 +332,7 @@ int main(int argc, char** argv) {
 			p.print(*g);
 			break;
 		} case COMPILE_MODE: {  // Compile grammar
-			visitor::compiler c(a.name(), a.output());
+			visitor::compiler c(a.name(), a.output(), (a.outputType() != CPP_SOURCE));
 			c.memo(a.memo());
 			c.compile(*g);
 			break;
