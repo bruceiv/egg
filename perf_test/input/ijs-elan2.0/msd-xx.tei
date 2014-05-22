@@ -1,0 +1,159 @@
+<TEI.2>
+  <teiHeader type="msd-library" 
+   creator="ET" date.created="2000-10-30" date.updated="2002-04-01">
+    <fileDesc>
+      <titleStmt>
+	<title>IJS-ELAN/MULTEXT-East morphosyntactic library</title>
+	<respStmt>
+	  <name>Toma&zcaron; Erjavec, IJS</name>
+	  <resp>Editor</resp>
+	</respStmt>
+	<funder>EU MLIS Project "ELAN"</funder>
+	<funder>EU Copernicus Project PL96-1142 "Concede"</funder>
+	<funder>EU Copernicus Project COP106 "MULTEXT-East"</funder>
+      </titleStmt>
+      <editionStmt>
+	<edition>IJS-ELAN V2.0</edition>
+      </editionStmt>
+      <publicationStmt>
+	<distributor>
+          <address lang="sl">
+	    <addrLine>Odsek za inteligentne sisteme</addrLine>
+	    <addrLine>Institut "Jo&zcaron;ef Stefan"</addrLine>
+	    <addrLine>Jamova 93</addrLine>
+	    <addrLine>1000 Ljubljana</addrLine>
+	  </address>
+         <address lang="en">
+	    <addrLine>Dept. of Intelligent Systems,</addrLine>
+	    <addrLine>Jozef Stefan Institute</addrLine>
+	    <addrLine>Jamova 39</addrLine>
+	    <addrLine>SI-1000 Ljubljana</addrLine>
+	    <addrLine>Slovenia</addrLine>
+	  </address>
+         </distributor>
+	 <pubPlace><xptr url="http://nl.ijs.si/elan/"/></pubPlace>
+	 <availability status="free">
+	  <p>Freely available.</p>
+	 </availability>
+      </publicationStmt>
+      <sourceDesc>
+	<biblFull>
+	  <titleStmt>
+	    <title>Multext-East/Concede: Morphosyntactic feature library</title>
+	  </titleStmt>
+	  <editionStmt>
+	    <edition>Concede Release</edition>
+	  </editionStmt>
+	  <publicationStmt>
+	    <distributor>MULTEXT-East Web site</distributor>
+	    <address>
+	      <addrLine>http://nl.ijs.si/ME/</addrLine>
+	    </address>
+	  </publicationStmt>
+	  <sourceDesc>
+	    <biblStruct>
+	      <monogr>
+		<title>Specifications and Notation for Lexicon Encoding</title>
+                <editor>Toma&zcaron; Erjavec</editor>
+                <author>Bulgarian: R.Pavlov, L.Dimitrova, L.Sinapova, K.Simov</author>
+                <author>Czech: V.Petkevi&ccaron;</author>
+                <author>Estonian: H.J.Kaalep </author>
+                <author>English: N.Ide, G.Priest-Dorman, T.Erjavec, T.Varadi</author>
+                <author>Hungarian: L.Tihanyi, T.Varadi </author>
+                <author>Romanian: D.Tufi&scedil;, A.M.Barbu </author>
+                <author>Slovene: T.Erjavec, P.Holozan, V.Gorjanc, M.Stabej </author>
+                <author>Croatian: M.Tadi&cacute; </author>
+                <imprint>
+                  <pubPlace>http://nl.ijs.si/ME/</pubPlace>
+                  <date>2001-03-16</date>
+                </imprint>
+	      </monogr>
+	    </biblStruct>
+	  </sourceDesc>
+	</biblFull>
+      </sourceDesc>
+    </fileDesc>
+    <encodingDesc>
+      <projectDesc>
+	<p>EU MLIS project ELAN: European Language Activity Network
+         <xptr url="http://nl.ijs.si/elan/"/>.
+        </p>
+      </projectDesc>
+      <projectDesc>
+	<p>MULTEXT-East:
+      Multilingual Text Tools and Corpora for Central and Eastern
+      European Languages. EU Copernicus Project COP106</p>
+        <p>Concede:
+      Consortium for Central European Dictionary Encoding.
+      EU Copernicus Project PL96-1142</p>
+     </projectDesc>
+     <tagsDecl>
+       <tagUsage gi="fLib" occurs="1">Library of Morphosyntactic Specifications</tagUsage>
+       <tagUsage gi="f" occurs="490">Defined features.
+         Attributes are: 
+           <list>
+            <item>SELECT, the languages that the feature-value is appropriate for</item>
+            <item>ID, the identifier of the feature composed of the
+part-of-speech code, the feature number, a period and the feature
+code, e.g. id="A1.f"</item>
+          </list>
+        </tagUsage>
+        <tagUsage gi="sym" occurs="490">A feature-value.
+Attributes are:
+          <list>
+            <item>VALUE, the full name of the value </item>
+          </list>
+        </tagUsage>
+        <tagUsage gi="fsLib" occurs="1">Library of Morphosyntactic Descriptions</tagUsage>
+        <tagUsage gi="fs" occurs="2257">Valid morphosyntactic description for Slovene or English.
+Attributes are:
+          <list>
+            <item>TYPE, the part-of-speech, formally the feature-structure type</item>
+            <item>ID, the lexical/corpus MSD</item>
+            <item>SELECT, the languages that the MSD is appropriate for</item>
+            <item>FEATS, the decomposition of the MSD into
+feature-value pairs. A feature is composed of the PoS code, the
+position of the attribute, the full stop, and the code of the value,
+e.g. A4.p for fourth attribute of Adjectives, with value code 'p'.</item>
+          </list>
+        </tagUsage>
+      </tagsDecl>
+    </encodingDesc>
+    <revisionDesc>
+      <change>
+	<date>2002-02-05</date>
+	<respStmt>
+	  <name>Toma&zcaron; Erjavec</name> <resp>Editor</resp>
+	</respStmt>
+	<item>Prepared MULTEXT-East/Concede library for inclusion with
+the IJS-ELAN corpus V2: deleted FS for languages other than
+Slovene/English and added those that appear due to changed Slovene
+specification from the FIDA project. Caveat: old and new ones are now
+mixed, should be fixed.
+        </item>
+      </change>
+      <change>
+       <date>2002-04-01</date>
+       <respStmt>
+        <name>Toma&zcaron; Erjavec</name> <resp>Editor</resp>
+       </respStmt>
+       <item>Recoded in P4/XML and prepared V2.0 for distribution.
+       </item>
+      </change>
+    </revisionDesc>
+  </teiHeader>
+
+  <text>
+    <body>
+      <div type="fLib">
+        <head>The MULTEXT-East morphosyntactic specification</head>
+        <p>&fLib;</p>
+      </div>
+      <div type="fsLib">
+        <head>The MULTEXT-East lexical morphosyntactic descriptions
+for Slovene and English</head>
+        <p>&fsLib;</p>
+      </div>
+    </body>
+  </text>
+</TEI.2>

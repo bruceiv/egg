@@ -1,0 +1,520 @@
+<fLib>
+
+<!-- 1. Noun (N)-->
+<f id="N1.c"  select="en ro sl cs bg et hu hr" name="Type"><sym value="common"/></f>
+<f id="N1.p"  select="en ro sl cs bg et hu hr" name="Type"><sym value="proper"/></f>
+<f id="N2.m"  select="en ro sl cs bg       hr" name="Gender"><sym value="masculine"/></f>
+<f id="N2.f"  select="en ro sl cs bg       hr" name="Gender"><sym value="feminine"/></f>
+<f id="N2.n"  select="en ro sl cs bg       hr" name="Gender"><sym value="neuter"/></f>
+<f id="N3.s"  select="en ro sl cs bg et hu hr" name="Number"><sym value="singular"/></f>
+<f id="N3.p"  select="en ro sl cs bg et hu hr" name="Number"><sym value="plural"/></f>
+<f id="N3.d"  select="      sl cs            " name="Number"><sym value="dual"/></f>
+<f id="N3.t"  select="            bg         " name="Number"><sym value="count"/></f>
+<f id="N4.n"  select="      sl cs bg et hu hr" name="Case"><sym value="nominative"/></f>
+<f id="N4.g"  select="      sl cs    et hu hr" name="Case"><sym value="genitive"/></f>
+<f id="N4.d"  select="      sl cs       hu hr" name="Case"><sym value="dative"/></f>
+<f id="N4.a"  select="      sl cs       hu hr" name="Case"><sym value="accusative"/></f>
+<f id="N4.v"  select="   ro    cs bg       hr" name="Case"><sym value="vocative"/></f>
+<f id="N4.l"  select="      sl cs          hr" name="Case"><sym value="locative"/></f>
+<f id="N4.i"  select="      sl cs       hu hr" name="Case"><sym value="instrumental"/></f>
+<f id="N4.r"  select="   ro                  " name="Case"><sym value="direct"/></f>
+<f id="N4.o"  select="   ro                  " name="Case"><sym value="oblique"/></f>
+<f id="N4.1"  select="               et      " name="Case"><sym value="partitive"/></f>
+<f id="N4.x"  select="               et hu   " name="Case"><sym value="illative"/></f>
+<f id="N4.2"  select="               et hu   " name="Case"><sym value="inessive"/></f>
+<f id="N4.e"  select="               et hu   " name="Case"><sym value="elative"/></f>
+<f id="N4.t"  select="               et hu   " name="Case"><sym value="allative"/></f>
+<f id="N4.3"  select="               et hu   " name="Case"><sym value="adessive"/></f>
+<f id="N4.b"  select="               et hu   " name="Case"><sym value="ablative"/></f>
+<f id="N4.4"  select="               et      " name="Case"><sym value="translative"/></f>
+<f id="N4.9"  select="               et hu   " name="Case"><sym value="terminative"/></f>
+<f id="N4.w"  select="               et hu   " name="Case"><sym value="essive"/></f>
+<f id="N4.5"  select="               et      " name="Case"><sym value="abessive"/></f>
+<f id="N4.k"  select="               et      " name="Case"><sym value="komitative"/></f>
+<f id="N4.7"  select="               et      " name="Case"><sym value="aditive"/></f>
+<f id="N4.m"  select="                  hu   " name="Case"><sym value="temporalis"/></f>
+<f id="N4.c"  select="                  hu   " name="Case"><sym value="causalis"/></f>
+<f id="N4.s"  select="                  hu   " name="Case"><sym value="sublative"/></f>
+<f id="N4.h"  select="                  hu   " name="Case"><sym value="delative"/></f>
+<f id="N4.q"  select="                  hu   " name="Case"><sym value="sociative"/></f>
+<f id="N4.y"  select="                  hu   " name="Case"><sym value="factive"/></f>
+<f id="N4.p"  select="                  hu   " name="Case"><sym value="superessive"/></f>
+<f id="N4.u"  select="                  hu   " name="Case"><sym value="distributive"/></f>
+<f id="N5.n"  select="   ro       bg         " name="Definiteness"><sym value="no"/></f>
+<f id="N5.y"  select="   ro       bg         " name="Definiteness"><sym value="yes"/></f>
+<f id="N5.s"  select="            bg         " name="Definiteness"><sym value="short-art"/></f>
+<f id="N5.f"  select="            bg         " name="Definiteness"><sym value="full-art"/></f>
+<f id="N6.n"  select="   ro                  " name="Clitic"><sym value="no"/></f>
+<f id="N6.y"  select="   ro                  " name="Clitic"><sym value="yes"/></f>
+<f id="N7.n"  select="      sl cs       hu hr" name="Animate"><sym value="no"/></f>
+<f id="N7.y"  select="      sl cs       hu hr" name="Animate"><sym value="yes"/></f>
+<f id="N8.s"  select="                  hu   " name="Owner-Number"><sym value="singular"/></f>
+<f id="N8.p"  select="                  hu   " name="Owner-Number"><sym value="plural"/></f>
+<f id="N9.1"  select="                  hu   " name="Owner-Person"><sym value="first"/></f>
+<f id="N9.2"  select="                  hu   " name="Owner-Person"><sym value="second"/></f>
+<f id="N9.3"  select="                  hu   " name="Owner-Person"><sym value="third"/></f>
+<f id="N10.s" select="                  hu   " name="Owned-Number"><sym value="singular"/></f>
+<f id="N10.p" select="                  hu   " name="Owned-Number"><sym value="plural"/></f>
+
+<!-- 2. Verb (V)-->
+<f id="V1.m"  select="en ro sl cs bg et hu hr" name="Type"><sym value="main"/></f>
+<f id="V1.a"  select="en ro sl cs bg et hu hr" name="Type"><sym value="auxiliary"/></f>
+<f id="V1.o"  select="en ro sl cs    et    hr" name="Type"><sym value="modal"/></f>
+<f id="V1.c"  select="   ro sl cs          hr" name="Type"><sym value="copula"/></f>
+<f id="V1.b"  select="en                     " name="Type"><sym value="base"/></f>
+<f id="V2.i"  select="en ro sl cs bg et hu hr" name="VForm"><sym value="indicative"/></f>
+<f id="V2.s"  select="   ro                  " name="VForm"><sym value="subjunctive"/></f>
+<f id="V2.m"  select="   ro sl cs bg et hu hr" name="VForm"><sym value="imperative"/></f>
+<f id="V2.c"  select="en    sl cs    et hu hr" name="VForm"><sym value="conditional"/></f>
+<f id="V2.n"  select="en ro sl cs    et hu hr" name="VForm"><sym value="infinitive"/></f>
+<f id="V2.p"  select="en ro sl cs bg et    hr" name="VForm"><sym value="participle"/></f>
+<f id="V2.g"  select="   ro       bg et      " name="VForm"><sym value="gerund"/></f>
+<f id="V2.u"  select="      sl       et      " name="VForm"><sym value="supine"/></f>
+<f id="V2.t"  select="         cs            " name="VForm"><sym value="transgressive"/></f>
+<f id="V2.q"  select="               et      " name="VForm"><sym value="quotative"/></f>
+<f id="V3.p"  select="en ro sl cs bg et hu hr" name="Tense"><sym value="present"/></f>
+<f id="V3.i"  select="   ro       bg et    hr" name="Tense"><sym value="imperfect"/></f>
+<f id="V3.f"  select="      sl cs          hr" name="Tense"><sym value="future"/></f>
+<f id="V3.s"  select="en ro sl cs bg et hu hr" name="Tense"><sym value="past"/></f>
+<f id="V3.l"  select="   ro                hr" name="Tense"><sym value="pluperfect"/></f>
+<f id="V3.a"  select="            bg       hr" name="Tense"><sym value="aorist"/></f>
+<f id="V4.1"  select="en ro sl cs bg et hu hr" name="Person"><sym value="first"/></f>
+<f id="V4.2"  select="en ro sl cs bg et hu hr" name="Person"><sym value="second"/></f>
+<f id="V4.3"  select="en ro sl cs bg et hu hr" name="Person"><sym value="third"/></f>
+<f id="V5.s"  select="en ro sl cs bg et hu hr" name="Number"><sym value="singular"/></f>
+<f id="V5.p"  select="en ro sl cs bg et hu hr" name="Number"><sym value="plural"/></f>
+<f id="V5.d"  select="      sl               " name="Number"><sym value="dual"/></f>
+<f id="V6.m"  select="   ro sl cs bg       hr" name="Gender"><sym value="masculine"/></f>
+<f id="V6.f"  select="   ro sl cs bg       hr" name="Gender"><sym value="feminine"/></f>
+<f id="V6.n"  select="   ro sl cs bg       hr" name="Gender"><sym value="neuter"/></f>
+<f id="V7.a"  select="      sl cs bg et    hr" name="Voice"><sym value="active"/></f>
+<f id="V7.p"  select="      sl cs bg et    hr" name="Voice"><sym value="passive"/></f>
+<f id="V8.n"  select="      sl cs    et    hr" name="Negative"><sym value="no"/></f>
+<f id="V8.y"  select="      sl cs    et    hr" name="Negative"><sym value="yes"/></f>
+<f id="V9.n"  select="            bg    hu   " name="Definiteness"><sym value="no"/></f>
+<f id="V9.y"  select="            bg    hu   " name="Definiteness"><sym value="yes"/></f>
+<f id="V9.s"  select="            bg         " name="Definiteness"><sym value="short-art"/></f>
+<f id="V9.f"  select="            bg         " name="Definiteness"><sym value="full-art"/></f>
+<f id="V9.2"  select="                  hu   " name="Definiteness"><sym value="1s2s"/></f>
+<f id="V10.n" select="   ro                  " name="Clitic"><sym value="no"/></f>
+<f id="V10.y" select="   ro                  " name="Clitic"><sym value="yes"/></f>
+<f id="V11.n" name="Case"><sym value="nominative"/></f>
+<f id="V11.g" name="Case"><sym value="genitive"/></f>
+<f id="V11.d" name="Case"><sym value="dative"/></f>
+<f id="V11.a" name="Case"><sym value="accusative"/></f>
+<f id="V11.l" name="Case"><sym value="locative"/></f>
+<f id="V11.i" name="Case"><sym value="instrumental"/></f>
+<f id="V11.x" select="               et      " name="Case"><sym value="illative"/></f>
+<f id="V11.2" select="               et      " name="Case"><sym value="inessive"/></f>
+<f id="V11.e" select="               et      " name="Case"><sym value="elative"/></f>
+<f id="V11.4" select="               et      " name="Case"><sym value="translative"/></f>
+<f id="V11.5" select="               et      " name="Case"><sym value="abessive"/></f>
+<f id="V12.n" select="         cs            " name="Animate"><sym value="no"/></f>
+<f id="V12.y" select="         cs            " name="Animate"><sym value="yes"/></f>
+<f id="V13.n" select="         cs            " name="Clitic-s"><sym value="no"/></f>
+<f id="V13.y" select="         cs            " name="Clitic-s"><sym value="yes"/></f>
+<f id="V14.p" select="      sl               " name="Aspect"><sym value="progressive"/></f>
+<f id="V14.e" select="      sl               " name="Aspect"><sym value="perfective"/></f>
+
+<!-- 3. Adjective (A)-->
+<f id="A1.f"  select="en ro sl cs       hu hr" name="Type"><sym value="qualificative"/></f>
+<f id="A1.i"  name="Type"><sym value="indefinite"/></f>
+<f id="A1.s"  select="      sl cs          hr" name="Type"><sym value="possessive"/></f>
+<f id="A1.o"  select="      sl               " name="Type"><sym value="ordinal"/></f>
+<f id="A2.p"  select="en ro sl cs    et hu hr" name="Degree"><sym value="positive"/></f>
+<f id="A2.c"  select="en ro sl cs    et hu hr" name="Degree"><sym value="comparative"/></f>
+<f id="A2.s"  select="en ro sl cs    et hu hr" name="Degree"><sym value="superlative"/></f>
+<f id="A2.e"  select="      sl               " name="Degree"><sym value="elative"/></f>
+<f id="A3.m"  select="   ro sl cs bg       hr" name="Gender"><sym value="masculine"/></f>
+<f id="A3.f"  select="   ro sl cs bg       hr" name="Gender"><sym value="feminine"/></f>
+<f id="A3.n"  select="   ro sl cs bg       hr" name="Gender"><sym value="neuter"/></f>
+<f id="A4.s"  select="   ro sl cs bg et hu hr" name="Number"><sym value="singular"/></f>
+<f id="A4.p"  select="   ro sl cs bg et hu hr" name="Number"><sym value="plural"/></f>
+<f id="A4.d"  select="      sl cs            " name="Number"><sym value="dual"/></f>
+<f id="A5.n"  select="      sl cs    et hu hr" name="Case"><sym value="nominative"/></f>
+<f id="A5.g"  select="      sl cs    et hu hr" name="Case"><sym value="genitive"/></f>
+<f id="A5.d"  select="      sl cs       hu hr" name="Case"><sym value="dative"/></f>
+<f id="A5.a"  select="      sl cs       hu hr" name="Case"><sym value="accusative"/></f>
+<f id="A5.v"  select="   ro    cs          hr" name="Case"><sym value="vocative"/></f>
+<f id="A5.l"  select="      sl cs          hr" name="Case"><sym value="locative"/></f>
+<f id="A5.i"  select="      sl cs       hu hr" name="Case"><sym value="instrumental"/></f>
+<f id="A5.r"  select="   ro                  " name="Case"><sym value="direct"/></f>
+<f id="A5.o"  select="   ro                  " name="Case"><sym value="oblique"/></f>
+<f id="A5.1"  select="               et      " name="Case"><sym value="partitive"/></f>
+<f id="A5.x"  select="               et hu   " name="Case"><sym value="illative"/></f>
+<f id="A5.2"  select="               et hu   " name="Case"><sym value="inessive"/></f>
+<f id="A5.e"  select="               et hu   " name="Case"><sym value="elative"/></f>
+<f id="A5.t"  select="               et hu   " name="Case"><sym value="allative"/></f>
+<f id="A5.3"  select="               et hu   " name="Case"><sym value="adessive"/></f>
+<f id="A5.b"  select="               et hu   " name="Case"><sym value="ablative"/></f>
+<f id="A5.4"  select="               et      " name="Case"><sym value="translative"/></f>
+<f id="A5.9"  select="               et hu   " name="Case"><sym value="terminative"/></f>
+<f id="A5.w"  select="               et hu   " name="Case"><sym value="essive"/></f>
+<f id="A5.5"  select="               et      " name="Case"><sym value="abessive"/></f>
+<f id="A5.k"  select="               et      " name="Case"><sym value="komitative"/></f>
+<f id="A5.7"  select="               et      " name="Case"><sym value="aditive"/></f>
+<f id="A5.m"  select="                  hu   " name="Case"><sym value="temporalis"/></f>
+<f id="A5.c"  select="                  hu   " name="Case"><sym value="causalis"/></f>
+<f id="A5.s"  select="                  hu   " name="Case"><sym value="sublative"/></f>
+<f id="A5.h"  select="                  hu   " name="Case"><sym value="delative"/></f>
+<f id="A5.q"  select="                  hu   " name="Case"><sym value="sociative"/></f>
+<f id="A5.y"  select="                  hu   " name="Case"><sym value="factive"/></f>
+<f id="A5.p"  select="                  hu   " name="Case"><sym value="superessive"/></f>
+<f id="A5.u"  select="                  hu   " name="Case"><sym value="distributive"/></f>
+<f id="A5.f"  select="                  hu   " name="Case"><sym value="essive-formal"/></f>
+<f id="A6.n"  select="   ro sl    bg       hr" name="Definiteness"><sym value="no"/></f>
+<f id="A6.y"  select="   ro sl    bg       hr" name="Definiteness"><sym value="yes"/></f>
+<f id="A6.s"  select="            bg         " name="Definiteness"><sym value="short-art"/></f>
+<f id="A6.f"  select="            bg         " name="Definiteness"><sym value="full-art"/></f>
+<f id="A7.n"  select="   ro                  " name="Clitic"><sym value="no"/></f>
+<f id="A7.y"  select="   ro                  " name="Clitic"><sym value="yes"/></f>
+<f id="A8.n"  select="      sl cs       hu hr" name="Animate"><sym value="no"/></f>
+<f id="A8.y"  select="      sl cs       hu hr" name="Animate"><sym value="yes"/></f>
+<f id="A9.n"  select="         cs            " name="Formation"><sym value="nominal"/></f>
+<f id="A9.c"  select="         cs            " name="Formation"><sym value="compound"/></f>
+<f id="A10.s" select="                  hu   " name="Owner-Number"><sym value="singular"/></f>
+<f id="A10.p" select="                  hu   " name="Owner-Number"><sym value="plural"/></f>
+<f id="A11.1" select="                  hu   " name="Owner-Person"><sym value="first"/></f>
+<f id="A11.2" select="                  hu   " name="Owner-Person"><sym value="second"/></f>
+<f id="A11.3" select="                  hu   " name="Owner-Person"><sym value="third"/></f>
+<f id="A12.s" select="                  hu   " name="Owned-Number"><sym value="singular"/></f>
+<f id="A12.p" select="                  hu   " name="Owned-Number"><sym value="plural"/></f>
+
+<!-- 4. Pronoun (P)-->
+<f id="P1.p"  select="en ro sl cs bg et hu" name="Type"><sym value="personal"/></f>
+<f id="P1.d"  select="   ro sl cs bg et hu" name="Type"><sym value="demonstrative"/></f>
+<f id="P1.i"  select="   ro sl cs bg et hu" name="Type"><sym value="indefinite"/></f>
+<f id="P1.s"  select="en ro sl cs bg et hu" name="Type"><sym value="possessive"/></f>
+<f id="P1.q"  select="en    sl cs bg et hu" name="Type"><sym value="interrogative"/></f>
+<f id="P1.r"  select="en    sl cs bg et hu" name="Type"><sym value="relative"/></f>
+<f id="P1.e"  name="Type"><sym value="exclamative"/></f>
+<f id="P1.x"  select="en ro sl cs bg et hu" name="Type"><sym value="reflexive"/></f>
+<f id="P1.y"  select="               et hu" name="Type"><sym value="reciprocal"/></f>
+<f id="P1.z"  select="   ro sl cs bg      " name="Type"><sym value="negative"/></f>
+<f id="P1.g"  select="en    sl cs bg      " name="Type"><sym value="general"/></f>
+<f id="P1.w"  select="   ro               " name="Type"><sym value="int-rel"/></f>
+<f id="P1.h"  select="   ro               " name="Type"><sym value="emphatic"/></f>
+<f id="P1.m"  select="               et   " name="Type"><sym value="determinal"/></f>
+<f id="P1.t"  select="en                  " name="Type"><sym value="ex-there"/></f>
+<f id="P2.1"  select="en ro sl cs bg et hu" name="Person"><sym value="first"/></f>
+<f id="P2.2"  select="en ro sl cs bg et hu" name="Person"><sym value="second"/></f>
+<f id="P2.3"  select="en ro sl cs bg et hu" name="Person"><sym value="third"/></f>
+<f id="P3.m"  select="en ro sl cs bg      " name="Gender"><sym value="masculine"/></f>
+<f id="P3.f"  select="en ro sl cs bg      " name="Gender"><sym value="feminine"/></f>
+<f id="P3.n"  select="en ro sl cs bg      " name="Gender"><sym value="neuter"/></f>
+<f id="P4.s"  select="en ro sl cs bg et hu" name="Number"><sym value="singular"/></f>
+<f id="P4.p"  select="en ro sl cs bg et hu" name="Number"><sym value="plural"/></f>
+<f id="P4.d"  select="      sl cs         " name="Number"><sym value="dual"/></f>
+<f id="P5.n"  select="en ro sl cs bg et hu" name="Case"><sym value="nominative"/></f>
+<f id="P5.g"  select="   ro sl cs    et hu" name="Case"><sym value="genitive"/></f>
+<f id="P5.d"  select="   ro sl cs bg    hu" name="Case"><sym value="dative"/></f>
+<f id="P5.a"  select="en ro sl cs bg    hu" name="Case"><sym value="accusative"/></f>
+<f id="P5.v"  select="   ro               " name="Case"><sym value="vocative"/></f>
+<f id="P5.l"  select="      sl cs         " name="Case"><sym value="locative"/></f>
+<f id="P5.i"  select="      sl cs       hu" name="Case"><sym value="instrumental"/></f>
+<f id="P5.r"  select="   ro               " name="Case"><sym value="direct"/></f>
+<f id="P5.o"  select="   ro               " name="Case"><sym value="oblique"/></f>
+<f id="P5.1"  select="               et   " name="Case"><sym value="partitive"/></f>
+<f id="P5.x"  select="               et hu" name="Case"><sym value="illative"/></f>
+<f id="P5.2"  select="               et hu" name="Case"><sym value="inessive"/></f>
+<f id="P5.e"  select="               et hu" name="Case"><sym value="elative"/></f>
+<f id="P5.t"  select="               et hu" name="Case"><sym value="allative"/></f>
+<f id="P5.3"  select="               et hu" name="Case"><sym value="adessive"/></f>
+<f id="P5.b"  select="               et hu" name="Case"><sym value="ablative"/></f>
+<f id="P5.4"  select="               et   " name="Case"><sym value="translative"/></f>
+<f id="P5.9"  select="               et hu" name="Case"><sym value="terminative"/></f>
+<f id="P5.w"  select="               et hu" name="Case"><sym value="essive"/></f>
+<f id="P5.5"  select="               et   " name="Case"><sym value="abessive"/></f>
+<f id="P5.k"  select="               et   " name="Case"><sym value="komitative"/></f>
+<f id="P5.7"  select="               et   " name="Case"><sym value="aditive"/></f>
+<f id="P5.m"  select="                  hu" name="Case"><sym value="temporalis"/></f>
+<f id="P5.c"  select="                  hu" name="Case"><sym value="causalis"/></f>
+<f id="P5.s"  select="                  hu" name="Case"><sym value="sublative"/></f>
+<f id="P5.h"  select="                  hu" name="Case"><sym value="delative"/></f>
+<f id="P5.q"  select="                  hu" name="Case"><sym value="sociative"/></f>
+<f id="P5.y"  select="                  hu" name="Case"><sym value="factive"/></f>
+<f id="P5.p"  select="                  hu" name="Case"><sym value="superessive"/></f>
+<f id="P5.u"  select="                  hu" name="Case"><sym value="distributive"/></f>
+<f id="P5.f"  select="                  hu" name="Case"><sym value="essive-formal"/></f>
+<f id="P6.s"  select="en ro sl cs       hu" name="Owner-Number"><sym value="singular"/></f>
+<f id="P6.p"  select="en ro sl cs       hu" name="Owner-Number"><sym value="plural"/></f>
+<f id="P6.d"  select="      sl            " name="Owner-Number"><sym value="dual"/></f>
+<f id="P7.m"  select="en    sl cs         " name="Owner-Gender"><sym value="masculine"/></f>
+<f id="P7.f"  select="en    sl cs         " name="Owner-Gender"><sym value="feminine"/></f>
+<f id="P7.n"  select="      sl cs         " name="Owner-Gender"><sym value="neuter"/></f>
+<f id="P8.n"  select="   ro sl cs bg      " name="Clitic"><sym value="no"/></f>
+<f id="P8.y"  select="   ro sl cs bg      " name="Clitic"><sym value="yes"/></f>
+<f id="P8.b"  select="      sl            " name="Clitic"><sym value="bound"/></f>
+<f id="P9.p"  select="      sl cs bg      " name="Referent-Type"><sym value="personal"/></f>
+<f id="P9.s"  select="      sl cs bg      " name="Referent-Type"><sym value="possessive"/></f>
+<f id="P9.a"  select="            bg      " name="Referent-Type"><sym value="attributive"/></f>
+<f id="P9.q"  select="            bg      " name="Referent-Type"><sym value="quantitative"/></f>
+<f id="P10.n" select="      sl cs         " name="Syntactic-Type"><sym value="nominal"/></f>
+<f id="P10.a" select="      sl cs         " name="Syntactic-Type"><sym value="adjectival"/></f>
+<f id="P10.r" select="      sl            " name="Syntactic-Type"><sym value="adverbial"/></f>
+<f id="P11.n" select="            bg      " name="Definiteness"><sym value="no"/></f>
+<f id="P11.y" select="            bg      " name="Definiteness"><sym value="yes"/></f>
+<f id="P11.s" select="            bg      " name="Definiteness"><sym value="short-art"/></f>
+<f id="P11.f" select="            bg      " name="Definiteness"><sym value="full-art"/></f>
+<f id="P12.n" select="      sl cs         " name="Animate"><sym value="no"/></f>
+<f id="P12.y" select="      sl cs         " name="Animate"><sym value="yes"/></f>
+<f id="P13.y" select="         cs         " name="Clitic-s"><sym value="yes"/></f>
+<f id="P13.n" select="         cs         " name="Clitic-s"><sym value="no"/></f>
+<f id="P14.s" select="   ro               " name="Pronoun-Form"><sym value="strong"/></f>
+<f id="P14.w" select="   ro               " name="Pronoun-Form"><sym value="weak"/></f>
+<f id="P15.1" select="                  hu" name="Owner-Person"><sym value="first"/></f>
+<f id="P15.2" select="                  hu" name="Owner-Person"><sym value="second"/></f>
+<f id="P15.3" select="                  hu" name="Owner-Person"><sym value="third"/></f>
+<f id="P16.s" select="                  hu" name="Owned-Number"><sym value="singular"/></f>
+<f id="P16.p" select="                  hu" name="Owned-Number"><sym value="plural"/></f>
+<f id="P17.r" select="en                  " name="Wh-Type"><sym value="relative"/></f>
+<f id="P17.q" select="en                  " name="Wh-Type"><sym value="question"/></f>
+
+<!-- 5. Determiner (D)-->
+<f id="D1.d"  select="en ro                  " name="Type"><sym value="demonstrative"/></f>
+<f id="D1.i"  select="en ro                  " name="Type"><sym value="indefinite"/></f>
+<f id="D1.s"  select="en ro                  " name="Type"><sym value="possessive"/></f>
+<f id="D1.q"  name="Type"><sym value="interrogative"/></f>
+<f id="D1.r"  name="Type"><sym value="relative"/></f>
+<f id="D1.e"  name="Type"><sym value="exclamative"/></f>
+<f id="D1.a"  name="Type"><sym value="article"/></f>
+<f id="D1.g"  select="en                     " name="Type"><sym value="general"/></f>
+<f id="D1.w"  select="   ro                  " name="Type"><sym value="int-rel"/></f>
+<f id="D1.z"  select="   ro                  " name="Type"><sym value="negative"/></f>
+<f id="D1.h"  select="   ro                  " name="Type"><sym value="emphatic"/></f>
+<f id="D2.1"  select="en ro                  " name="Person"><sym value="first"/></f>
+<f id="D2.2"  select="en ro                  " name="Person"><sym value="second"/></f>
+<f id="D2.3"  select="en ro                  " name="Person"><sym value="third"/></f>
+<f id="D3.m"  select="   ro                  " name="Gender"><sym value="masculine"/></f>
+<f id="D3.f"  select="   ro                  " name="Gender"><sym value="feminine"/></f>
+<f id="D3.n"  select="   ro                  " name="Gender"><sym value="neuter"/></f>
+<f id="D4.s"  select="en ro                  " name="Number"><sym value="singular"/></f>
+<f id="D4.p"  select="en ro                  " name="Number"><sym value="plural"/></f>
+<f id="D5.r"  select="   ro                  " name="Case"><sym value="direct"/></f>
+<f id="D5.o"  select="   ro                  " name="Case"><sym value="oblique"/></f>
+<f id="D6.s"  select="en ro                  " name="Owner-Number"><sym value="singular"/></f>
+<f id="D6.p"  select="en ro                  " name="Owner-Number"><sym value="plural"/></f>
+<f id="D7.m"  select="en                     " name="Owner-Gender"><sym value="masculine"/></f>
+<f id="D7.f"  select="en                     " name="Owner-Gender"><sym value="feminine"/></f>
+<f id="D7.n"  select="en                     " name="Owner-Gender"><sym value="neuter"/></f>
+<f id="D8.n"  select="   ro                  " name="Clitic"><sym value="no"/></f>
+<f id="D8.y"  select="   ro                  " name="Clitic"><sym value="yes"/></f>
+<f id="D9.e"  select="   ro                  " name="Modific-Type"><sym value="prenomin"/></f>
+<f id="D9.o"  select="   ro                  " name="Modific-Type"><sym value="postnomin"/></f>
+<f id="D10.r" select="en                     " name="Wh-Type"><sym value="relative"/></f>
+<f id="D10.q" select="en                     " name="Wh-Type"><sym value="question"/></f>
+
+<!-- 6. Article (T)-->
+<f id="T1.f"  select="   ro             hu   " name="Type"><sym value="definite"/></f>
+<f id="T1.i"  select="   ro             hu   " name="Type"><sym value="indefinite"/></f>
+<f id="T1.s"  select="   ro                  " name="Type"><sym value="possessive"/></f>
+<f id="T1.d"  select="   ro                  " name="Type"><sym value="demonstrative"/></f>
+<f id="T2.m"  select="   ro                  " name="Gender"><sym value="masculine"/></f>
+<f id="T2.f"  select="   ro                  " name="Gender"><sym value="feminine"/></f>
+<f id="T2.n"  select="   ro                  " name="Gender"><sym value="neuter"/></f>
+<f id="T3.s"  select="   ro                  " name="Number"><sym value="singular"/></f>
+<f id="T3.p"  select="   ro                  " name="Number"><sym value="plural"/></f>
+<f id="T4.r"  select="   ro                  " name="Case"><sym value="direct"/></f>
+<f id="T4.o"  select="   ro                  " name="Case"><sym value="oblique"/></f>
+<f id="T5.n"  select="   ro                  " name="Clitic"><sym value="no"/></f>
+<f id="T5.y"  select="   ro                  " name="Clitic"><sym value="yes"/></f>
+
+<!-- 7. Adverb (R)-->
+<f id="R1.g"  select="   ro sl cs bg    hu hr" name="Type"><sym value="general"/></f>
+<f id="R1.p"  select="   ro             hu   " name="Type"><sym value="particle"/></f>
+<f id="R1.o"  select="                  hu   " name="Type"><sym value="causal"/></f>
+<f id="R1.z"  select="   ro                  " name="Type"><sym value="negative"/></f>
+<f id="R1.a"  select="            bg         " name="Type"><sym value="adjectival"/></f>
+<f id="R1.v"  select="                  hu   " name="Type"><sym value="verbal"/></f>
+<f id="R1.m"  select="en ro             hu   " name="Type"><sym value="modifier"/></f>
+<f id="R1.s"  select="en                     " name="Type"><sym value="specifier"/></f>
+<f id="R1.w"  select="   ro                  " name="Type"><sym value="int-rel"/></f>
+<f id="R1.c"  select="   ro                  " name="Type"><sym value="portmanteau"/></f>
+<f id="R1.q"  select="                  hu   " name="Type"><sym value="interrogative"/></f>
+<f id="R2.p"  select="en ro sl cs          hr" name="Degree"><sym value="positive"/></f>
+<f id="R2.c"  select="en ro sl cs          hr" name="Degree"><sym value="comparative"/></f>
+<f id="R2.s"  select="en ro sl cs          hr" name="Degree"><sym value="superlative"/></f>
+<f id="R2.e"  select="      sl               " name="Degree"><sym value="elative"/></f>
+<f id="R3.n"  select="   ro             hu   " name="Clitic"><sym value="no"/></f>
+<f id="R3.y"  select="   ro             hu   " name="Clitic"><sym value="yes"/></f>
+<f id="R4.s"  select="                  hu   " name="Number"><sym value="singular"/></f>
+<f id="R4.p"  select="                  hu   " name="Number"><sym value="plural"/></f>
+<f id="R5.1"  select="                  hu   " name="Person"><sym value="first"/></f>
+<f id="R5.2"  select="                  hu   " name="Person"><sym value="second"/></f>
+<f id="R5.3"  select="                  hu   " name="Person"><sym value="third"/></f>
+<f id="R6.r"  select="en                     " name="Wh-Type"><sym value="relative"/></f>
+<f id="R6.q"  select="en                     " name="Wh-Type"><sym value="question"/></f>
+
+<!-- 8. Adposition (S)-->
+<f id="S1.p"  select="en ro sl cs bg et    hr" name="Type"><sym value="preposition"/></f>
+<f id="S1.t"  select="en             et hu   " name="Type"><sym value="postposition"/></f>
+<f id="S2.s"  select="   ro sl cs          hr" name="Formation"><sym value="simple"/></f>
+<f id="S2.c"  select="   ro sl cs          hr" name="Formation"><sym value="compound"/></f>
+<f id="S3.n"  name="Case"><sym value="nominative"/></f>
+<f id="S3.g"  select="   ro sl cs          hr" name="Case"><sym value="genitive"/></f>
+<f id="S3.d"  select="   ro sl cs          hr" name="Case"><sym value="dative"/></f>
+<f id="S3.a"  select="   ro sl cs          hr" name="Case"><sym value="accusative"/></f>
+<f id="S3.l"  select="      sl cs          hr" name="Case"><sym value="locative"/></f>
+<f id="S3.i"  select="      sl cs          hr" name="Case"><sym value="instrumental"/></f>
+<f id="S4.n"  select="   ro                  " name="Clitic"><sym value="no"/></f>
+<f id="S4.y"  select="   ro                  " name="Clitic"><sym value="yes"/></f>
+
+<!-- 9. Conjunction (C)-->
+<f id="C1.c"  select="en ro sl cs bg et hu hr" name="Type"><sym value="coordinating"/></f>
+<f id="C1.s"  select="en ro sl cs bg et hu hr" name="Type"><sym value="subordinating"/></f>
+<f id="C1.r"  select="   ro                  " name="Type"><sym value="portmanteau"/></f>
+<f id="C2.s"  select="   ro sl    bg    hu hr" name="Formation"><sym value="simple"/></f>
+<f id="C2.c"  select="   ro sl    bg    hu hr" name="Formation"><sym value="compound"/></f>
+<f id="C3.s"  select="   ro                  " name="Coord-Type"><sym value="simple"/></f>
+<f id="C3.r"  select="   ro                  " name="Coord-Type"><sym value="repetit"/></f>
+<f id="C3.c"  select="   ro                  " name="Coord-Type"><sym value="correlat"/></f>
+<f id="C3.p"  select="                  hu   " name="Coord-Type"><sym value="sentence"/></f>
+<f id="C3.w"  select="                  hu   " name="Coord-Type"><sym value="words"/></f>
+<f id="C3.i"  select="en                     " name="Coord-Type"><sym value="initial"/></f>
+<f id="C3.n"  select="en                     " name="Coord-Type"><sym value="non-initial"/></f>
+<f id="C4.z"  select="   ro                  " name="Sub-Type"><sym value="negative"/></f>
+<f id="C4.p"  select="   ro                  " name="Sub-Type"><sym value="positive"/></f>
+<f id="C5.n"  select="   ro                  " name="Clitic"><sym value="no"/></f>
+<f id="C5.y"  select="   ro                  " name="Clitic"><sym value="yes"/></f>
+<f id="C6.s"  select="         cs            " name="Number"><sym value="singular"/></f>
+<f id="C6.p"  select="         cs            " name="Number"><sym value="plural"/></f>
+<f id="C7.1"  select="         cs            " name="Person"><sym value="first"/></f>
+<f id="C7.2"  select="         cs            " name="Person"><sym value="second"/></f>
+<f id="C7.3"  select="         cs            " name="Person"><sym value="third"/></f>
+
+<!-- 10. Numeral (M)-->
+<f id="M1.c"  select="en ro sl cs bg et hu hr" name="Type"><sym value="cardinal"/></f>
+<f id="M1.o"  select="en ro sl cs bg et hu hr" name="Type"><sym value="ordinal"/></f>
+<f id="M1.f"  select="   ro             hu   " name="Type"><sym value="fractal"/></f>
+<f id="M1.m"  select="   ro sl cs          hr" name="Type"><sym value="multiple"/></f>
+<f id="M1.l"  select="   ro             hu   " name="Type"><sym value="collect"/></f>
+<f id="M1.s"  select="      sl cs          hr" name="Type"><sym value="special"/></f>
+<f id="M2.m"  select="   ro sl cs bg       hr" name="Gender"><sym value="masculine"/></f>
+<f id="M2.f"  select="   ro sl cs bg       hr" name="Gender"><sym value="feminine"/></f>
+<f id="M2.n"  select="   ro sl cs bg       hr" name="Gender"><sym value="neuter"/></f>
+<f id="M3.s"  select="   ro sl cs bg et hu hr" name="Number"><sym value="singular"/></f>
+<f id="M3.p"  select="   ro sl cs bg et hu hr" name="Number"><sym value="plural"/></f>
+<f id="M3.d"  select="      sl cs            " name="Number"><sym value="dual"/></f>
+<f id="M4.n"  select="      sl cs    et hu hr" name="Case"><sym value="nominative"/></f>
+<f id="M4.g"  select="      sl cs    et hu hr" name="Case"><sym value="genitive"/></f>
+<f id="M4.d"  select="      sl cs       hu hr" name="Case"><sym value="dative"/></f>
+<f id="M4.a"  select="      sl cs       hu hr" name="Case"><sym value="accusative"/></f>
+<f id="M4.v"  select="                     hr" name="Case"><sym value="vocative"/></f>
+<f id="M4.l"  select="      sl cs          hr" name="Case"><sym value="locative"/></f>
+<f id="M4.i"  select="      sl cs       hu hr" name="Case"><sym value="instrumental"/></f>
+<f id="M4.r"  select="   ro                  " name="Case"><sym value="direct"/></f>
+<f id="M4.o"  select="   ro                  " name="Case"><sym value="oblique"/></f>
+<f id="M4.1"  select="               et      " name="Case"><sym value="partitive"/></f>
+<f id="M4.x"  select="               et hu   " name="Case"><sym value="illative"/></f>
+<f id="M4.2"  select="               et hu   " name="Case"><sym value="inessive"/></f>
+<f id="M4.e"  select="               et hu   " name="Case"><sym value="elative"/></f>
+<f id="M4.t"  select="               et hu   " name="Case"><sym value="allative"/></f>
+<f id="M4.3"  select="               et hu   " name="Case"><sym value="adessive"/></f>
+<f id="M4.b"  select="               et hu   " name="Case"><sym value="ablative"/></f>
+<f id="M4.4"  select="               et      " name="Case"><sym value="translative"/></f>
+<f id="M4.9"  select="               et hu   " name="Case"><sym value="terminative"/></f>
+<f id="M4.w"  select="               et hu   " name="Case"><sym value="essive"/></f>
+<f id="M4.5"  select="               et      " name="Case"><sym value="abessive"/></f>
+<f id="M4.k"  select="               et      " name="Case"><sym value="komitative"/></f>
+<f id="M4.7"  select="               et      " name="Case"><sym value="aditive"/></f>
+<f id="M4.m"  select="                  hu   " name="Case"><sym value="temporalis"/></f>
+<f id="M4.c"  select="                  hu   " name="Case"><sym value="causalis"/></f>
+<f id="M4.s"  select="                  hu   " name="Case"><sym value="sublative"/></f>
+<f id="M4.h"  select="                  hu   " name="Case"><sym value="delative"/></f>
+<f id="M4.q"  select="                  hu   " name="Case"><sym value="sociative"/></f>
+<f id="M4.y"  select="                  hu   " name="Case"><sym value="factive"/></f>
+<f id="M4.p"  select="                  hu   " name="Case"><sym value="superessive"/></f>
+<f id="M4.u"  select="                  hu   " name="Case"><sym value="distributive"/></f>
+<f id="M4.f"  select="                  hu   " name="Case"><sym value="essive-formal"/></f>
+<f id="M4.6"  select="                  hu   " name="Case"><sym value="multiplicative"/></f>
+<f id="M5.d"  select="   ro sl cs bg et hu hr" name="Form"><sym value="digit"/></f>
+<f id="M5.r"  select="   ro sl cs bg et hu hr" name="Form"><sym value="roman"/></f>
+<f id="M5.l"  select="   ro sl cs bg et hu hr" name="Form"><sym value="letter"/></f>
+<f id="M5.b"  select="   ro                  " name="Form"><sym value="both"/></f>
+<f id="M5.m"  select="            bg         " name="Form"><sym value="m-form"/></f>
+<f id="M5.a"  select="            bg         " name="Form"><sym value="approx"/></f>
+<f id="M6.n"  select="   ro sl    bg         " name="Definiteness"><sym value="no"/></f>
+<f id="M6.y"  select="   ro sl    bg         " name="Definiteness"><sym value="yes"/></f>
+<f id="M6.s"  select="            bg         " name="Definiteness"><sym value="short-art"/></f>
+<f id="M6.f"  select="            bg         " name="Definiteness"><sym value="full-art"/></f>
+<f id="M7.n"  select="   ro                  " name="Clitic"><sym value="no"/></f>
+<f id="M7.y"  select="   ro                  " name="Clitic"><sym value="yes"/></f>
+<f id="M8.1"  select="         cs            " name="Class"><sym value="definite1"/></f>
+<f id="M8.2"  select="         cs            " name="Class"><sym value="definite2"/></f>
+<f id="M8.3"  select="         cs            " name="Class"><sym value="definite34"/></f>
+<f id="M8.f"  select="         cs            " name="Class"><sym value="definite"/></f>
+<f id="M8.d"  select="         cs            " name="Class"><sym value="demonstrative"/></f>
+<f id="M8.i"  select="         cs            " name="Class"><sym value="indefinite"/></f>
+<f id="M8.q"  select="         cs            " name="Class"><sym value="interrogative"/></f>
+<f id="M8.r"  select="         cs            " name="Class"><sym value="relative"/></f>
+<f id="M9.n"  select="      sl cs          hr" name="Animate"><sym value="no"/></f>
+<f id="M9.y"  select="      sl cs          hr" name="Animate"><sym value="yes"/></f>
+<f id="M10.s" select="                  hu   " name="Owner-Number"><sym value="singular"/></f>
+<f id="M10.p" select="                  hu   " name="Owner-Number"><sym value="plural"/></f>
+<f id="M11.1" select="                  hu   " name="Owner-Person"><sym value="first"/></f>
+<f id="M11.2" select="                  hu   " name="Owner-Person"><sym value="second"/></f>
+<f id="M11.3" select="                  hu   " name="Owner-Person"><sym value="third"/></f>
+<f id="M12.s" select="                  hu   " name="Owned-Number"><sym value="singular"/></f>
+<f id="M12.p" select="                  hu   " name="Owned-Number"><sym value="plural"/></f>
+
+<!-- 11. Interjection (I)-->
+<f id="I1.m"  select="                  hu   " name="Type"><sym value="mood"/></f>
+<f id="I1.o"  select="                  hu   " name="Type"><sym value="other"/></f>
+<f id="I2.s"  select="            bg       hr" name="Formation"><sym value="simple"/></f>
+<f id="I2.c"  select="            bg       hr" name="Formation"><sym value="compound"/></f>
+
+<!-- 12. Residual (X)-->
+
+<!-- 13. Abbreviation (Y)-->
+<f id="Y1.n"  select="   ro          et    hr" name="Syntactic-Type"><sym value="nominal"/></f>
+<f id="Y1.v"  select="   ro          et      " name="Syntactic-Type"><sym value="verbal"/></f>
+<f id="Y1.a"  select="   ro          et      " name="Syntactic-Type"><sym value="adjectival"/></f>
+<f id="Y1.r"  select="   ro          et    hr" name="Syntactic-Type"><sym value="adverbial"/></f>
+<f id="Y1.p"  select="   ro                  " name="Syntactic-Type"><sym value="pronominal"/></f>
+<f id="Y2.m"  select="   ro                hr" name="Gender"><sym value="masculine"/></f>
+<f id="Y2.f"  select="   ro                hr" name="Gender"><sym value="feminine"/></f>
+<f id="Y2.n"  select="   ro                hr" name="Gender"><sym value="neuter"/></f>
+<f id="Y3.s"  select="   ro          et    hr" name="Number"><sym value="singular"/></f>
+<f id="Y3.p"  select="   ro          et    hr" name="Number"><sym value="plural"/></f>
+<f id="Y4.n"  select="               et    hr" name="Case"><sym value="nominative"/></f>
+<f id="Y4.g"  select="               et    hr" name="Case"><sym value="genitive"/></f>
+<f id="Y4.d"  select="                     hr" name="Case"><sym value="dative"/></f>
+<f id="Y4.a"  select="                     hr" name="Case"><sym value="accusative"/></f>
+<f id="Y4.l"  select="                     hr" name="Case"><sym value="locative"/></f>
+<f id="Y4.i"  select="                     hr" name="Case"><sym value="instrumental"/></f>
+<f id="Y4.r"  select="   ro                  " name="Case"><sym value="direct"/></f>
+<f id="Y4.o"  select="   ro                  " name="Case"><sym value="oblique"/></f>
+<f id="Y4.v"  select="   ro                  " name="Case"><sym value="vocative"/></f>
+<f id="Y4.1"  select="               et      " name="Case"><sym value="partitive"/></f>
+<f id="Y4.x"  select="               et      " name="Case"><sym value="illative"/></f>
+<f id="Y4.2"  select="               et      " name="Case"><sym value="inessive"/></f>
+<f id="Y4.e"  select="               et      " name="Case"><sym value="elative"/></f>
+<f id="Y4.t"  select="               et      " name="Case"><sym value="allative"/></f>
+<f id="Y4.3"  select="               et      " name="Case"><sym value="adessive"/></f>
+<f id="Y4.b"  select="               et      " name="Case"><sym value="ablative"/></f>
+<f id="Y4.4"  select="               et      " name="Case"><sym value="translative"/></f>
+<f id="Y4.9"  select="               et      " name="Case"><sym value="terminative"/></f>
+<f id="Y4.w"  select="               et      " name="Case"><sym value="essive"/></f>
+<f id="Y4.5"  select="               et      " name="Case"><sym value="abessive"/></f>
+<f id="Y4.k"  select="               et      " name="Case"><sym value="komitative"/></f>
+<f id="Y4.7"  select="               et      " name="Case"><sym value="aditive"/></f>
+<f id="Y5.y"  select="   ro                  " name="Definiteness"><sym value="yes"/></f>
+<f id="Y5.n"  select="   ro                  " name="Definiteness"><sym value="no"/></f>
+
+<!-- 14. Particle (Q)-->
+<f id="Q1.z"  select="   ro       bg       hr" name="Type"><sym value="negative"/></f>
+<f id="Q1.n"  select="   ro                  " name="Type"><sym value="infinitive"/></f>
+<f id="Q1.s"  select="   ro                  " name="Type"><sym value="subjunctive"/></f>
+<f id="Q1.a"  select="   ro                  " name="Type"><sym value="aspect"/></f>
+<f id="Q1.f"  select="   ro                  " name="Type"><sym value="future"/></f>
+<f id="Q1.g"  select="            bg         " name="Type"><sym value="general"/></f>
+<f id="Q1.c"  select="            bg         " name="Type"><sym value="comparative"/></f>
+<f id="Q1.v"  select="            bg         " name="Type"><sym value="verbal"/></f>
+<f id="Q1.q"  select="            bg       hr" name="Type"><sym value="interrogative"/></f>
+<f id="Q1.o"  select="            bg       hr" name="Type"><sym value="modal"/></f>
+<f id="Q1.r"  select="                     hr" name="Type"><sym value="affirmative"/></f>
+<f id="Q2.s"  select="            bg         " name="Formation"><sym value="simple"/></f>
+<f id="Q2.c"  select="            bg         " name="Formation"><sym value="compound"/></f>
+<f id="Q3.n"  select="   ro                  " name="Clitic"><sym value="no"/></f>
+<f id="Q3.y"  select="   ro                  " name="Clitic"><sym value="yes"/></f>
+</fLib>
