@@ -69,6 +69,8 @@ test-interpret: egg
 	diff tests/egg.dout.txt tests/egg.test.txt
 	../egg match eggr.egg grammar eggr.egg > tests/eggr.test.txt
 	diff tests/eggr.dout.txt tests/eggr.test.txt
+	../egg match ../perf_test/JSON.egg JSON ../perf_test/input/json-ijs-elan2.0/kuca-xx.tei.json > tests/json.test.txt
+	diff tests/json.dout.txt tests/json.test.txt
 	rm tests/*.test.txt
 	@echo
 	@echo INTERPRETED TESTS PASSED
