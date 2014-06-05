@@ -1,13 +1,13 @@
 Document       = prolog Element Misc* EOT
 prolog 	       = XMLDecl? Misc*
-XMLDecl 	     = "<?xml" VersionInfo EncodingDecl? S? "?>"
-VersionInfo 	 = S "version" Eq ("\'" VersionNum "\'" 
+XMLDecl 	   = "<?xml" VersionInfo EncodingDecl? S? "?>"
+VersionInfo    = S "version" Eq ("\'" VersionNum "\'" 
                  | "\"" VersionNum "\""
                  )
 Eq             = S? "=" S?
 VersionNum 	   = ([a-zA-Z0-9_.:] | "-")+
-Misc 	         = COMMENT | S
-EncodingDecl 	 = S "encoding" Eq ("\'" EncName "\'" 
+Misc 	       = COMMENT | S
+EncodingDecl   = S "encoding" Eq ("\'" EncName "\'" 
                  | "\"" EncName "\""
                  )
 EncName 	     = [A-Za-z] ([A-Za-z0-9._] | "-")*
@@ -17,10 +17,10 @@ DIGIT          = [0-9]
 NAME_CHAR      = LETTER | DIGIT | "." | "-" | "_" | ":"
 NAME           = (LETTER | "_" | ":") NAME_CHAR*
 ENTITY_REF     = "&" NAME ";"
-CHAR_REF 	     = "&#x" [0-9a-fA-F]+ ";" | "&#" [0-9]+ ";"
-REFERENCE 	   = 	ENTITY_REF | CHAR_REF
+CHAR_REF 	   = "&#x" [0-9a-fA-F]+ ";" | "&#" [0-9]+ ";"
+REFERENCE 	   = ENTITY_REF | CHAR_REF
 EOT            = !.
-COMMENT 	     = "<!--" (!'-' . | "-" !'-' .)* "-->"
+COMMENT 	   = "<!--" (!'-' . | "-" !'-' .)* "-->"
 ATT_VALUE 	   = "\"" (![<&\"] . | REFERENCE)* "\""
 			         | "\'"  (![<&\'] . | REFERENCE)* "\'"
 CHAR_DATA 	   = (![<&] .)+

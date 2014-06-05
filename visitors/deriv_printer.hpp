@@ -110,6 +110,7 @@ namespace derivs {
 			} else {
 				out << "{RULE :" << it->second << "} ";
 			}
+			print_fns(&e); out << " ";
 			print_unbraced(e.r);
 			out << std::endl;
 		}
@@ -173,9 +174,13 @@ namespace derivs {
 				rs.insert(std::make_pair(e.r.get(), std::to_string(i)));
 				pl.push_back(&e);
 				
-				out << "{RULE @" << i << "}";
+				out << "{RULE ";
+				print_fns(&e);
+				out << " @" << i << "}";
 			} else {  // printed this rule before
-				out << "{RULE @" << it->second << "}";
+				out << "{RULE ";
+				print_fns(&e);
+				out << " @" << it->second << "}";
 			}
 		}
 		

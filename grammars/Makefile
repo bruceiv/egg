@@ -28,6 +28,9 @@ parser.hpp:
 %.cpp:  %.egg
 	../egg -o $@ -i $<
 
+xml.hpp:  
+	../egg -o xml.hpp -i ../perf_test/XML.egg
+
 abc:  abc.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -o abc abc.cpp $(LDFLAGS)
 
@@ -36,6 +39,9 @@ anbncn:  anbncn.cpp parser.hpp
 
 calc:  calc.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -o calc calc.cpp $(LDFLAGS)
+
+xml:  xml.hpp xml.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -o xml xml.cpp $(LDFLAGS)
 
 egg:
 	cd .. && $(MAKE) egg

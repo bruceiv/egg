@@ -30,6 +30,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 #include "utils/uint_set.hpp"
@@ -167,6 +168,7 @@ namespace derivs {
 	
 	/// Abstract base class for memoized parsing expressions
 	class memo_expr : public expr {
+	friend class fixer;
 	public:
 		/// Memoization table type
 		using table = std::unordered_map<memo_expr*, ptr<expr>>;
@@ -203,6 +205,57 @@ namespace derivs {
 			bool back  : 1; ///< Is there a backtrack set stored?
 		} flags;                     ///< Memoization status flags
 	}; // class memo_expr
+	
+	/// Calculates least fixed point of match sets for compound expressions and stores them in the 
+	/// memo table. Approach based on Kleene's fixed point theorem, as implemented in the 
+	/// derivative parser of Might et al. for CFGs.
+	class fixer : public visitor {
+	public:
+		/// Calculates the least fixed point of x->match() and memoizes it
+		void operator() (ptr<expr> x);
+		
+		// Implements visitor
+		void visit(fail_expr&);
+		void visit(inf_expr&);
+		void visit(eps_expr&);
+		void visit(look_expr&);
+		void visit(char_expr&);
+		void visit(range_expr&);
+		void visit(any_expr&);
+		void visit(str_expr&);
+		void visit(rule_expr&);
+		void visit(not_expr&);
+		void visit(map_expr&);
+		void visit(alt_expr&);
+		void visit(seq_expr&);
+	
+	private:
+		/// Performs fixed point computation to calculate match set of x
+		/// Based on Kleene's thm, iterates upward from a bottom set of {}
+		gen_set fix_match(ptr<expr> x);
+		
+		/// Recursively calculates next iteration of match set
+		/// @param x        The expression to match
+		/// @param changed  Did some subexpression change its value for match?
+		/// @param visited  Which subexpressions have been visited?
+		/// @return The match set
+		gen_set iter_match(ptr<expr> x, bool& changed, 
+		                   std::unordered_set<ptr<expr>>& visited);
+		
+		/// Wraps visitor pattern for actual calculation of next match set
+		/// @param x        The expression to match
+		/// @param changed  Did some subexpression change its value for match?
+		/// @param visited  Which subexpressions have been visited?
+		/// @return The match set
+		gen_set calc_match(ptr<expr> x, bool& changed, 
+		                   std::unordered_set<ptr<expr>>& visited);
+		
+		std::unordered_set<ptr<expr>>  running;  ///< Set of expressions currently being fixed
+		std::unordered_set<ptr<expr>>  fixed;    ///< Set of expressions already fixed
+		std::unordered_set<ptr<expr>>* visited;  ///< Set of expressions visited in current fix
+		bool*                          changed;  ///< Has anything in the current fix changed?
+		gen_set                        match;    ///< Match returned by current fix
+	}; // class fixer
 	
 	/// A failure parsing expression
 	class fail_expr : public expr {
@@ -525,8 +578,8 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char) const;
-		virtual gen_set  match_set() const;
-		virtual gen_set  back_set()  const;
+		virtual gen_set  match_set()  const;
+		virtual gen_set  back_set()   const;
 		virtual expr_type type()      const { return seq_type; }
 		
 		ptr<expr> a;   ///< First subexpression
