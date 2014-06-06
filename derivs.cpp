@@ -5,6 +5,25 @@
 
 namespace derivs {
 	
+	std::ostream& operator<< (std::ostream& out, expr_type t) {
+		switch (t) {
+		case fail_type:  out << "FAIL";  break;
+		case inf_type:   out << "INF";   break;
+		case eps_type:   out << "EPS";   break;
+		case look_type:  out << "LOOK";  break;
+		case char_type:  out << "CHAR";  break;
+		case range_type: out << "RANGE"; break;
+		case any_type:   out << "ANY";   break;
+		case str_type:   out << "STR";   break;
+		case rule_type:  out << "RULE";  break;
+		case not_type:   out << "NOT";   break;
+		case map_type:   out << "MAP";   break;
+		case alt_type:   out << "ALT";   break;
+		case seq_type:   out << "SEQ";   break;
+		}
+		return out;
+	}
+	
 	// expr ////////////////////////////////////////////////////////////////////////
 	
 	gen_set expr::new_back_map(ptr<expr> e, gen_type gm, bool& did_inc) {
@@ -119,7 +138,7 @@ namespace derivs {
 		// by Kleene's thm this is a fixed point
 		gen_set match_set = expr::empty_set;
 		while (true) {
-			iter_match(x, changed, visited);
+			match_set = iter_match(x, changed, visited);
 			if ( ! changed ) break;
 			changed = false;
 			visited.clear();
@@ -161,9 +180,8 @@ namespace derivs {
 	void fixer::visit(char_expr&)   { match = expr::empty_set; }
 	void fixer::visit(range_expr&)  { match = expr::empty_set; }
 	void fixer::visit(any_expr&)    { match = expr::empty_set; }
-	void fixer::visit(str_expr& x)  { 
-		match = x.size() == 0 ? expr::zero_set : expr::empty_set;
-	}
+	void fixer::visit(str_expr& x)  { match = expr::empty_set; }
+	
 	void fixer::visit(rule_expr& x) {
 		// Stop this from infinitely recursing
 		if ( ! x.flags.match ) {
@@ -174,11 +192,20 @@ namespace derivs {
 		// Calculate and cache match set
 		match = x.memo_match = iter_match(x.r, *changed, *visited);
 	}
-	void fixer::visit(not_expr&)    { match = expr::one_set; }
+	
+	void fixer::visit(not_expr& x)  {
+		// Make sure subexpressions are fixed
+		iter_match(x.e, *changed, *visited);
+		// Return static match value
+		match = expr::one_set;
+	}
+	
 	void fixer::visit(map_expr& x)  {
 		// Calculate and cache match set
 		match = x.memo_match = x.eg(iter_match(x.e, *changed, *visited));
+		x.flags.match = true;
 	}
+	
 	void fixer::visit(alt_expr& x)  {
 		// Save changed and visited references, in case first iter_match overwrites
 		bool& changed = *(this->changed);
@@ -187,7 +214,9 @@ namespace derivs {
 		// Calculate and cache match set
 		match = x.memo_match = x.ag(iter_match(x.a, changed, visited)) 
 		                       | x.bg(iter_match(x.b, changed, visited));
+		x.flags.match = true;
 	}
+	
 	void fixer::visit(seq_expr& x)    {
 		// Save changed and visited references, in case iter_match overwrites
 		bool& changed = *(this->changed);
@@ -198,39 +227,53 @@ namespace derivs {
 		
 		gen_set am = iter_match(x.a, changed, visited);
 		auto at = am.begin();
+		// Make sure successor is fixed also
+		iter_match(x.b, changed, visited);
 		
-		// Include matches from match-fail follower
-		if ( at != am.end() && *at == 0 ) {  // uninitialized version
-			m = iter_match(x.b, changed, visited);
+		// initialize match-fail follower if uninitialized and needed
+		if ( at != am.end() && *at == 0 ) {
+			// Add backtrack node
+			if ( x.c->type() == fail_type ) {
+				bool did_inc = false;
+				x.c = x.b;
+				x.cg = expr::default_back_map(x.c, did_inc);
+				if ( did_inc ) x.gm = 1;
+			}
 			++at;
-		} else {  // initialized version
-			m = x.cg(iter_match(x.c, changed, visited));
 		}
+		// Include matches from match-fail follower
+		m = x.cg(iter_match(x.c, changed, visited));
 		
 		// Include matches from matching lookahead successors
-		if ( at != am.end() && x.bs.empty() ) {  // uninitialized version
-			gen_set bm = iter_match(x.b, changed, visited);
-			m |= bm;
-			if ( !bm.empty() && bm.min() == 0 ) m |= 1;
-		} else {  // initialized version
-			auto bit = x.bs.begin();
-			while ( at != am.end() && bit != x.bs.end() ) {
-				auto& bi = *bit;
-				auto  ai = *at;
-			
-				// Find matching generations
-				if ( bi.g < ai ) { ++bit; continue; }
-				else if ( bi.g > ai ) { ++at; continue; }
-			
-				// Add followers to match set as well as follower match-fail
-				m |= bi.eg(iter_match(bi.e, changed, visited));
-				if ( bi.gl > 0 ) m |= bi.gl;
-			
-				++at; ++bit;
+		auto bit = x.bs.begin();
+		while ( at != am.end() && bit != x.bs.end() ) {
+			auto& bi = *bit;
+			auto  ai = *at;
+		
+			// Find matching generations
+			if ( bi.g < ai ) {
+				// Make sure generation is fixed
+				iter_match(bi.e, changed, visited);
+				// skip adding generation to match set
+				++bit; continue;
 			}
+			else if ( bi.g > ai ) { ++at; continue; }
+		
+			// Add followers to match set as well as follower match-fail
+			gen_set bm = bi.eg(iter_match(bi.e, changed, visited));
+			m |= bm;
+			
+			if ( bi.gl > 0 ) m |= bi.gl;
+			else if ( ! bm.empty() && bm.min() == 0 ) {
+				bi.gl = 1;
+				m |= bi.gl;
+			}
+		
+			++at; ++bit;
 		}
 		
 		match = x.memo_match = m;
+		x.flags.match = true;
 	}
 	
 	// fail_expr ///////////////////////////////////////////////////////////////////

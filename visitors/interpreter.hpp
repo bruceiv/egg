@@ -153,12 +153,6 @@ namespace derivs {
 			
 			rVal = nullptr;
 			
-			// Calculate fixed point of match() for all expressions
-			derivs::fixer fix;
-			for (auto rp : rs) {
-				fix(rp.second);
-			}
-			
 			// Normalize rules
 			normalizer n(memo);
 			std::map<std::string, ptr<rule_expr>> nrs;
@@ -168,6 +162,12 @@ namespace derivs {
 				names.insert(std::make_pair(nr->r.get(), rp.first));
 			}
 			rs.swap(nrs);
+			
+			// Calculate fixed point of match() for all expressions
+			derivs::fixer fix;
+			for (auto rp : rs) {
+				fix(rp.second);
+			}
 			
 			if ( dbg ) {
 				derivs::printer p(std::cout, names);

@@ -28,7 +28,10 @@ CXXFLAGS = -O0 -ggdb --std=c++0x
 
 OBJS = derivs.o
 
-egg:  main.cpp $(OBJS) egg.hpp parser.hpp derivs.hpp \
+derivs.o:  derivs.cpp derivs.hpp
+	$(CXX) $(CXXFLAGS) -c derivs.cpp
+
+egg:  main.cpp $(OBJS) egg.hpp parser.hpp \
       visitors/printer.hpp visitors/compiler.hpp visitors/interpreter.hpp visitors/normalizer.hpp \
       visitors/deriv_printer.hpp
 	$(CXX) $(CXXFLAGS) -o egg main.cpp $(OBJS) $(LDFLAGS)

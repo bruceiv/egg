@@ -87,6 +87,8 @@ namespace derivs {
 		seq_type
 	}; // enum expr_type
 	
+	std::ostream& operator<< (std::ostream& out, expr_type t);
+	
 	/// Abstract base class of all derivative visitors
 	class visitor {
 	public:
@@ -107,6 +109,7 @@ namespace derivs {
 	
 	/// Abstract base class for parsing expressions
 	class expr {
+	friend class fixer;
 	protected:
 		expr() = default;
 		
