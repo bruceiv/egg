@@ -814,7 +814,7 @@ namespace parser {
 	/** Memoizes a some-matcher */
 	combinator memoize_some(ind id, const combinator& f) {
 		return [id,&f](state& ps) {
-			posn psStart;
+			posn psStart = ps.posn();
 			many_memoized(id, f, ps);
 			return ( ps.posn() > psStart );
 		};
