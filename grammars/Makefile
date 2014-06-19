@@ -28,8 +28,11 @@ parser.hpp:
 %.cpp:  %.egg
 	../egg -o $@ -i $<
 
-xml.hpp:  
+xml.hpp:  ../perf_test/XML.egg
 	../egg -o xml.hpp -i ../perf_test/XML.egg
+
+json.hpp:  ../perf_test/JSON.egg
+	../egg -o json.hpp -i ../perf_test/JSON.egg
 
 abc:  abc.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -o abc abc.cpp $(LDFLAGS)
@@ -40,8 +43,14 @@ anbncn:  anbncn.cpp parser.hpp
 calc:  calc.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -o calc calc.cpp $(LDFLAGS)
 
+nested:  nested.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -o nested nested.cpp $(LDFLAGS)
+
 xml:  xml.hpp xml.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -o xml xml.cpp $(LDFLAGS)
+
+json:  json.hpp json.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -o json json.cpp $(LDFLAGS)
 
 egg:
 	cd .. && $(MAKE) egg
@@ -50,8 +59,10 @@ clean:
 	-rm abc abc.cpp 
 	-rm anbncn anbncn.cpp 
 	-rm calc calc.cpp
+	-rm nested nested.cpp
+	-rm xml xml.hpp
 
-test-compile: egg abc anbncn calc
+test-compile: egg abc anbncn calc nested xml json
 	@echo
 	./abc < tests/abc.in.txt > tests/abc.test.txt
 	diff tests/abc.out.txt tests/abc.test.txt
@@ -59,6 +70,12 @@ test-compile: egg abc anbncn calc
 	diff tests/anbncn.out.txt tests/anbncn.test.txt
 	./calc < tests/calc.in.txt > tests/calc.test.txt
 	diff tests/calc.out.txt tests/calc.test.txt
+	./nested < tests/nested.in.txt > tests/nested.test.txt
+	diff tests/nested.out.txt tests/nested.test.txt
+	./xml < ../perf_test/input/ijs-elan2.0/kuca-xx.tei > tests/xml.test.txt
+	diff tests/xml.out.txt tests/xml.test.txt
+	./json < ../perf_test/input/json-ijs-elan2.0/kuca-xx.tei.json > tests/json.test.txt
+	diff tests/json.out.txt tests/json.test.txt
 	rm tests/*.test.txt
 	@echo
 	@echo COMPILED TESTS PASSED
@@ -71,12 +88,16 @@ test-interpret: egg
 	diff tests/anbncn.dout.txt tests/anbncn.test.txt
 	../egg match-lines calc.egg expr tests/calc.in.txt > tests/calc.test.txt
 	diff tests/calc.dout.txt tests/calc.test.txt
+	../egg match-lines nested.egg String tests/nested.in.txt > tests/nested.test.txt
+	diff tests/nested.dout.txt tests/nested.test.txt
 	../egg match-lines eggr.egg grammar tests/egg.in.txt > tests/egg.test.txt
 	diff tests/egg.dout.txt tests/egg.test.txt
 	../egg match eggr.egg grammar eggr.egg > tests/eggr.test.txt
 	diff tests/eggr.dout.txt tests/eggr.test.txt
 	../egg match ../perf_test/JSON.egg JSON ../perf_test/input/json-ijs-elan2.0/kuca-xx.tei.json > tests/json.test.txt
 	diff tests/json.dout.txt tests/json.test.txt
+	../egg match ../perf_test/XML.egg Document ../perf_test/input/ijs-elan2.0/kuca-xx.tei > tests/xml.test.txt
+	diff tests/xml.dout.txt tests/xml.test.txt
 	rm tests/*.test.txt
 	@echo
 	@echo INTERPRETED TESTS PASSED

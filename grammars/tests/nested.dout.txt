@@ -1,0 +1,9 @@
+DONE PARSING
+Rule `String` matched "()"
+Rule `String` matched "(hello(world))"
+Rule `String` matched "((foo)bar(baz))"
+Rule `String` matched "()()(())(()()(()))"
+Rule `String` DID NOT match "("
+Rule `String` DID NOT match "(()"
+Rule `String` DID NOT match "())"
+Rule `String` matched ""

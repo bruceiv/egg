@@ -19,6 +19,7 @@
 # THE SOFTWARE.
 
 CXX = clang++
+#CXX = g++
 
 CXXFLAGS = -O0 -ggdb --std=c++0x
 #CXXFLAGS = -O0 --std=c++0x
@@ -37,4 +38,5 @@ egg:  main.cpp $(OBJS) egg.hpp parser.hpp \
 	$(CXX) $(CXXFLAGS) -o egg main.cpp $(OBJS) $(LDFLAGS)
 
 clean:  
+	-rm derivs.o
 	-rm egg
