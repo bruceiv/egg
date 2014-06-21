@@ -4,6 +4,7 @@ calc
 nested
 xml
 json
+java
 *.hpp
 *.cpp
 *.o

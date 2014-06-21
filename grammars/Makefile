@@ -34,6 +34,9 @@ xml.hpp:  ../perf_test/XML.egg
 json.hpp:  ../perf_test/JSON.egg
 	../egg -o json.hpp -i ../perf_test/JSON.egg
 
+java.hpp:  ../perf_test/Java.egg
+	../egg -o java.hpp -i ../perf_test/Java.egg
+
 abc:  abc.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -o abc abc.cpp $(LDFLAGS)
 
@@ -51,6 +54,9 @@ xml:  xml.hpp xml.cpp parser.hpp
 
 json:  json.hpp json.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -o json json.cpp $(LDFLAGS)
+
+java:  java.hpp java.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -o java java.cpp $(LDFLAGS)
 
 egg:
 	cd .. && $(MAKE) egg
