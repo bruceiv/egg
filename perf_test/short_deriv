@@ -1,14 +1,11 @@
 #!/bin/zsh
 
 outname="output/deriv-`date +%y%m%d%H%M`-`git describe --tags --long`"
-if [ "$#" -ge 1 ]; then
-	outname="${outname}-$1"
-fi
 
 outfile="${outname}-xml.csv"
 echo '"filename","output","user(s)","sys(s)","wall(s)","max-mem(KB)","size(B)"' | tee $outfile
 # Iterate XML files sorted increasing by size
-for file in input/ijs-elan2.0/*(oL)[1,10]; do
+for file in input/ijs-elan2.0/*(oL[1,10]); do
 	echo -n "\"`basename $file`\",\"" | tee -a $outfile
 	/usr/bin/time -f "\",%U,%S,%e,%M," ../egg match XML.egg Document < $file 2>&1 | tr -d '\n' | tee -a $outfile
 	stat -c %s $file | tee -a $outfile

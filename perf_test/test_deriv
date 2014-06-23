@@ -1,9 +1,6 @@
 #!/bin/zsh
 
 outname="output/deriv-`date +%y%m%d%H%M`-`git describe --tags --long`"
-if [ "$#" -ge 1 ]; then
-	outname="${outname}-$1"
-fi
 
 outfile="${outname}-xml.csv"
 echo '"filename","output","user(s)","sys(s)","wall(s)","max-mem(KB)","size(B)"' | tee $outfile
