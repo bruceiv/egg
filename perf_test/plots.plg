@@ -1,0 +1,38 @@
+# Plots output data from egg performance tests
+# requires parameters pxml, pjson, dxml, djson; the files to plot
+
+set datafile separator ","
+
+set terminal pdfcairo linewidth 3
+set output 'plots/runtime.pdf'
+
+set xlabel 'Input Size (B)'
+set ylabel 'Runtime (s)'
+set key top left
+
+set style line 1 lt rgb '#fcaf3e' lw 1.5 pt 1
+set style line 2 lt rgb '#f57900' lw 1.5 pt 2
+set style line 3 lt rgb '#ce5c00' lw 1.5 pt 3
+
+set style line 4 lt rgb '#8ae234' lw 1.5 pt 5
+set style line 5 lt rgb '#73d216' lw 1.5 pt 7
+set style line 6 lt rgb '#4e9a06' lw 1.5 pt 9
+
+set style line 7 lt rgb '#729fcf' lw 1.5 pt 4
+set style line 8 lt rgb '#3465a4' lw 1.5 pt 6
+set style line 9 lt rgb '#204a87' lw 1.5 pt 8
+
+plot pxml using 7:3 with linespoints title 'Packrat XML' ls 4, \
+     pjson using 7:3 with linespoints title 'Packrat JSON' ls 5, \
+     dxml using 7:3 with linespoints title 'Derivative XML' ls 7, \
+     djson using 7:3 with linespoints title 'Derivative JSON' ls 8
+
+set output 'plots/mem-use.pdf'
+set ylabel 'Maximum RAM Use (KB)'
+
+plot pxml using 7:6 with linespoints title 'Packrat XML' ls 4, \
+     pjson using 7:6 with linespoints title 'Packrat JSON' ls 5, \
+     dxml using 7:6 with linespoints title 'Derivative XML' ls 7, \
+     djson using 7:6 with linespoints title 'Derivative JSON' ls 8
+
+set output

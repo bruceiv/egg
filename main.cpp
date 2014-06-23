@@ -320,7 +320,7 @@ int main(int argc, char** argv) {
 	ast::grammar_ptr g;
 	
 	if ( egg::grammar(ps, g) ) {
-		std::cout << "DONE PARSING" << std::endl;
+		if ( a.dbg() ) { std::cout << "DONE PARSING" << std::endl; }
 		if ( a.norm() ) {
 			visitor::normalizer n;
 			n.normalize(*g);
