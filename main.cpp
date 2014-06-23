@@ -343,8 +343,7 @@ int main(int argc, char** argv) {
 				std::cout << std::endl;
 			}
 			
-			parser::state in(a.source());
-			bool b = derivs::match(*g, in, a.rule(), a.dbg());
+			bool b = derivs::match(*g, a.source(), a.rule(), a.dbg());
 			a.output() << "Rule `" << a.rule() << "` " 
 			           << ( b ? "matched" : "DID NOT match" ) << std::endl;
 			break;
@@ -359,8 +358,7 @@ int main(int argc, char** argv) {
 			derivs::loader l(*g, a.dbg());
 			while ( std::getline(a.source(), line) ) {
 				std::stringstream ss(line);
-				parser::state in(ss);
-				bool b = derivs::match(l, in, a.rule(), a.dbg());
+				bool b = derivs::match(l, ss, a.rule(), a.dbg());
 				a.output() << "Rule `" << a.rule() << "` " 
 			               << ( b ? "matched" : "DID NOT match" ) 
 			               << " \"" << line << "\"" << std::endl;

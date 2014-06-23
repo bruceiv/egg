@@ -22,6 +22,7 @@
  * THE SOFTWARE.
  */
 
+#include <istream>
 #include <map>
 #include <string>
 #include <utility>
@@ -304,11 +305,11 @@ namespace derivs {
 	
 	/// Recognizes the input
 	/// @param l		Loaded derivatives
-	/// @param ps		Parser state
+	/// @param in		Input stream
 	/// @param rule		Start rule
 	/// @param dbg		Print debug output? (default false)
 	/// @return true for match, false for failure
-	bool match(loader& l, parser::state& ps, std::string rule, bool dbg = false) {
+	bool match(loader& l, std::istream& in, std::string rule, bool dbg = false) {
 		auto& rs = l.get_rules();
 		auto& memo = l.get_memo();
 		derivs::printer p(std::cout, l.get_names());
@@ -333,7 +334,9 @@ namespace derivs {
 			// Break on a match
 			if ( ! e->match().empty() ) return true;
 			
-			char x = ps();
+			char x;
+			if ( ! in.get(x) ) { x = '\0'; }  // read character, \0 for EOF
+			
 			if ( dbg ) {
 				std::cout << "d(\'" << (x == '\0' ? "\\0" : strings::escape(x)) << "\') =====>" 
 				          << std::endl;
@@ -343,7 +346,6 @@ namespace derivs {
 			memo.clear(); // clear memoization table after every character
 			
 			if ( x == '\0' ) break;
-			++ps;
 		}
 		if ( dbg ) { p.print(e); }
 		
@@ -353,13 +355,13 @@ namespace derivs {
 	
 	/// Recognizes the input
 	/// @param g		Source grammar
-	/// @param ps		Parser state
+	/// @param in		Input stream
 	/// @param rule		Start rule
 	/// @param dbg		Print debug output? (default false)
 	/// @return true for match, false for failure
-	bool match(ast::grammar& g, parser::state& ps, std::string rule, bool dbg = false) {
+	bool match(ast::grammar& g, std::istream& in, std::string rule, bool dbg = false) {
 		loader l(g, dbg);
-		return match(l, ps, rule, dbg);
+		return match(l, in, rule, dbg);
 	}
 	
 } // namespace derivs

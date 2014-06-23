@@ -1,4 +1,3 @@
-DONE PARSING
 Rule `g1` DID NOT match ""
 Rule `g1` matched "abc"
 Rule `g1` matched "c"
