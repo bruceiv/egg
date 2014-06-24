@@ -1,7 +1,5 @@
 #!/bin/zsh
 
-# gnuplot -e "pxml='output/packrat-1406210930-v0.3.1-79-g958cb03-xml.csv'; pjson='output/packrat-1406210930-v0.3.1-79-g958cb03-json.csv'; dxml='output/deriv-1406211124-v0.3.1-80-g93031cc-xml.csv'; djson='output/deriv-1406211124-v0.3.1-80-g93031cc-json.csv'" plots.plg
-
 pxml=( output/packrat-*-xml.csv(om[1]) )
 pjson=( output/packrat-*-json.csv(om[1]) )
 dxml=( output/deriv-*-xml.csv(om[1]) )

@@ -1,0 +1,34 @@
+# Plots output data from egg performance tests
+# requires parameters oxml, ojson, nxml, njson; the files to plot
+
+set datafile separator ","
+
+set terminal pdfcairo linewidth 3
+set output 'plots/runtime-diff.pdf'
+
+set xlabel 'Input Size (B)'
+set ylabel 'Runtime (s)'
+set key top left
+
+set style line 1 lt rgb '#fcaf3e' lw 1.5 pt 1
+set style line 2 lt rgb '#f57900' lw 1.5 pt 2
+set style line 3 lt rgb '#ce5c00' lw 1.5 pt 3
+
+set style line 4 lt rgb '#8ae234' lw 1.5 pt 5
+set style line 5 lt rgb '#73d216' lw 1.5 pt 7
+set style line 6 lt rgb '#4e9a06' lw 1.5 pt 9
+
+plot oxml using 7:3 with linespoints title 'Old XML' ls 1, \
+     ojson using 7:3 with linespoints title 'Old JSON' ls 2, \
+     nxml using 7:3 with linespoints title 'New XML' ls 4, \
+     njson using 7:3 with linespoints title 'New JSON' ls 5
+
+set output 'plots/mem-use-diff.pdf'
+set ylabel 'Maximum RAM Use (KB)'
+
+plot oxml using 7:6 with linespoints title 'Old XML' ls 1, \
+     ojson using 7:6 with linespoints title 'Old JSON' ls 2, \
+     nxml using 7:6 with linespoints title 'New XML' ls 4, \
+     njson using 7:6 with linespoints title 'New JSON' ls 5
+
+set output
