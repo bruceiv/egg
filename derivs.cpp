@@ -26,54 +26,50 @@ namespace derivs {
 	
 	// expr ////////////////////////////////////////////////////////////////////////
 	
-	gen_set expr::new_back_map(ptr<expr> e, gen_type gm, bool& did_inc) {
+	gen_map expr::new_back_map(ptr<expr> e, gen_type gm, bool& did_inc) {
 		assert(!e->back().empty() && "backtrack set never empty");
 		
-		gen_set eg = zero_set;
+		gen_map eg{0};
 		if ( e->back().max() > 0 ) {
 			assert(e->back().max() == 1 && "static lookahead gen <= 1");
 			did_inc = true;
-			eg |= gm + 1;
+			eg.add(1, gm + 1);
 		}
 		
 		return eg;
 	}
 	
-	gen_set expr::default_back_map(ptr<expr> e, bool& did_inc) {
+	gen_map expr::default_back_map(ptr<expr> e, bool& did_inc) {
 		assert(!e->back().empty() && "backtrack set never empty");
 		if ( e->back().max() > 0 ) {
 			assert(e->back().max() == 1 && "static lookahead gen <= 1");
 			did_inc = true;
-			return zero_one_set;
+			return gen_map{0,1};
 		} else {
-			return zero_set;
+			return gen_map{0};
 		}
 	}
 	
-	gen_set expr::update_back_map(ptr<expr> e, ptr<expr> de, gen_set eg, 
+	gen_map expr::update_back_map(ptr<expr> e, ptr<expr> de, gen_map eg, 
 	                               gen_type gm, bool& did_inc) {
 		assert(!e->back().empty() && !de->back().empty() && "backtrack set never empty");
 		
-		gen_set deg = eg;
-		if ( de->back().max() > e->back().max() ) {
-//			assert(de->back().max() == e->back().max() + 1 && "gen only grows by 1");
-			deg |= gm+1;
+		gen_map deg = eg;
+		
+		gen_type debm = de->back().max();
+		if ( debm > e->back().max() ) {
+			deg.add(debm, gm+1);
 			did_inc = true;
 		}
 		
 		return deg;
 	}
 	
-	const gen_set expr::empty_set{};
-	const gen_set expr::zero_set{0};
-	const gen_set expr::one_set{1};
-	const gen_set expr::zero_one_set{0,1};
-	
 	// memo_expr ///////////////////////////////////////////////////////////////////
 	
 	void memo_expr::reset_memo() {
-		memo_match = expr::empty_set;
-		memo_back = expr::empty_set;
+		memo_match = gen_set{};
+		memo_back = gen_set{};
 		flags = {false,false};
 	}
 	
@@ -136,7 +132,7 @@ namespace derivs {
 		
 		// recalculate match expression until it doesn't change; 
 		// by Kleene's thm this is a fixed point
-		gen_set match_set = expr::empty_set;
+		gen_set match_set{};
 		while (true) {
 			match_set = iter_match(x, changed, visited);
 			if ( ! changed ) break;
@@ -173,20 +169,20 @@ namespace derivs {
 		return match;
 	}
 	
-	void fixer::visit(fail_expr&)   { match = expr::empty_set; }
-	void fixer::visit(inf_expr&)    { match = expr::empty_set; }
-	void fixer::visit(eps_expr&)    { match = expr::zero_set; }
+	void fixer::visit(fail_expr&)   { match = gen_set{}; }
+	void fixer::visit(inf_expr&)    { match = gen_set{}; }
+	void fixer::visit(eps_expr&)    { match = gen_set{0}; }
 	void fixer::visit(look_expr& x) { match = gen_set{x.b}; }
-	void fixer::visit(char_expr&)   { match = expr::empty_set; }
-	void fixer::visit(range_expr&)  { match = expr::empty_set; }
-	void fixer::visit(any_expr&)    { match = expr::empty_set; }
-	void fixer::visit(str_expr& x)  { match = expr::empty_set; }
+	void fixer::visit(char_expr&)   { match = gen_set{}; }
+	void fixer::visit(range_expr&)  { match = gen_set{}; }
+	void fixer::visit(any_expr&)    { match = gen_set{}; }
+	void fixer::visit(str_expr& x)  { match = gen_set{}; }
 	
 	void fixer::visit(rule_expr& x) {
 		// Stop this from infinitely recursing
 		if ( ! x.flags.match ) {
 			x.flags.match = true;
-			x.memo_match = expr::empty_set;
+			x.memo_match = gen_set{};
 		}
 		
 		// Calculate and cache match set
@@ -197,7 +193,7 @@ namespace derivs {
 		// Make sure subexpressions are fixed
 		iter_match(x.e, *changed, *visited);
 		// Return static match value
-		match = expr::one_set;
+		match = gen_set{1};
 	}
 	
 	void fixer::visit(map_expr& x)  {
@@ -283,9 +279,9 @@ namespace derivs {
 	// A failure expression can't un-fail - no strings to match with any prefix
 	ptr<expr> fail_expr::d(char) const { return fail_expr::make(); }
 		
-	gen_set fail_expr::match() const { return expr::empty_set; }
+	gen_set fail_expr::match() const { return gen_set{}; }
 	
-	gen_set fail_expr::back()  const { return expr::zero_set; }
+	gen_set fail_expr::back()  const { return gen_set{0}; }
 	
 	// inf_expr ////////////////////////////////////////////////////////////////////
 	
@@ -294,9 +290,9 @@ namespace derivs {
 	// An infinite loop expression never breaks, ill defined with any prefix
 	ptr<expr> inf_expr::d(char) const { return inf_expr::make(); }
 	
-	gen_set inf_expr::match() const { return expr::empty_set; }
+	gen_set inf_expr::match() const { return gen_set{}; }
 	
-	gen_set inf_expr::back()  const { return expr::zero_set; }
+	gen_set inf_expr::back()  const { return gen_set{0}; }
 	
 	// eps_expr ////////////////////////////////////////////////////////////////////
 	
@@ -307,9 +303,9 @@ namespace derivs {
 		return ( x == '\0' ) ? eps_expr::make() : fail_expr::make();
 	}
 	
-	gen_set eps_expr::match() const { return expr::zero_set; }
+	gen_set eps_expr::match() const { return gen_set{0}; }
 	
-	gen_set eps_expr::back()  const { return expr::zero_set; }
+	gen_set eps_expr::back()  const { return gen_set{0}; }
 	
 	// look_expr ///////////////////////////////////////////////////////////////////
 	
@@ -319,10 +315,7 @@ namespace derivs {
 	
 	// No prefixes to remove from language containing the empty string; all fail
 	ptr<expr> look_expr::d(char x) const { return look_expr::make(b); }
-/*	ptr<expr> look_expr::d(char x) const {  
-		return ( x == '\0' ) ? look_expr::make(b) : fail_expr::make();
-	}
-*/	
+
 	gen_set look_expr::match() const { return gen_set{b}; }
 	
 	gen_set look_expr::back()  const { return gen_set{b}; }
@@ -336,9 +329,9 @@ namespace derivs {
 		return ( c == x ) ? eps_expr::make() : fail_expr::make();
 	}
 	
-	gen_set char_expr::match() const { return expr::empty_set; }
+	gen_set char_expr::match() const { return gen_set{}; }
 	
-	gen_set char_expr::back()  const { return expr::zero_set; }
+	gen_set char_expr::back()  const { return gen_set{0}; }
 	
 	// range_expr //////////////////////////////////////////////////////////////////
 	
@@ -349,9 +342,9 @@ namespace derivs {
 		return ( b <= x && x <= e ) ? eps_expr::make() : fail_expr::make();
 	}
 	
-	gen_set range_expr::match() const { return expr::empty_set; }
+	gen_set range_expr::match() const { return gen_set{}; }
 	
-	gen_set range_expr::back()  const { return expr::zero_set; }
+	gen_set range_expr::back()  const { return gen_set{0}; }
 	
 	// any_expr ////////////////////////////////////////////////////////////////////
 	
@@ -362,9 +355,9 @@ namespace derivs {
 		return ( x == '\0' ) ? fail_expr::make() : eps_expr::make();
 	}
 	
-	gen_set any_expr::match() const { return expr::empty_set; }
+	gen_set any_expr::match() const { return gen_set{}; }
 	
-	gen_set any_expr::back()  const { return expr::zero_set; }
+	gen_set any_expr::back()  const { return gen_set{0}; }
 	
 	// str_expr ////////////////////////////////////////////////////////////////////
 	
@@ -387,9 +380,9 @@ namespace derivs {
 		return expr::make_ptr<str_expr>(t);
 	}
 	
-	gen_set str_expr::match() const { return expr::empty_set; }
+	gen_set str_expr::match() const { return gen_set{}; }
 	
-	gen_set str_expr::back()  const { return expr::zero_set; }
+	gen_set str_expr::back()  const { return gen_set{0}; }
 	
 	// rule_expr ///////////////////////////////////////////////////////////////////
 	
@@ -410,7 +403,7 @@ namespace derivs {
 	gen_set rule_expr::match_set() const {
 		// Stop this from infinitely recursing
 		flags.match = true;
-		memo_match = expr::empty_set;
+		memo_match = gen_set{};
 		
 		// Calculate match set
 		return r->match();
@@ -419,7 +412,7 @@ namespace derivs {
 	gen_set rule_expr::back_set() const {
 		// Stop this from infinitely recursing
 		flags.back = true;
-		memo_back = expr::zero_set;
+		memo_back = gen_set{0};
 		
 		// Calculate backtrack set
 		return r->back();
@@ -443,18 +436,17 @@ namespace derivs {
 	// Take negative lookahead of subexpression derivative
 	ptr<expr> not_expr::deriv(char x) const { return not_expr::make(memo, e->d(x)); }
 	
-	gen_set not_expr::match_set() const { return expr::empty_set; }
+	gen_set not_expr::match_set() const { return gen_set{}; }
 	
-	gen_set not_expr::back_set() const { return expr::one_set; }
+	gen_set not_expr::back_set() const { return gen_set{1}; }
 	
 	// map_expr ////////////////////////////////////////////////////////////////////
 	
-	ptr<expr> map_expr::make(memo_expr::table& memo, ptr<expr> e, gen_type gm, gen_set eg) {
+	ptr<expr> map_expr::make(memo_expr::table& memo, ptr<expr> e, gen_type gm, gen_map eg) {
 		// account for unmapped generations
-		assert(e->back().max() < eg.count() && "no unmapped generations");
+		assert(!eg.empty() && "non-empty generation map");
+		assert(e->back().max() <= eg.max_key() && "no unmapped generations");
 		assert(eg.max() <= gm && "max is actually max");
-//		auto n = eg.count();
-//		for (auto i = e->back().max() + 1; i < n; ++i) eg |= ++gm;
 		
 		switch ( e->type() ) {
 		// Map expression match generation into exit generation
@@ -467,7 +459,7 @@ namespace derivs {
 		}
 		
 		// check if map isn't needed (identity map)
-		if ( gm + 1 == eg.count() ) return e;
+		if ( gm == eg.max_key() ) return e;
 		
 		return expr::make_ptr<map_expr>(memo, e, gm, eg);
 	}
@@ -490,7 +482,7 @@ namespace derivs {
 		// - If we've added a lookahead generation that wasn't there before, map it into the 
 		//   generation space of the derived alternation
 		bool did_inc = false;
-		gen_set deg = expr::update_back_map(e, de, eg, gm, did_inc);
+		gen_map deg = expr::update_back_map(e, de, eg, gm, did_inc);
 		return expr::make_ptr<map_expr>(memo, de, gm + did_inc, deg);
 	}
 	
@@ -513,13 +505,13 @@ namespace derivs {
 		if ( b->type() == fail_type || ! a->match().empty() ) return a;
 		
 		bool did_inc = false;
-		gen_set ag = expr::default_back_map(a, did_inc);
-		gen_set bg = expr::default_back_map(b, did_inc);
+		gen_map ag = expr::default_back_map(a, did_inc);
+		gen_map bg = expr::default_back_map(b, did_inc);
 		return expr::make_ptr<alt_expr>(memo, a, b, ag, bg, 0 + did_inc);
 	}
 	
 	ptr<expr> alt_expr::make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
-	                         gen_set ag, gen_set bg, gen_type gm) {
+	                         gen_map ag, gen_map bg, gen_type gm) {
 	    assert(!(ag.empty() || bg.empty()) && "backtrack maps non-empty");
 	    assert(gm >= ag.max() && gm >= bg.max() && "gm is actual maximum");
 	    
@@ -549,7 +541,7 @@ namespace derivs {
 		switch ( da->type() ) {
 		case fail_type: {
 			ptr<expr> db = b->d(x);
-			gen_set dbg = expr::update_back_map(b, db, bg, gm, did_inc);
+			gen_map dbg = expr::update_back_map(b, db, bg, gm, did_inc);
 			return map_expr::make(memo, db, gm + did_inc, dbg);
 		}
 		case inf_type:  return da; // an inf_expr
@@ -557,7 +549,7 @@ namespace derivs {
 		}
 		
 		// Map in new lookahead generations for derivative
-		gen_set dag = expr::update_back_map(a, da, ag, gm, did_inc);
+		gen_map dag = expr::update_back_map(a, da, ag, gm, did_inc);
 		
 		if ( ! da->match().empty() ) {
 			return map_expr::make(memo, da, gm + did_inc, dag);
@@ -566,7 +558,7 @@ namespace derivs {
 		// Calculate other derivative and map in new lookahead generations
 		ptr<expr> db = b->d(x);
 		if ( db->type() == fail_type ) return map_expr::make(memo, da, gm + did_inc, dag);
-		gen_set dbg = expr::update_back_map(b, db, bg, gm, did_inc);
+		gen_map dbg = expr::update_back_map(b, db, bg, gm, did_inc);
 				
 		return expr::make_ptr<alt_expr>(memo, da, db, dag, dbg, gm + did_inc);
 	}
@@ -602,14 +594,14 @@ namespace derivs {
 		
 		// Set up match-fail follower
 		ptr<expr> c;
-		gen_set   cg;
+		gen_map   cg;
 		gen_set am = a->match();
 		if ( ! am.empty() && am.min() == 0 ) {
 			c = b;
 			cg = expr::default_back_map(c, did_inc);
 		} else {
 			c = fail_expr::make();
-			cg = expr::zero_set;
+			cg = gen_map{0};
 		}
 		
 		// set up lookahead follower
@@ -641,22 +633,13 @@ namespace derivs {
 		case eps_type: {
 			// Take follower (or follower's end-of-string derivative on end-of-string)
 			ptr<expr> bn = ( x == '\0' ) ? b->d('\0') : b;
-			gen_set bng = expr::new_back_map(bn, gm, did_inc);
+			gen_map bng = expr::new_back_map(bn, gm, did_inc);
 			return map_expr::make(memo, bn, gm + did_inc, bng);
-/*			// If end of string, return how the follower handles end-of-string
-			if ( x == '\0' ) {
-				return b->d('\0');
-			}
-			
-			// Return follower, but with any lookahead gens mapped to their proper generation
-			gen_set bg = expr::new_back_map(b, gm, did_inc);
-			return map_expr::make(memo, b, gm + did_inc, bg);
-*/		} case look_type: {
+		} case look_type: {
 			// Lookahead follower (or lookahead follower match-fail)
 			auto i = std::static_pointer_cast<look_expr>(da)->b;
 			for (const look_node& bi : bs) {
 				if ( bi.g < i ) continue;
-//				if ( bi.g > i ) break;  // generation list is sorted
 				if ( bi.g > i ) return fail_expr::make();  // generation list is sorted
 				
 				ptr<expr> dbi = bi.e->d(x);  // found element, take derivative
@@ -669,7 +652,7 @@ namespace derivs {
 					}
 				}
 				
-				gen_set dbig = expr::update_back_map(bi.e, dbi, bi.eg, gm, did_inc);
+				gen_map dbig = expr::update_back_map(bi.e, dbi, bi.eg, gm, did_inc);
 				
 				// if there is no failure backtrack (or this generation is it) 
 				// we don't have to track it
@@ -680,25 +663,19 @@ namespace derivs {
 				
 				// Otherwise return alt-expr of this lookahead and its failure backtrack
 				return alt_expr::make(memo, dbi, look_expr::make(),
-				                      dbig, gen_set{0,bi.gl}, gm + did_inc);
-/*				return alt_expr::make(memo,
-				                      dbi, 
-				                      seq_expr::make(memo, 
-				                                     not_expr::make(memo, dbi), 
-				                                     look_expr::make()), 
-	                                  dbig, gen_set{0,bi.gl});
-*/			}
+				                      dbig, gen_map{0,bi.gl}, gm + did_inc);
+			}
 			// end-of-string is only case where we can get a lookahead success for an unseen gen
 			if ( x == '\0' ) {
 				ptr<expr> bn = b->d('\0');
-				gen_set bng = expr::new_back_map(bn, gm, did_inc);
+				gen_map bng = expr::new_back_map(bn, gm, did_inc);
 				return map_expr::make(memo, bn, gm + did_inc, bng);
 			}
 			return fail_expr::make(); // if lookahead follower not found, fail
 		} case fail_type: {
 			// Return match-fail follower
 			ptr<expr> dc = c->d(x);
-			gen_set dcg = expr::update_back_map(c, dc, cg, gm, did_inc);
+			gen_map dcg = expr::update_back_map(c, dc, cg, gm, did_inc);
 			return map_expr::make(memo, dc, gm + did_inc, dcg);
 		} case inf_type: {
 			// Propegate infinite loop
@@ -708,7 +685,7 @@ namespace derivs {
 		
 		// Construct new match-fail follower
 		ptr<expr> dc;
-		gen_set dcg;
+		gen_map dcg;
 		
 		gen_set dam = da->match();
 		if ( ! dam.empty() && dam.min() == 0 ) {
@@ -725,7 +702,7 @@ namespace derivs {
 		look_list dbs;
 		for (const look_node& bi : bs) {
 			ptr<expr> dbi = bi.e->d(x);
-			gen_set dbig = expr::update_back_map(bi.e, dbi, bi.eg, gm, did_inc);
+			gen_map dbig = expr::update_back_map(bi.e, dbi, bi.eg, gm, did_inc);
 			gen_type dgl = bi.gl;
 			gen_set dbim = dbi->match();
 			if ( ! dbim.empty() && dbim.min() == 0 ) {  // set new match-fail backtrack if needed
@@ -738,7 +715,6 @@ namespace derivs {
 		// Add new lookahead backtrack if needed
 		gen_type dabm = da->back().max();
 		if ( dabm > a->back().max() ) {
-//			assert(dabm == a->back().max() + 1 && "backtrack gen only grows by 1");
 			gen_type gl = 0;
 			gen_set bm = b->match();
 			if ( ! bm.empty() && bm.min() == 0 ) {  // set new match-fail backtrack if needed

@@ -33,13 +33,11 @@
 #include <unordered_set>
 #include <utility>
 
-#include "utils/uint_set.hpp"
-
-#include <iostream>
+#include "utils/uint_pfn.hpp"
 
 /**
  * Implements derivative parsing for parsing expression grammars, according to the algorithm 
- * described by Aaron Moss in 2014 (currently unpublished - contact the author for a manuscript).
+ * described by Aaron Moss in 2014 (http://arxiv.org/abs/1405.4841).
  * 
  * The basic idea of this derivative parsing algorithm is to repeatedly take the "derivative" of a 
  * parsing expression with respect to the next character in the input sequence, where the 
@@ -50,10 +48,12 @@ namespace derivs {
 	template <typename T>
 	using ptr = std::shared_ptr<T>;
 	
+	/// map of backtrack generations
+	using gen_map  = utils::uint_pfn;
 	/// set of backtrack generations
-	using gen_set  = utils::uint_set;
+	using gen_set  = gen_map::set_type;
 	/// single backtrack generation
-	using gen_type = gen_set::value_type;
+	using gen_type = gen_map::value_type;
 	
 	// Forward declarations of expression node types
 	class fail_expr;
@@ -114,16 +114,16 @@ namespace derivs {
 		expr() = default;
 		
 		/// Creates a new backtrack map to map an expression into a generation space
-		static gen_set new_back_map(ptr<expr> e, gen_type gm, bool& did_inc);
-		static inline gen_set new_back_map(ptr<expr> e, gen_type gm) {
+		static gen_map new_back_map(ptr<expr> e, gen_type gm, bool& did_inc);
+		static inline gen_map new_back_map(ptr<expr> e, gen_type gm) {
 			bool did_inc = true;
 			return new_back_map(e, gm, did_inc);
 		}
 		
 		/// Gets the default backtracking map for an expression 
-		///   (zero_set if no lookahead gens, zero_one_set otherwise)
-		static gen_set default_back_map(ptr<expr> e, bool& did_inc);
-		static inline gen_set default_back_map(ptr<expr> e) {
+		///   (zero_map if no lookahead gens, zero_one_map otherwise)
+		static gen_map default_back_map(ptr<expr> e, bool& did_inc);
+		static inline gen_map default_back_map(ptr<expr> e) {
 			bool did_inc = true;
 			return default_back_map(e, did_inc);
 		}
@@ -135,19 +135,14 @@ namespace derivs {
 		/// @param gm		The current maximum generation
 		/// @param did_inc	Set to true if this operation involved a new backtrack gen
 		/// @return The backtrack map for de
-		static gen_set update_back_map(ptr<expr> e, ptr<expr> de, gen_set eg, 
+		static gen_map update_back_map(ptr<expr> e, ptr<expr> de, gen_map eg, 
 		                               gen_type gm, bool& did_inc);
-		static inline gen_set update_back_map(ptr<expr> e, ptr<expr> de, gen_set eg, gen_type gm) {
+		static inline gen_map update_back_map(ptr<expr> e, ptr<expr> de, gen_map eg, gen_type gm) {
 			bool did_inc = true;
 			return update_back_map(e, de, eg, gm, did_inc);
 		}
 		
 	public:
-		static const gen_set empty_set;
-		static const gen_set zero_set;
-		static const gen_set one_set;
-		static const gen_set zero_one_set;
-		
 		template<typename T, typename... Args>
 		static ptr<expr> make_ptr(Args&&... args) {
 			return std::static_pointer_cast<expr>(std::make_shared<T>(args...));
@@ -514,10 +509,10 @@ namespace derivs {
 	/// Maintains generation mapping from collapsed alternation expression.
 	class map_expr : public memo_expr {
 	public:
-		map_expr(memo_expr::table& memo, ptr<expr> e, gen_type gm, gen_set eg)
+		map_expr(memo_expr::table& memo, ptr<expr> e, gen_type gm, gen_map eg)
 			: memo_expr(memo), e(e), gm(gm), eg(eg) {}
 		
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> e, gen_type mg, gen_set eg);
+		static ptr<expr> make(memo_expr::table& memo, ptr<expr> e, gen_type mg, gen_map eg);
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char) const;
@@ -527,21 +522,21 @@ namespace derivs {
 		
 		ptr<expr> e;   ///< Subexpression
 		gen_type  gm;  ///< Maximum generation from source expresssion
-		gen_set   eg;  ///< Generation flags for subexpression
+		gen_map   eg;  ///< Generation flags for subexpression
 	}; // class map_expr
 	
 	/// A parsing expression representing the alternation of two parsing expressions
 	class alt_expr : public memo_expr {
 	public:
 		alt_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
-		         gen_set ag = expr::zero_set, gen_set bg = expr::zero_set, gen_type gm = 0)
+		         gen_map ag = gen_map{0}, gen_map bg = gen_map{0}, gen_type gm = 0)
 			: memo_expr(memo), a(a), b(b), ag(ag), bg(bg), gm(gm) {}
 		
 		/// Make an expression using the default generation rules
 		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
 		/// Make an expression with the given generation maps
 		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
-		                      gen_set ag, gen_set bg, gen_type gm);
+		                      gen_map ag, gen_map bg, gen_type gm);
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char) const;
@@ -551,8 +546,8 @@ namespace derivs {
 		
 		ptr<expr> a;   ///< First subexpression
 		ptr<expr> b;   ///< Second subexpression
-		gen_set   ag;  ///< Generation flags for a
-		gen_set   bg;  ///< Generation flags for b
+		gen_map   ag;  ///< Generation flags for a
+		gen_map   bg;  ///< Generation flags for b
 		gen_type  gm;  ///< Maximum generation
 	}; // class alt_expr
 	
@@ -560,21 +555,21 @@ namespace derivs {
 	class seq_expr : public memo_expr {
 	public:
 		struct look_node {
-			look_node(gen_type g, gen_set eg, ptr<expr> e, gen_type gl = 0) 
+			look_node(gen_type g, gen_map eg, ptr<expr> e, gen_type gl = 0) 
 				: g(g), eg(eg), e(e), gl(gl) {}
 			
 			gen_type  g;   ///< Backtrack generation this follower corresponds to
-			gen_set   eg;  ///< Map of generations from this node to the containing node
+			gen_map   eg;  ///< Map of generations from this node to the containing node
 			ptr<expr> e;   ///< Follower expression for this lookahead generation
 			gen_type  gl;  ///< Generation of last match
 		}; // struct look_list
 		using look_list = std::list<look_node>;
 		
 		seq_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b)
-			: memo_expr(memo), a(a), b(b), bs(), c(fail_expr::make()), cg(expr::zero_set), gm(0) {}
+			: memo_expr(memo), a(a), b(b), bs(), c(fail_expr::make()), cg(gen_map{0}), gm(0) {}
 		
 		seq_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, look_list bs, 
-		         ptr<expr> c, gen_set cg, gen_type gm)
+		         ptr<expr> c, gen_map cg, gen_type gm)
 			: memo_expr(memo), a(a), b(b), bs(bs), c(c), cg(cg), gm(gm) {}
 	
 		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
@@ -589,7 +584,7 @@ namespace derivs {
 		ptr<expr> b;   ///< Gen-zero follower
 		look_list bs;  ///< List of following subexpressions for each backtrack generation
 		ptr<expr> c;   ///< Matching backtrack value
-		gen_set   cg;  ///< Backtrack map for c
+		gen_map   cg;  ///< Backtrack map for c
 		gen_type  gm;  ///< Maximum backtrack generation
 	}; // class seq_expr
 	
