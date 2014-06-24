@@ -51,7 +51,7 @@ public:
 	
 	~uint_set() = default;
 	
-	/// Adds a value to the set (values must be added in increasing order)
+	/// Adds a value to the set
 	inline uint_set& operator|= (value_type x) {
 		if ( xs.empty() ) {
 			xs.push_back(x);
@@ -89,7 +89,7 @@ public:
 		return *this = *this | o;
 	}
 	
-	/// Gets the i'th entry in this set (not bounds checked)
+/*	/// Gets the i'th entry in this set (not bounds checked)
 	inline value_type operator() (value_type i) const { return xs[i]; }
 	
 	/// Returns the set of the i'th entries in this set for each i in is (not bounds checked)
@@ -98,7 +98,7 @@ public:
 		for (auto& i : is) { ms.xs.push_back(xs[i]); }
 		return ms;
 	}
-	
+*/	
 	/// Deep equality check for two nodes
 	bool operator== (const uint_set& o) const {
 		if ( xs.size() != o.xs.size() ) return false;

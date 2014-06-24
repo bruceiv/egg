@@ -19,7 +19,10 @@
 # THE SOFTWARE.
 
 CXX = clang++
-CXXFLAGS = -O0 -ggdb --std=c++0x
+#CXX = g++
+
+#CXXFLAGS = -O0 -ggdb --std=c++0x
+CXXFLAGS = -O2 --std=c++0x
 #CXXFLAGS = -O3 --std=c++0x
 
 parser.hpp:  

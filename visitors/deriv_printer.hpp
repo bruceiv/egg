@@ -89,6 +89,20 @@ namespace derivs {
 			out << "]";
 		}
 		
+		void print_uint_map(const utils::uint_pfn& f) {
+			out << "[";
+			auto ft = f.begin();
+			if ( ft != f.end() ) {
+				out << ft->first << ":" << ft->second;
+				++ft;
+				while ( ft != f.end() ) {
+					out << ", " << ft->first << ":" << ft->second;
+					++ft;
+				}
+			}
+			out << "]";
+		}
+		
 		void print_fns(expr* e) {
 			out << "b";
 			print_uint_set(e->back());
@@ -198,7 +212,7 @@ namespace derivs {
 			print_fns(&e);
 			out << "g" << (unsigned int)e.gm;
 			out << " ";
-			print_uint_set(e.eg);
+			print_uint_map(e.eg);
 			out << " ";
 			print_unbraced(e.e);
 			out << ")";
@@ -209,11 +223,11 @@ namespace derivs {
 			print_fns(&e);
 			out << "g" << (unsigned int)e.gm;
 			out << " ";
-			print_uint_set(e.ag);
+			print_uint_map(e.ag);
 			out << " ";
 			print_unbraced(e.a);
 			out << " / ";
-			print_uint_set(e.bg);
+			print_uint_map(e.bg);
 			out << " ";
 			print_unbraced(e.b);
 			out << ")";
@@ -233,7 +247,7 @@ namespace derivs {
 				out << " {" << (unsigned int)it->g;
 				if ( it->gl > 0 ) { out << "." << (unsigned int)it->gl; }
 				out << "} ";
-				print_uint_set(it->eg);
+				print_uint_map(it->eg);
 				out << " ";
 				if ( it->e != e.b ) print_unbraced(it->e);
 				else out << "''''";
@@ -242,7 +256,7 @@ namespace derivs {
 					out << " | {" << (unsigned int)it->g;
 					if ( it->gl > 0 ) { out << "." << (unsigned int)it->gl; }
 					out << "} ";
-					print_uint_set(it->eg);
+					print_uint_map(it->eg);
 					out << " ";
 					if ( it->e != e.b ) print_unbraced(it->e);
 					else out << "''''";
@@ -251,7 +265,7 @@ namespace derivs {
 			}
 			if ( e.c->type() != fail_type ) {
 				out << " \\\\ ";
-				print_uint_set(e.cg);
+				print_uint_map(e.cg);
 				out << " ";
 				if ( e.c != e.b ) print_unbraced(e.c);
 				else out << "''''";
