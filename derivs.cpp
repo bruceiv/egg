@@ -699,8 +699,18 @@ namespace derivs {
 		}
 		
 		// Build derivatives of lookahead backtracks
+		gen_set dab = da->back();
+		auto dabt = dab.begin();
+		assert(dabt != dab.end() && "backtrack set non-empty");
+		if ( *dabt == 0 ) { ++dabt; }  // skip backtrack generation 0
+		auto bit = bs.begin();
+
 		look_list dbs;
-		for (const look_node& bi : bs) {
+		while ( dabt != dab.end() && bit != bs.end() ) {
+			const look_node& bi = *bit;
+			if ( bi.g < *dabt ) { ++bit; continue; }  // skip generations not in backtrack list
+			assert(bi.g == *dabt && "no generations missing from backtrack list");
+			
 			ptr<expr> dbi = bi.e->d(x);
 			gen_map dbig = expr::update_back_map(bi.e, dbi, bi.eg, gm, did_inc);
 			gen_type dgl = bi.gl;
@@ -710,11 +720,15 @@ namespace derivs {
 				did_inc = true;
 			}
 			dbs.emplace_back(bi.g, dbig, dbi, dgl);
+			
+			++dabt; ++bit;
 		}
 		
 		// Add new lookahead backtrack if needed
-		gen_type dabm = da->back().max();
-		if ( dabm > a->back().max() ) {
+		if ( dabt != dab.end() ) {
+			gen_type dabm = *dabt;
+			assert(dabm > a->back().max() && "leftover generation greater than previous");
+			assert(++dabt == dab.end() && "only one new lookahead backtrack");
 			gen_type gl = 0;
 			gen_set bm = b->match();
 			if ( ! bm.empty() && bm.min() == 0 ) {  // set new match-fail backtrack if needed
