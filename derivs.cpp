@@ -54,10 +54,26 @@ namespace derivs {
 	                               gen_type gm, bool& did_inc) {
 		assert(!e->back().empty() && !de->back().empty() && "backtrack set never empty");
 		
-		gen_map deg = eg;
+		gen_map deg;
+		gen_set deb = de->back();
+		auto debt = deb.begin();
+		auto egt = eg.begin();
 		
-		gen_type debm = de->back().max();
-		if ( debm > e->back().max() ) {
+		// Only copy mappings still in backtrack set
+		while ( debt != deb.end() && egt != eg.end() ) {
+			gen_type debi = *debt;
+			auto egi = *egt; 
+			if ( egi.first < debi ) { ++egt; continue; }  // skip mappings not in backtrack set
+			assert(egi.first == debi && "no missing backtrack mappings");
+			deg.add(debi, egi.second);  // add mappings needed for backtracking
+			++debt; ++egt;
+		}
+		
+		// Check if new generation is needed
+		if ( debt != deb.end() ) {
+			gen_type debm = *debt;
+			assert(debm > e->back().max() && "leftover generations are new");
+			assert(++debt == deb.end() && "only one leftover generation");
 			deg.add(debm, gm+1);
 			did_inc = true;
 		}
