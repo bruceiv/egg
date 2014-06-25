@@ -22,7 +22,11 @@
 #include <iostream>
 
 #include "parser.hpp"
-#include "xml.hpp"
+#ifdef NOMEMO
+  #include "xml-nomemo.hpp"
+#else
+  #include "xml.hpp"
+#endif
 
 int main(int argc, char** argv) {
 	using namespace std;

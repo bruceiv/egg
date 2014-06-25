@@ -22,7 +22,11 @@
 #include <iostream>
 
 #include "parser.hpp"
-#include "json.hpp"
+#ifdef NOMEMO
+  #include "json-nomemo.hpp"
+#else
+  #include "json.hpp"
+#endif
 
 int main(int argc, char** argv) {
 	using namespace std;

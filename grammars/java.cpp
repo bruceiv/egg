@@ -22,7 +22,11 @@
 #include <iostream>
 
 #include "parser.hpp"
-#include "java.hpp"
+#ifdef NOMEMO
+  #include "java-nomemo.hpp"
+#else
+  #include "java.hpp"
+#endif
 
 int main(int argc, char** argv) {
 	using namespace std;

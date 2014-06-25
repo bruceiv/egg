@@ -47,6 +47,18 @@ json.hpp:  ../perf_test/JSON.egg
 java.hpp:  ../perf_test/Java.egg
 	../egg -o java.hpp -i ../perf_test/Java.egg
 
+%-nomemo.cpp:  %.egg
+	../egg --no-memo -o $@ -i $<
+
+xml-nomemo.hpp:  ../perf_test/XML.egg
+	../egg --no-memo -o xml-nomemo.hpp -i ../perf_test/XML.egg
+
+json-nomemo.hpp:  ../perf_test/JSON.egg
+	../egg --no-memo -o json-nomemo.hpp -i ../perf_test/JSON.egg
+
+java-nomemo.hpp:  ../perf_test/Java.egg
+	../egg --no-memo -o java-nomemo.hpp -i ../perf_test/Java.egg
+
 abc:  abc.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -o abc abc.cpp $(LDFLAGS)
 
@@ -68,6 +80,27 @@ json:  json.hpp json.cpp parser.hpp
 java:  java.hpp java.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -o java java.cpp $(LDFLAGS)
 
+abc-nomemo:  abc-nomemo.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -o abc-nomemo abc-nomemo.cpp $(LDFLAGS)
+
+anbncn-nomemo:  anbncn-nomemo.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -o anbncn-nomemo anbncn-nomemo.cpp $(LDFLAGS)
+
+calc-nomemo:  calc-nomemo.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -o calc-nomemo calc-nomemo.cpp $(LDFLAGS)
+
+nested-nomemo:  nested-nomemo.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -o nested-nomemo nested-nomemo.cpp $(LDFLAGS)
+
+xml-nomemo:  xml-nomemo.hpp xml.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -DNOMEMO -o xml-nomemo xml.cpp $(LDFLAGS)
+
+json-nomemo:  json-nomemo.hpp json.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -DNOMEMO -o json-nomemo json.cpp $(LDFLAGS)
+
+java-nomemo:  java-nomemo.hpp java.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -DNOMEMO -o java-nomemo java.cpp $(LDFLAGS)
+
 egg:
 	cd .. && $(MAKE) egg
 
@@ -77,8 +110,17 @@ clean:
 	-rm calc calc.cpp
 	-rm nested nested.cpp
 	-rm xml xml.hpp
+	-rm json json.hpp
+	-rm java java.hpp
+	-rm abc-nomemo abc-nomemo.cpp
+	-rm anbncn-nomemo anbncn-nomemo.cpp
+	-rm calc-nomemo calc-nomemo.cpp
+	-rm nested-nomemo nested-nomemo.cpp
+	-rm xml-nomemo xml-nomemo.hpp
+	-rm json-nomemo json-nomemo.hpp
+	-rm java-nomemo java-nomemo.hpp
 
-test-compile: egg abc anbncn calc nested xml json
+test-compile: abc anbncn calc nested xml json
 	@echo
 	./abc < tests/abc.in.txt > tests/abc.test.txt
 	diff tests/abc.out.txt tests/abc.test.txt
@@ -95,6 +137,24 @@ test-compile: egg abc anbncn calc nested xml json
 	rm tests/*.test.txt
 	@echo
 	@echo COMPILED TESTS PASSED
+
+test-nomemo: abc-nomemo anbncn-nomemo calc-nomemo nested-nomemo xml-nomemo json-nomemo
+	@echo
+	./abc-nomemo < tests/abc.in.txt > tests/abc.test.txt
+	diff tests/abc.out.txt tests/abc.test.txt
+	./anbncn-nomemo < tests/anbncn.in.txt > tests/anbncn.test.txt
+	diff tests/anbncn.out.txt tests/anbncn.test.txt
+	./calc-nomemo < tests/calc.in.txt > tests/calc.test.txt
+	diff tests/calc.out.txt tests/calc.test.txt
+	./nested-nomemo < tests/nested.in.txt > tests/nested.test.txt
+	diff tests/nested.out.txt tests/nested.test.txt
+	./xml-nomemo < ../perf_test/input/ijs-elan2.0/kuca-xx.tei > tests/xml.test.txt
+	diff tests/xml.out.txt tests/xml.test.txt
+	./json-nomemo < ../perf_test/input/json-ijs-elan2.0/kuca-xx.tei.json > tests/json.test.txt
+	diff tests/json.out.txt tests/json.test.txt
+	rm tests/*.test.txt
+	@echo
+	@echo NO-MEMO TESTS PASSED
 
 test-interpret: egg
 	@echo
