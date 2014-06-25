@@ -21,11 +21,16 @@
 CXX = clang++
 #CXX = g++
 
-CXXFLAGS = -O0 -ggdb --std=c++0x
-#CXXFLAGS = -O0 --std=c++0x
-#CXXFLAGS = -O1 --std=c++0x
-#CXXFLAGS = -O2 --std=c++0x
-#CXXFLAGS = -O3 --std=c++0x
+# Development
+#CXXFLAGS = -O0 -ggdb --std=c++0x
+
+# Profiling
+#CXXFLAGS = -O0 -ggdb --std=c++0x -DNDEBUG
+CXXFLAGS = -O2 -ggdb --std=c++0x -DNDEBUG
+
+# Release
+#CXXFLAGS = -O2 --std=c++0x -DNDEBUG
+#CXXFLAGS = -O3 --std=c++0x -DNDEBUG
 
 OBJS = derivs.o
 
