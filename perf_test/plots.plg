@@ -1,5 +1,5 @@
 # Plots output data from egg performance tests
-# requires parameters pxml, pjson, dxml, djson; the files to plot
+# requires parameters nxml, njson, pxml, pjson, dxml, djson; the files to plot
 
 set datafile separator ","
 
@@ -22,7 +22,9 @@ set style line 7 lt rgb '#729fcf' lw 1.5 pt 4
 set style line 8 lt rgb '#3465a4' lw 1.5 pt 6
 set style line 9 lt rgb '#204a87' lw 1.5 pt 8
 
-plot pxml using 7:3 with linespoints title 'Packrat XML' ls 4, \
+plot nxml using 7:3 with linespoints title 'Naive XML' ls 1, \
+     njson using 7:3 with linespoints title 'Naive JSON' ls 2, \
+     pxml using 7:3 with linespoints title 'Packrat XML' ls 4, \
      pjson using 7:3 with linespoints title 'Packrat JSON' ls 5, \
      dxml using 7:3 with linespoints title 'Derivative XML' ls 7, \
      djson using 7:3 with linespoints title 'Derivative JSON' ls 8
@@ -30,7 +32,9 @@ plot pxml using 7:3 with linespoints title 'Packrat XML' ls 4, \
 set output 'plots/mem-use.pdf'
 set ylabel 'Maximum RAM Use (KB)'
 
-plot pxml using 7:6 with linespoints title 'Packrat XML' ls 4, \
+plot nxml using 7:6 with linespoints title 'Packrat XML' ls 1, \
+     njson using 7:6 with linespoints title 'Packrat JSON' ls 2, \
+     pxml using 7:6 with linespoints title 'Packrat XML' ls 4, \
      pjson using 7:6 with linespoints title 'Packrat JSON' ls 5, \
      dxml using 7:6 with linespoints title 'Derivative XML' ls 7, \
      djson using 7:6 with linespoints title 'Derivative JSON' ls 8
