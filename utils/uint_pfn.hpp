@@ -60,10 +60,7 @@ public:
 	~uint_pfn() = default;
 	
 	/// Adds a mapping to the function (must be greater than all previous values)
-	inline uint_pfn& add_back(value_type i, value_type fi) {
-		fm.emplace_back(i, fi);
-		return *this;
-	}
+	inline void add_back(value_type i, value_type fi) { fm.emplace_back(i, fi); }
 	
 	/// Gets the value of the function for i (undefined if i not in)
 	value_type operator() (value_type i) const {
