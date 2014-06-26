@@ -23,9 +23,8 @@
  */
 
 #include <algorithm>
-//#include <map>
-#include<utility>
-#include<vector>
+#include <utility>
+#include <vector>
 
 #include "uint_set.hpp"
 
@@ -34,12 +33,8 @@ namespace utils {
 /// A partial function from unsigned int to unsigned int; assumed to be monotonically increasing.
 class uint_pfn {
 public:
-	typedef unsigned int                                      value_type;
-	typedef uint_set                                          set_type;
-//	typedef std::map<value_type, value_type>::size_type       size_type;
-//	typedef std::map<value_type, value_type>::difference_type difference_type;
-//	typedef std::map<value_type, value_type>::const_iterator  iterator;
-//	typedef std::map<value_type, value_type>::const_iterator  const_iterator;
+	typedef unsigned int                                                   value_type;
+	typedef uint_set                                                       set_type;
 	typedef std::vector<std::pair<value_type,value_type>>::size_type       size_type;
 	typedef std::vector<std::pair<value_type,value_type>>::difference_type difference_type;
 	typedef std::vector<std::pair<value_type,value_type>>::const_iterator  iterator;
@@ -54,7 +49,6 @@ public:
 	uint_pfn(std::initializer_list<value_type> xs) : fm() {
 		value_type i = 0;
 		for (value_type xi : xs) {
-//			fm.emplace_hint(fm.cend(), i, xi);
 			fm.emplace_back(i, xi);
 			++i;
 		}
@@ -66,20 +60,9 @@ public:
 	~uint_pfn() = default;
 	
 	/// Adds a mapping to the function (must be greater than all previous values)
-	inline uint_pfn& add_back(value_type i, value_type fi) {
-//		fm.emplace_hint(fm.cend(), i, fi);
-		fm.emplace_back(i, fi);
-		return *this;
-	}
-	
-//	/// Adds all the mappings in another function
-//	inline uint_pfn& add_all(const uint_pfn& o) {
-//		fm.insert(o.fm.begin(), o.fm.end());
-//		return *this;
-//	}
+	inline void add_back(value_type i, value_type fi) { fm.emplace_back(i, fi); }
 	
 	/// Gets the value of the function for i (undefined if i not in)
-//	inline value_type operator() (value_type i) const { return xm.at(i); }
 	value_type operator() (value_type i) const {
 		size_type begin = 0, end = fm.size();
 		while ( begin < end ) {
@@ -96,13 +79,12 @@ public:
 	/// Gets the values of the function for a set of indices (undefined if s not subset of domain)
 	set_type operator() (const set_type& s) const {
 		uint_set fs;
-//		for (auto& i : s) { fs |= xf.at(i); }
 		auto ft = fm.begin();
 		auto st = s.begin();
 		while ( ft != fm.end() && st != s.end() ) {
 			if ( ft->first < *st ) { ++ft; continue; }
 			assert(ft->first == *st && "Index must be in pfn");
-			fs |= ft->second;
+			fs.add_back(ft->second);
 			++ft; ++st;
 		}
 		assert(st == s.end() && "Index must be in pfn");
@@ -113,7 +95,6 @@ public:
 	/// domain)
 	uint_pfn operator() (const uint_pfn& g) const {
 		uint_pfn fg;
-//		for (auto& m : g) { fg.add_back(m.first, fm.at(m.second)); }
 		auto ft = fm.begin();
 		auto gt = g.begin();
 		while ( ft != fm.end() && gt != g.end() ) {
@@ -160,7 +141,6 @@ public:
 	inline const_iterator cend()   const { return fm.cend(); }
 	
 private:
-//	std::map<value_type, value_type> fm;  // underlying map	
 	std::vector<std::pair<value_type, value_type>> fm; // underlying map
 }; // class uint_map
 

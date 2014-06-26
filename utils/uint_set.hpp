@@ -26,6 +26,7 @@
 #include <initializer_list>
 #include <iterator>
 #include <vector>
+#include <set>
 
 namespace utils {
 
@@ -44,39 +45,45 @@ public:
 	uint_set(uint_set&&) = default;
 	/// Initialize to a given list
 	uint_set(std::initializer_list<value_type> xs) : xs(xs) {}
+	/// Initialize from a sorted container
+	template<typename Iter>
+	uint_set(Iter begin, Iter end) : xs(begin, end) {}
 	
 	uint_set& operator= (const uint_set&) = default;
 	uint_set& operator= (uint_set&&) = default;
 	
 	~uint_set() = default;
 	
-	/// Adds a value to the set
-	inline uint_set& operator|= (value_type x) {
-		if ( xs.empty() ) {
-			xs.push_back(x);
-		} else {
-			auto i = xs.back();
-			if ( i < x ) { xs.push_back(x); }
-			else if ( i != x ){
-				for (auto it = ++(xs.rbegin()); it != xs.rend(); ++it) {
-					i = *it;
-					if ( i == x ) break;
-					if ( i < x ) {
-						xs.insert(it.base(), x);
-						break;
-					}
-				}
-			}
-		}
-		return *this;
-	}
+	/// Adds a value to the set (must be greater than all other values)
+	inline void add_back(value_type x) { xs.push_back(x); }
 	
-	/// Adds a value to a new set
-	inline uint_set operator| (value_type x) {
-		uint_set out = *this;
-		out |= x;
-		return out;
-	}
+//	/// Adds a value to the set
+//	inline uint_set& operator|= (value_type x) {
+//		if ( xs.empty() ) {
+//			xs.push_back(x);
+//		} else {
+//			auto i = xs.back();
+//			if ( i < x ) { xs.push_back(x); }
+//			else if ( i != x ){
+//				for (auto it = ++(xs.rbegin()); it != xs.rend(); ++it) {
+//					i = *it;
+//					if ( i == x ) break;
+//					if ( i < x ) {
+//						xs.insert(it.base(), x);
+//						break;
+//					}
+//				}
+//			}
+//		}
+//		return *this;
+//	}
+	
+//	/// Adds a value to a new set
+//	inline uint_set operator| (value_type x) {
+//		uint_set out = *this;
+//		out |= x;
+//		return out;
+//	}
 	
 	/// Takes the union of two sets
 	uint_set operator| (const uint_set& o) const {
@@ -85,29 +92,14 @@ public:
 		return out;
 	}
 	
-	inline uint_set& operator|= (const uint_set& o) {
-		return *this = *this | o;
-	}
-	
-/*	/// Gets the i'th entry in this set (not bounds checked)
-	inline value_type operator() (value_type i) const { return xs[i]; }
-	
-	/// Returns the set of the i'th entries in this set for each i in is (not bounds checked)
-	uint_set operator() (uint_set is) const {
-		uint_set ms;
-		for (auto& i : is) { ms.xs.push_back(xs[i]); }
-		return ms;
-	}
-*/	
+//	inline uint_set& operator|= (const uint_set& o) {
+//		return *this = *this | o;
+//	}
+		
 	/// Deep equality check for two nodes
 	bool operator== (const uint_set& o) const {
 		if ( xs.size() != o.xs.size() ) return false;
 		return std::equal(xs.begin(), xs.end(), o.xs.begin());
-//		for (size_type i = 0; i < xs.size(); ++i) {
-//			if ( xs[i] != o.xs[i] ) return false;
-//		}
-//		
-//		return true;
 	}
 	
 	/// Deep inequality check for two nodes
@@ -132,6 +124,11 @@ public:
 private:
 	std::vector<value_type> xs;  ///< Underlying list
 }; // class uint_set
+
+/// Adds all elements of a uint_set to a std::set
+inline void add_all(std::set<uint_set::value_type>& s, const uint_set& t) {
+	s.insert(t.begin(), t.end());
+}
 
 } // namespace utils
 
