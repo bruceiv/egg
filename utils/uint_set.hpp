@@ -26,6 +26,7 @@
 #include <initializer_list>
 #include <iterator>
 #include <vector>
+#include <set>
 
 namespace utils {
 
@@ -44,11 +45,17 @@ public:
 	uint_set(uint_set&&) = default;
 	/// Initialize to a given list
 	uint_set(std::initializer_list<value_type> xs) : xs(xs) {}
+	/// Initialize from a sorted container
+	template<typename Iter>
+	uint_set(Iter begin, Iter end) : xs(begin, end) {}
 	
 	uint_set& operator= (const uint_set&) = default;
 	uint_set& operator= (uint_set&&) = default;
 	
 	~uint_set() = default;
+	
+	/// Adds a value to the set (must be greater than all other values)
+	inline void add_back(value_type x) { xs.push_back(x); }
 	
 	/// Adds a value to the set
 	inline uint_set& operator|= (value_type x) {
@@ -77,7 +84,7 @@ public:
 		out |= x;
 		return out;
 	}
-	
+
 	/// Takes the union of two sets
 	uint_set operator| (const uint_set& o) const {
 		uint_set out;
@@ -117,6 +124,11 @@ public:
 private:
 	std::vector<value_type> xs;  ///< Underlying list
 }; // class uint_set
+
+/// Adds all elements of a uint_set to a std::set
+inline void add_all(std::set<uint_set::value_type>& s, const uint_set& t) {
+	s.insert(t.begin(), t.end());
+}
 
 } // namespace utils
 

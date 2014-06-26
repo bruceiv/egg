@@ -84,7 +84,7 @@ public:
 		while ( ft != fm.end() && st != s.end() ) {
 			if ( ft->first < *st ) { ++ft; continue; }
 			assert(ft->first == *st && "Index must be in pfn");
-			fs |= ft->second;
+			fs.add_back(ft->second);
 			++ft; ++st;
 		}
 		assert(st == s.end() && "Index must be in pfn");
