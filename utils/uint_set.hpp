@@ -22,11 +22,10 @@
  * THE SOFTWARE.
  */
 
-#include <initializer_list>
-
 #include <algorithm>
+#include <initializer_list>
 #include <iterator>
-#include <set>
+#include <vector>
 
 namespace utils {
 
@@ -72,6 +71,7 @@ public:
 		return *this;
 	}
 	
+	/// Adds a value to a new set
 	inline uint_set operator| (value_type x) {
 		uint_set out = *this;
 		out |= x;
@@ -102,12 +102,12 @@ public:
 	/// Deep equality check for two nodes
 	bool operator== (const uint_set& o) const {
 		if ( xs.size() != o.xs.size() ) return false;
-		
-		for (size_type i = 0; i < xs.size(); ++i) {
-			if ( xs[i] != o.xs[i] ) return false;
-		}
-		
-		return true;
+		return std::equal(xs.begin(), xs.end(), o.xs.begin());
+//		for (size_type i = 0; i < xs.size(); ++i) {
+//			if ( xs[i] != o.xs[i] ) return false;
+//		}
+//		
+//		return true;
 	}
 	
 	/// Deep inequality check for two nodes

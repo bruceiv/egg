@@ -23,7 +23,9 @@
  */
 
 #include <algorithm>
-#include <map>
+//#include <map>
+#include<utility>
+#include<vector>
 
 #include "uint_set.hpp"
 
@@ -34,21 +36,26 @@ class uint_pfn {
 public:
 	typedef unsigned int                                      value_type;
 	typedef uint_set                                          set_type;
-	typedef std::map<value_type, value_type>::size_type       size_type;
-	typedef std::map<value_type, value_type>::difference_type difference_type;
-	typedef std::map<value_type, value_type>::const_iterator  iterator;
-	typedef std::map<value_type, value_type>::const_iterator  const_iterator;
+//	typedef std::map<value_type, value_type>::size_type       size_type;
+//	typedef std::map<value_type, value_type>::difference_type difference_type;
+//	typedef std::map<value_type, value_type>::const_iterator  iterator;
+//	typedef std::map<value_type, value_type>::const_iterator  const_iterator;
+	typedef std::vector<std::pair<value_type,value_type>>::size_type       size_type;
+	typedef std::vector<std::pair<value_type,value_type>>::difference_type difference_type;
+	typedef std::vector<std::pair<value_type,value_type>>::const_iterator  iterator;
+	typedef std::vector<std::pair<value_type,value_type>>::const_iterator  const_iterator;
 	
 	// Use implicit c'tors, d'tors, assignment operator
 	uint_pfn() = default;
 	uint_pfn(const uint_pfn&) = default;
 	uint_pfn(uint_pfn&&) = default;
 	
-	/// Initialize to a given list
-	uint_pfn(std::initializer_list<value_type> xs) : xm() {
+	/// Initialize to a given list (must be sorted in increasing order)
+	uint_pfn(std::initializer_list<value_type> xs) : fm() {
 		value_type i = 0;
 		for (value_type xi : xs) {
-			xm.emplace_hint(xm.cend(), i, xi);
+//			fm.emplace_hint(fm.cend(), i, xi);
+			fm.emplace_back(i, xi);
 			++i;
 		}
 	}
@@ -58,39 +65,71 @@ public:
 	
 	~uint_pfn() = default;
 	
-	/// Adds a mapping to the function
-	inline uint_pfn& add(value_type i, value_type xi) {
-		xm.emplace_hint(xm.cend(), i, xi);
+	/// Adds a mapping to the function (must be greater than all previous values)
+	inline uint_pfn& add_back(value_type i, value_type fi) {
+//		fm.emplace_hint(fm.cend(), i, fi);
+		fm.emplace_back(i, fi);
 		return *this;
 	}
 	
-	/// Adds all the mappings in another function
-	inline uint_pfn& addAll(const uint_pfn& o) {
-		xm.insert(o.xm.begin(), o.xm.end());
-		return *this;
+//	/// Adds all the mappings in another function
+//	inline uint_pfn& add_all(const uint_pfn& o) {
+//		fm.insert(o.fm.begin(), o.fm.end());
+//		return *this;
+//	}
+	
+	/// Gets the value of the function for i (undefined if i not in)
+//	inline value_type operator() (value_type i) const { return xm.at(i); }
+	value_type operator() (value_type i) const {
+		size_type begin = 0, end = fm.size();
+		while ( begin < end ) {
+			size_type mid = (begin+end)/2;
+			value_type j = fm[mid].first;
+			if ( i == j ) return fm[mid].second;
+			if ( i < j ) { end = mid; }
+			else /* if ( i > j ) */ { begin = mid; }
+		}
+		assert(false && "Index must be in pfn");
+		return (value_type)-1;
 	}
 	
-	/// Gets the value of the function for i
-	inline value_type operator() (value_type i) const { return xm.at(i); }
-	
-	/// Gets the values of the function for a set of indices
+	/// Gets the values of the function for a set of indices (undefined if s not subset of domain)
 	set_type operator() (const set_type& s) const {
 		uint_set fs;
-		for (auto& i : s) { fs |= xm.at(i); }
+//		for (auto& i : s) { fs |= xf.at(i); }
+		auto ft = fm.begin();
+		auto st = s.begin();
+		while ( ft != fm.end() && st != s.end() ) {
+			if ( ft->first < *st ) { ++ft; continue; }
+			assert(ft->first == *st && "Index must be in pfn");
+			fs |= ft->second;
+			++ft; ++st;
+		}
+		assert(st == s.end() && "Index must be in pfn");
 		return fs;
 	}
 	
-	/// Gets the composition of this function with another
+	/// Gets the composition of this function with another (undefined if range(g) not subset of 
+	/// domain)
 	uint_pfn operator() (const uint_pfn& g) const {
 		uint_pfn fg;
-		for (auto& m : g) { fg.add(m.first, xm.at(m.second)); }
+//		for (auto& m : g) { fg.add_back(m.first, fm.at(m.second)); }
+		auto ft = fm.begin();
+		auto gt = g.begin();
+		while ( ft != fm.end() && gt != g.end() ) {
+			if ( ft->first < gt->second ) { ++ft; continue; }
+			assert(ft->first == gt->second && "Index must be in pfn");
+			fg.add_back(gt->first, ft->second);
+			++ft; ++gt;
+		}
+		assert(gt == g.end() && "Index must be in pfn");
 		return fg;
 	}
 	
 	/// Deep equality check for two functions
 	bool operator== (const uint_pfn& o) const {
-		if ( xm.size() != o.xm.size() ) return false;
-		return std::equal(xm.begin(), xm.end(), o.xm.begin());
+		if ( fm.size() != o.fm.size() ) return false;
+		return std::equal(fm.begin(), fm.end(), o.fm.begin());
 	}
 	
 	/// Deep inequality check for two nodes
@@ -98,30 +137,31 @@ public:
 	
 	/// Minimum value of function (does not check for empty)
 	value_type min() const {
-		return xm.begin()->second;
+		return fm.begin()->second;
 	}
 	
 	/// Maximum value of function (does not check for empty)
 	value_type max() const {
-		return xm.rbegin()->second;
+		return fm.rbegin()->second;
 	}
 	
 	/// Maximum value of function's domain (does not check for empty)
 	value_type max_key() const {
-		return xm.rbegin()->first;
+		return fm.rbegin()->first;
 	}
 	
 	/// Is this set empty?
-	inline bool empty() const { return xm.empty(); }
+	inline bool empty() const { return fm.empty(); }
 	
 	// Just forward iterator calls (use only constant iterators)
-	inline const_iterator begin()  const { return xm.cbegin(); }
-	inline const_iterator cbegin() const { return xm.cbegin(); }
-	inline const_iterator end()    const { return xm.cend(); }
-	inline const_iterator cend()   const { return xm.cend(); }
+	inline const_iterator begin()  const { return fm.cbegin(); }
+	inline const_iterator cbegin() const { return fm.cbegin(); }
+	inline const_iterator end()    const { return fm.cend(); }
+	inline const_iterator cend()   const { return fm.cend(); }
 	
 private:
-	std::map<value_type, value_type> xm;  // underlying map	
+//	std::map<value_type, value_type> fm;  // underlying map	
+	std::vector<std::pair<value_type, value_type>> fm; // underlying map
 }; // class uint_map
 
 } // namespace utils

@@ -33,7 +33,7 @@ namespace derivs {
 		if ( e->back().max() > 0 ) {
 			assert(e->back().max() == 1 && "static lookahead gen <= 1");
 			did_inc = true;
-			eg.add(1, gm + 1);
+			eg.add_back(1, gm + 1);
 		}
 		
 		return eg;
@@ -65,7 +65,7 @@ namespace derivs {
 			auto egi = *egt; 
 			if ( egi.first < debi ) { ++egt; continue; }  // skip mappings not in backtrack set
 			assert(egi.first == debi && "no missing backtrack mappings");
-			deg.add(debi, egi.second);  // add mappings needed for backtracking
+			deg.add_back(debi, egi.second);  // add mappings needed for backtracking
 			++debt; ++egt;
 		}
 		
@@ -74,7 +74,7 @@ namespace derivs {
 			gen_type debm = *debt;
 			assert(debm > e->back().max() && "leftover generations are new");
 			assert(++debt == deb.end() && "only one leftover generation");
-			deg.add(debm, gm+1);
+			deg.add_back(debm, gm+1);
 			did_inc = true;
 		}
 		
