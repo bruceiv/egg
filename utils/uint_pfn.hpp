@@ -60,10 +60,7 @@ public:
 	~uint_pfn() = default;
 	
 	/// Adds a mapping to the function (must be greater than all previous values)
-	inline uint_pfn& add_back(value_type i, value_type fi) {
-		fm.emplace_back(i, fi);
-		return *this;
-	}
+	inline void add_back(value_type i, value_type fi) { fm.emplace_back(i, fi); }
 	
 	/// Gets the value of the function for i (undefined if i not in)
 	value_type operator() (value_type i) const {
@@ -87,7 +84,7 @@ public:
 		while ( ft != fm.end() && st != s.end() ) {
 			if ( ft->first < *st ) { ++ft; continue; }
 			assert(ft->first == *st && "Index must be in pfn");
-			fs |= ft->second;
+			fs.add_back(ft->second);
 			++ft; ++st;
 		}
 		assert(st == s.end() && "Index must be in pfn");

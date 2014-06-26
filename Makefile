@@ -22,11 +22,11 @@ CXX = clang++
 #CXX = g++
 
 # Development
-#CXXFLAGS = -O0 -ggdb --std=c++0x
+CXXFLAGS = -O0 -ggdb --std=c++0x
 
 # Profiling
 #CXXFLAGS = -O0 -ggdb --std=c++0x -DNDEBUG
-CXXFLAGS = -O2 -ggdb --std=c++0x -DNDEBUG
+#CXXFLAGS = -O2 -ggdb --std=c++0x -DNDEBUG
 
 # Release
 #CXXFLAGS = -O2 --std=c++0x -DNDEBUG
@@ -34,7 +34,7 @@ CXXFLAGS = -O2 -ggdb --std=c++0x -DNDEBUG
 
 OBJS = derivs.o
 
-derivs.o:  derivs.cpp derivs.hpp
+derivs.o:  derivs.cpp derivs.hpp utils/uint_pfn.hpp utils/uint_set.hpp
 	$(CXX) $(CXXFLAGS) -c derivs.cpp
 
 egg:  main.cpp $(OBJS) egg.hpp parser.hpp \

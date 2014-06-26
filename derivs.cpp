@@ -1,6 +1,8 @@
 #include "derivs.hpp"
 
 #include <iostream>
+#include <set>
+
 #include "visitors/deriv_printer.hpp"
 
 namespace derivs {
@@ -235,7 +237,7 @@ namespace derivs {
 		std::unordered_set<ptr<expr>>& visited = *(this->visited);
 		
 		// Calculate and cache match set
-		gen_set m;
+		std::set<gen_type> m;
 		
 		gen_set am = iter_match(x.a, changed, visited);
 		auto at = am.begin();
@@ -254,7 +256,7 @@ namespace derivs {
 			++at;
 		}
 		// Include matches from match-fail follower
-		m = x.cg(iter_match(x.c, changed, visited));
+		utils::add_all(m, x.cg(iter_match(x.c, changed, visited)));
 		
 		// Include matches from matching lookahead successors
 		auto bit = x.bs.begin();
@@ -273,18 +275,18 @@ namespace derivs {
 		
 			// Add followers to match set as well as follower match-fail
 			gen_set bm = bi.eg(iter_match(bi.e, changed, visited));
-			m |= bm;
+			utils::add_all(m, bm);
 			
-			if ( bi.gl > 0 ) m |= bi.gl;
+			if ( bi.gl > 0 ) m.emplace(bi.gl);
 			else if ( ! bm.empty() && bm.min() == 0 ) {
 				bi.gl = 1;
-				m |= bi.gl;
+				m.emplace(bi.gl);
 			}
 		
 			++at; ++bit;
 		}
 		
-		match = x.memo_match = m;
+		match = x.memo_match = gen_set{m.begin(), m.end()};
 		x.flags.match = true;
 	}
 	
@@ -759,7 +761,8 @@ namespace derivs {
 	
 	gen_set seq_expr::match_set() const {
 		// Include matches from match-fail follower
-		gen_set x = cg(c->match());
+		std::set<gen_type> x;
+		utils::add_all(x, cg(c->match()));
 		
 		// Include matches from matching lookahead successors
 		gen_set am = a->match();
@@ -775,31 +778,32 @@ namespace derivs {
 			else if ( bi.g > ai ) { ++at; continue; }
 			
 			// Add followers to match set as well as follower match-fail
-			x |= bi.eg(bi.e->match());
-			if ( bi.gl > 0 ) x |= bi.gl;
+			utils::add_all(x, bi.eg(bi.e->match()));
+			if ( bi.gl > 0 ) x.emplace(bi.gl);
 			
 			++at; ++bit;
 		}
 		
-		return x;
+		return gen_set{x.begin(), x.end()};
 	}
 		
 	gen_set seq_expr::back_set() const {
 		// Include backtrack from match-fail follower
-		gen_set x = cg(c->back());
+		std::set<gen_type> x;
+		utils::add_all(x, cg(c->back()));
 		
 		// Include lookahead follower backtracks
 		for (const look_node& bi : bs) {
-			x |= bi.eg(bi.e->back());
-			if ( bi.gl > 0 ) x |= bi.gl;
+			utils::add_all(x, bi.eg(bi.e->back()));
+			if ( bi.gl > 0 ) x.emplace(bi.gl);
 		}
 		
 		// Check for gen-zero backtrack from predecessor (successors included earlier)
 		if ( a->back().min() == 0 ) {
-			x |= 0;
+			x.emplace(0);
 		}
 		
-		return x;
+		return gen_set{x.begin(), x.end()};
 	}
 		
 } // namespace derivs
