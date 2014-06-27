@@ -26,7 +26,6 @@
 #include <initializer_list>
 #include <iterator>
 #include <vector>
-#include <set>
 
 namespace utils {
 
@@ -48,42 +47,73 @@ public:
 	/// Initialize from a sorted container
 	template<typename Iter>
 	uint_set(Iter begin, Iter end) : xs(begin, end) {}
+
+/// Sorts the vector and constructs a new uint_set from its unique elements
+static uint_set from_vector(std::vector<value_type>& v) {
+	uint_set s;
+	
+	if ( v.empty() ) return s;
+	std::sort(v.begin(), v.end());
+	
+	value_type last = v[0];
+	s.add_back(last);
+	for (int i = 1; i < v.size(); ++i) {
+		value_type crnt = v[i];
+		if ( crnt == last ) continue;
+		s.add_back(crnt);
+		last = crnt;
+	}
+	
+	return s;
+}
 	
 	uint_set& operator= (const uint_set&) = default;
 	uint_set& operator= (uint_set&&) = default;
 	
 	~uint_set() = default;
 	
-	/// Adds a value to the set (must be greater than all other values)
+	/// Adds a value to the set (breaks normalization if not strictly greatest value)
 	inline void add_back(value_type x) { xs.push_back(x); }
 	
-	/// Adds a value to the set
-	inline uint_set& operator|= (value_type x) {
-		if ( xs.empty() ) {
-			xs.push_back(x);
-		} else {
-			auto i = xs.back();
-			if ( i < x ) { xs.push_back(x); }
-			else if ( i != x ){
-				for (auto it = ++(xs.rbegin()); it != xs.rend(); ++it) {
-					i = *it;
-					if ( i == x ) break;
-					if ( i < x ) {
-						xs.insert(it.base(), x);
-						break;
-					}
-				}
-			}
-		}
-		return *this;
-	}
+/// Adds all the values to a vector (breaks normalization if not sorted and greater than 
+/// previous values)
+inline void add_back(const uint_set& s) { for (value_type x : s) xs.emplace_back(x); }
+
+/// Normalizes underlying set; afterwards will be sorted and have unique values
+uint_set& norm() {
+	std::sort(xs.begin(), xs.end());
+	auto last = std::unique(xs.begin(), xs.end());
+	xs.erase(last, xs.end());
+	return *this;
+}
 	
-	/// Adds a value to a new set
-	inline uint_set operator| (value_type x) {
-		uint_set out = *this;
-		out |= x;
-		return out;
-	}
+//	/// Adds a value to the set
+//	inline uint_set& operator|= (value_type x) {
+//		if ( xs.empty() ) {
+//			xs.push_back(x);
+//		} else {
+//			auto i = xs.back();
+//			if ( i < x ) { xs.push_back(x); }
+//			else if ( i != x ){
+//				for (auto it = ++(xs.rbegin()); it != xs.rend(); ++it) {
+//					i = *it;
+//					if ( i == x ) break;
+//					if ( i < x ) {
+//						xs.insert(it.base(), x);
+//						break;
+//					}
+//				}
+//			}
+//		}
+//		return *this;
+//	}
+	
+//	/// Adds a value to a new set
+//	inline uint_set operator| (value_type x) {
+//		uint_set out = *this;
+//		out |= x;
+//		return out;
+//	}
 
 	/// Takes the union of two sets
 	uint_set operator| (const uint_set& o) const {
@@ -92,9 +122,9 @@ public:
 		return out;
 	}
 	
-	inline uint_set& operator|= (const uint_set& o) {
-		return *this = *this | o;
-	}
+//	inline uint_set& operator|= (const uint_set& o) {
+//		return *this = *this | o;
+//	}
 	
 	/// Deep equality check for two nodes
 	bool operator== (const uint_set& o) const {
@@ -124,11 +154,6 @@ public:
 private:
 	std::vector<value_type> xs;  ///< Underlying list
 }; // class uint_set
-
-/// Adds all elements of a uint_set to a std::set
-inline void add_all(std::set<uint_set::value_type>& s, const uint_set& t) {
-	s.insert(t.begin(), t.end());
-}
 
 } // namespace utils
 
