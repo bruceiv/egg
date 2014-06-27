@@ -235,9 +235,6 @@ namespace derivs {
 		bool& changed = *(this->changed);
 		std::unordered_set<ptr<expr>>& visited = *(this->visited);
 		
-		// Calculate and cache match set
-		gen_set m;
-		
 		gen_set am = iter_match(x.a, changed, visited);
 		auto at = am.begin();
 		// Make sure successor is fixed also
@@ -255,7 +252,7 @@ namespace derivs {
 			++at;
 		}
 		// Include matches from match-fail follower
-		m.add_back(x.cg(iter_match(x.c, changed, visited)));
+		gen_set m = x.cg(iter_match(x.c, changed, visited));
 		
 		// Include matches from matching lookahead successors
 		auto bit = x.bs.begin();
@@ -274,18 +271,18 @@ namespace derivs {
 		
 			// Add followers to match set as well as follower match-fail
 			gen_set bm = bi.eg(iter_match(bi.e, changed, visited));
-			m.add_back(bm);
+			m |= bm;
 			
 			if ( bi.gl > 0 ) m.add_back(bi.gl);
 			else if ( ! bm.empty() && bm.min() == 0 ) {
 				bi.gl = 1;
-				m.add_back(bi.gl);
+				m |= bi.gl;
 			}
 		
 			++at; ++bit;
 		}
 		
-		match = x.memo_match = m.norm();
+		match = x.memo_match = m;
 		x.flags.match = true;
 	}
 	
@@ -776,31 +773,31 @@ namespace derivs {
 			else if ( bi.g > ai ) { ++at; continue; }
 			
 			// Add followers to match set as well as follower match-fail
-			x.add_back(bi.eg(bi.e->match()));
-			if ( bi.gl > 0 ) x.add_back(bi.gl);
+			x |= bi.eg(bi.e->match());
+			if ( bi.gl > 0 ) x |= bi.gl;
 			
 			++at; ++bit;
 		}
 		
-		return x.norm();
+		return x;
 	}
-		
+	
 	gen_set seq_expr::back_set() const {
 		// Include backtrack from match-fail follower
 		gen_set x = cg(c->back());
 		
-		// Include lookahead follower backtracks
-		for (const look_node& bi : bs) {
-			x.add_back(bi.eg(bi.e->back()));
-			if ( bi.gl > 0 ) x.add_back(bi.gl);
-		}
-		
 		// Check for gen-zero backtrack from predecessor (successors included earlier)
 		if ( a->back().min() == 0 ) {
-			x.add_back(0);
+			x |= 0;
 		}
 		
-		return x.norm();
+		// Include lookahead follower backtracks
+		for (const look_node& bi : bs) {
+			x |= bi.eg(bi.e->back());
+			if ( bi.gl > 0 ) x |= bi.gl;
+		}
+		
+		return x;
 	}
 		
 } // namespace derivs
