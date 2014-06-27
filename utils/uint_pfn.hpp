@@ -60,7 +60,10 @@ public:
 	~uint_pfn() = default;
 	
 	/// Adds a mapping to the function (must be greater than all previous values)
-	inline void add_back(value_type i, value_type fi) { fm.emplace_back(i, fi); }
+	inline void add_back(value_type i, value_type fi) {
+		assert(fm.empty() || (i > fm.back().first && fi > fm.back().second) && "adds in strict order");
+		fm.emplace_back(i, fi);
+	}
 	
 	/// Gets the value of the function for i (undefined if i not in)
 	value_type operator() (value_type i) const {
@@ -116,18 +119,21 @@ public:
 	/// Deep inequality check for two nodes
 	inline bool operator!= (const uint_pfn& o) const { return ! operator==(o); }
 	
-	/// Minimum value of function (does not check for empty)
-	value_type min() const {
+	/// Minimum value of function (undefined if empty)
+	inline value_type min() const {
+		assert(!fm.empty() && "can't call min on empty pfn");
 		return fm.begin()->second;
 	}
 	
-	/// Maximum value of function (does not check for empty)
-	value_type max() const {
+	/// Maximum value of function (undefined if empty)
+	inline value_type max() const {
+		assert(!fm.empty() && "can't call max on empty pfn");
 		return fm.rbegin()->second;
 	}
 	
-	/// Maximum value of function's domain (does not check for empty)
-	value_type max_key() const {
+	/// Maximum value of function's domain (undefined if empty)
+	inline value_type max_key() const {
+		assert(!fm.empty() && "can't call max_key on empty pfn");
 		return fm.rbegin()->first;
 	}
 	

@@ -95,7 +95,9 @@ public:
 	}
 	
 	inline uint_set& operator|= (const uint_set& o) {
-		return *this = *this | o;
+		uint_set n = *this | o;
+		xs.swap(n.xs);
+		return *this;
 	}
 	
 	/// Deep equality check for two nodes
@@ -110,9 +112,17 @@ public:
 	/// Number of elements
 	inline size_type count() const { return xs.size(); }
 	
-	inline value_type min() const { return xs.front(); }
+	/// Minimum value (must not be empty)
+	inline value_type min() const {
+		assert(!xs.empty() && "can't call min on empty");
+		return xs.front();
+	}
 	
-	inline value_type max() const { return xs.back(); }
+	/// Maximum value
+	inline value_type max() const {
+		assert(!xs.empty() && "can't call max on empty");
+		return xs.back();
+	}
 	
 	/// Is this set empty?
 	inline bool empty() const { return xs.empty(); }
