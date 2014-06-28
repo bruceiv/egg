@@ -31,7 +31,7 @@ namespace derivs {
 	
 	// UTILITY /////////////////////////////////////////////////////////////////////
 	
-	gen_map new_back_map(const expr& e, gen_type gm, bool& did_inc, ind i = 0) {
+	gen_map new_back_map(const expr& e, gen_type gm, bool& did_inc, ind i) {
 		if ( e.back(i).max() > 0 ) {
 			assert(e.back(i).max() == 1 && "static lookahead gen <= 1");
 			did_inc = true;
@@ -41,7 +41,7 @@ namespace derivs {
 		}
 	}
 	
-	gen_map new_back_map(const expr& e, gen_type& gm, ind i = 0) {
+	gen_map new_back_map(const expr& e, gen_type& gm, ind i) {
 		if ( e.back(i).max() > 0 ) {
 			assert(e.back(i).max() == 1 && "static lookahead gen <= 1");
 			return gen_map{0, ++gm};
@@ -50,7 +50,7 @@ namespace derivs {
 		}
 	}
 	
-	inline gen_map default_back_map(const expr& e, bool& did_inc, ind i = 0) {
+	gen_map default_back_map(const expr& e, bool& did_inc, ind i) {
 		return new_back_map(e, 0, did_inc, i);
 	}
 	
@@ -235,7 +235,8 @@ namespace derivs {
 	
 	expr shared_node::clone(ind i) const {
 		if ( i == shared->crnt ) {
-			return expr::make<shared_node>(std::move(shared->e.clone(i)), i, shared->prev_cache);
+			return expr::make<shared_node>(std::move(shared->e.clone(i)), i, 
+			                               shared->crnt_cache, shared->prev_cache);
 		} else {
 			return expr::make<shared_node>(std::move(shared->e.clone(i)), i);
 		}
@@ -256,12 +257,17 @@ namespace derivs {
 	void shared_node::d(expr&, char x, ind i) {
 		if ( i == shared->crnt ) {  // Computing current derivative
 			// Cache previous values
-			shared->prev_cache.set_back(shared->e.back(i));
-			shared->prev_cache.set_match(shared->e.match(i));
+			node_cache prev_cache = shared->crnt_cache;
+			if ( ! prev_cache.flags.back ) { prev_cache.set_back(shared->e.back(i)); }
+			if ( ! prev_cache.flags.match ) { prev_cache.set_match(shared->e.match(i)); }
 			
-			// Compute derivative and increment
+			// Compute derivative
 			shared->e.d(x, i);
+			
+			// Invalidate old values
 			++(shared->crnt);
+			shared->prev_cache = prev_cache;
+			shared->crnt_cache.invalidate();
 		} else assert(i == shared->crnt - 1 && "shared node only keeps two generations");
 		
 		// if we reach here than we know that the previously-computed derivative 
@@ -270,8 +276,11 @@ namespace derivs {
 		
 	gen_set shared_node::match(ind i) const {
 		if ( i == shared->crnt ) {
-			// Current generation, pass through
-			return shared->e.match(i);
+			// Current generation, cached calculation
+			if ( ! shared->crnt_cache.flags.match ) {
+				shared->crnt_cache.set_match( shared->e.match(i) );
+			}
+			return shared->crnt_cache.match;
 		} else if ( i == shared->crnt - 1 ) {
 			// Previous generation, read from cache
 			assert(shared->prev_cache.flags.match && "match cached for previous generation");
@@ -284,8 +293,11 @@ namespace derivs {
 	
 	gen_set shared_node::back(ind i)  const {
 		if ( i == shared->crnt ) {
-			// Current generation, pass through
-			return shared->e.back(i);
+			// Current generation, cached calculation
+			if ( ! shared->crnt_cache.flags.back ) {
+				shared->crnt_cache.set_back( shared->e.back(i) );
+			}
+			return shared->crnt_cache.back;
 		} else if ( i == shared->crnt - 1 ) {
 			// Previous generation, read from cache
 			assert(shared->prev_cache.flags.back && "back cached for previous generation");
