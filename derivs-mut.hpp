@@ -28,6 +28,7 @@
 #include <cstdlib> // for std::size_t
 #include <forward_list>
 #include <string>
+#include <typeinfo>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -204,6 +205,9 @@ namespace derivs {
 		/// Expression node type. 
 		/// Shared_nodes return their subexpression, thus NOT safe for typecast.
 		inline expr_type type() const { return n->type(); }
+		
+		/// Returns the contained node.
+		inline node* get() { return n; }
 		
 	private:
 		node* n;  ///< Contained node; owned by and destructed by expr
@@ -416,7 +420,9 @@ namespace derivs {
 		
 		static expr make(expr&& e, ind crnt = 0);
 		virtual expr clone(ind) const;
-		virtual void normalize(expr&, expr_set&);
+		/// Special overload that doesn't need a containing expression
+		void normalize(expr_set&);
+		virtual void normalize(expr&, expr_set& normed) { normalize(normed); }
 		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
@@ -425,7 +431,7 @@ namespace derivs {
 		/// NOTE: Assumes this will never be called for the previous value after a derivative taken
 		virtual expr_type type()     const { return shared->e.type(); }
 		
-		/// Returns a constant view of the contained pointer
+		/// Returns a view of the contained pointer
 		inline expr* get() const { return &(shared->e); }
 	}; // class shared_node
 	
@@ -435,6 +441,8 @@ namespace derivs {
 		rule_node(expr&& e) : r(std::move(e)) {}
 		rule_node(const rule_node& n) = default;
 		rule_node(const shared_node& r) : r(r) {}
+		
+		rule_node& operator= (const rule_node& n) = default;
 		
 		virtual expr clone(ind) const;
 		virtual void normalize(expr&, expr_set&);

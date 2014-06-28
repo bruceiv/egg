@@ -242,9 +242,7 @@ namespace derivs {
 		}
 	}
 	
-	void shared_node::normalize(expr&, expr_set& normed) {
-		// WARNING rule_node::normalize depends on this not mutating the expr& parameter
-		
+	void shared_node::normalize(expr_set& normed) {
 		// Ensure can't enter infinite normalization loop
 		if ( shared->dirty || normed.count(get()) ) return;
 		
@@ -313,10 +311,7 @@ namespace derivs {
 	// Unlike the usual semantics, we want to reuse the shared rule node and cached functions
 	expr rule_node::clone(ind) const { return expr::make<rule_node>(*this); }
 	
-	void rule_node::normalize(expr& self, expr_set& normed) {
-		// WARNING this depends on shared_node::normalize not mutating self
-		r.normalize(self, normed);
-	}
+	void rule_node::normalize(expr& self, expr_set& normed) { r.normalize(normed); }
 	
 	void rule_node::d(expr& self, char x, ind i) {
 		// Break left recursion by returning an inf node

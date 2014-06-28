@@ -62,7 +62,7 @@ namespace derivs {
 	
 	// Pretty printer for derivatives
 	class printer : visitor {
-		void print_braced(const expr& e) {
+		void print_braced(expr& e) {
 			if ( is_compound(e) ) {
 				out << "(";
 				e.accept(this);
@@ -72,7 +72,7 @@ namespace derivs {
 			}
 		}
 		
-		void print_unbraced(const expr& e) {
+		void print_unbraced(expr& e) {
 			e.accept(this);
 		}
 		
@@ -104,11 +104,11 @@ namespace derivs {
 			out << "]";
 		}
 		
-		void print_fns(const expr& e) {
+		void print_fns(const node* e) {
 			out << "b";
-			print_uint_set(e.back(i));
+			print_uint_set(e->back(i));
 			out << "m";
-			print_uint_set(e.match(i));
+			print_uint_set(e->match(i));
 		}
 	public:
 		/// Default printer
@@ -118,7 +118,7 @@ namespace derivs {
 		printer(std::ostream& out, std::map<expr*, std::string>& rs) 
 			: out(out), rs(rs), nc(rs.size()) {}
 		
-		void print_rule(const rule_node& e, ind i = 0) {
+		void print_rule(rule_node& e, ind i = 0) {
 			this->i = i;
 			auto it = rs.find(e.r.get());
 			if ( it == rs.end() ) {
@@ -127,15 +127,15 @@ namespace derivs {
 				out << "{RULE :" << it->second << "} ";
 			}
 			print_fns(&e); out << " ";
-			print_unbraced(e.r);
+			visit(e.r);
 			out << std::endl;
 		}
 		
 		/// Prints the expression
-		void print(const expr& e, ind i = 0) {
+		void print(expr& e, ind i = 0) {
 			this->i = i;
-			if ( typeid(*e.n) == typeid(rule_node) ) {
-				rule_node* r = static_cast<rule_node*>(e.n);
+			if ( typeid(*e.get()) == typeid(rule_node) ) {
+				rule_node* r = static_cast<rule_node*>(e.get());
 				if ( rs.count(r->r.get()) == 0 ) {
 					rs.insert(std::make_pair(r->r.get(), std::to_string(rs.size() - nc)));
 				}
@@ -153,9 +153,15 @@ namespace derivs {
 			pl.clear();
 		}
 		
+		/// Prints a shared expression
+		void print(shared_node& e, ind i = 0) {
+			out << "x" << e.shared->refs << " ";
+			print(e.shared->e, i);
+		}
+		
 		/// Prints the derivative of the expression to the given output stream 
 		//  (with the given named rules)
-		static void print(std::ostream& out, const expr& e, 
+		static void print(std::ostream& out, expr& e, 
 		                  std::map<expr*, std::string>& rs, ind i = 0) {
 			printer p(out, rs);
 			p.print(e, i);
@@ -167,30 +173,30 @@ namespace derivs {
 			print(out, e, rs, i);
 		}
 		
-		void visit(const fail_node& e)  { out << "{FAIL}"; }
+		void visit(fail_node& e)  { out << "{FAIL}"; }
 		
-		void visit(const inf_node& e)   { out << "{INF}"; }
+		void visit(inf_node& e)   { out << "{INF}"; }
 		
-		void visit(const eps_node& e)   { out << "{EPS}"; }
+		void visit(eps_node& e)   { out << "{EPS}"; }
 		
-		void visit(const look_node& e)  { out << "{LOOK:" << e.b << "}"; }
+		void visit(look_node& e)  { out << "{LOOK:" << e.b << "}"; }
 		
-		void visit(const char_node& e)  { out << "\'" << strings::escape(e.c) << "\'"; }
+		void visit(char_node& e)  { out << "\'" << strings::escape(e.c) << "\'"; }
 		
-		void visit(const range_node& e) {
+		void visit(range_node& e) {
 			out << "[" << strings::escape(e.b) << "-" << strings::escape(e.e) << "]";
 		}
 		
-		void visit(const any_node& e)   { out << "."; }
+		void visit(any_node& e)   { out << "."; }
 		
-		void visit(const str_node& e)   { out << "\"" << strings::escape(e.str()) << "\""; }
+		void visit(str_node& e)   { out << "\"" << strings::escape(e.str()) << "\""; }
 		
-		void visit(const shared_node& e) {
+		void visit(shared_node& e) {
 			out << "x" << e.shared->refs << " ";
 			print_unbraced(e.shared->e);
 		}
 		
-		void visit(const rule_node& e)  {
+		void visit(rule_node& e)  {
 			auto it = rs.find(e.r.get());
 			if ( it == rs.end() ) {  // not printed this rule before
 				unsigned int i = rs.size() - nc;
@@ -207,9 +213,9 @@ namespace derivs {
 			}
 		}
 		
-		void visit(const not_node& e)   { out << "!"; print_unbraced(e.e); }
+		void visit(not_node& e)   { out << "!"; print_unbraced(e.e); }
 		
-		void visit(const map_node& e)   {
+		void visit(map_node& e)   {
 			out << "(map:";
 			print_fns(&e);
 			out << "g" << (unsigned int)e.gm;
@@ -220,7 +226,7 @@ namespace derivs {
 			out << ")";
 		}
 		
-		void visit(const alt_node& e)  {
+		void visit(alt_node& e)  {
 			out << "(alt:";
 			print_fns(&e);
 			out << "g" << (unsigned int)e.gm;
@@ -235,7 +241,7 @@ namespace derivs {
 			out << ")";
 		}
 		
-		void visit(const seq_node& e) {
+		void visit(seq_node& e) {
 			out << "(seq:";
 			print_fns(&e);
 			out << "g" << (unsigned int)e.gm;
@@ -251,8 +257,7 @@ namespace derivs {
 				out << "} ";
 				print_uint_map(it->eg);
 				out << " ";
-				if ( it->e != e.b ) print_unbraced(it->e);
-				else out << "''''";
+				print_unbraced(it->e);
 				
 				while (++it != e.bs.end()) {
 					out << " | {" << (unsigned int)it->g;
@@ -260,8 +265,7 @@ namespace derivs {
 					out << "} ";
 					print_uint_map(it->eg);
 					out << " ";
-					if ( it->e != e.b ) print_unbraced(it->e);
-					else out << "''''";
+					print_unbraced(it->e);
 				}
 				out << ">";
 			}
@@ -269,8 +273,7 @@ namespace derivs {
 				out << " \\\\ ";
 				print_uint_map(e.cg);
 				out << " ";
-				if ( e.c != e.b ) print_unbraced(e.c);
-				else out << "''''";
+				print_unbraced(e.c);
 			}
 			out << ")";
 		}

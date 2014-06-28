@@ -33,6 +33,8 @@ namespace derivs {
 	public:
 		/// Calculates the least fixed point of x.match() and memoizes it
 		void operator() (expr& x);
+		/// Convenience call for shared_node
+		void operator() (shared_node& x);
 		
 		// Implements visitor
 		void visit(fail_node&);

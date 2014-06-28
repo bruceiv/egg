@@ -34,6 +34,7 @@
 #include "../utils/uint_set.hpp"
 
 #include "deriv_printer-mut.hpp"
+#include "deriv_fixer-mut.hpp"
 
 namespace derivs {
 	
@@ -59,25 +60,32 @@ namespace derivs {
 		
 		/// Makes a new anonymous nonterminal for a many-expression
 		expr make_many(expr&& e) {
-			// Make anonymous non-terminal R
-			rule_node r{ std::move(expr{}) };
-			// Build rule e R / eps for R
-			shared_node s{std::move(
-			                  expr::make<alt_node>(
-			                      expr::make<seq_node>(std::move(e), r),
-			                      expr::make<eps_node>()))};
-			// switch new rule into r
-			r.r = s;
-			return r;
+			// Build the outer rule e R / eps
+			rule_node r{std::move(
+			                expr::make<alt_node>(
+			                    expr::make<seq_node>(
+			                        std::move(e),
+			                        std::move(expr::make<rule_node>(std::move(expr{})))),
+			                    std::move(expr::make<eps_node>())))};
+			// Rebind inner rule to outer rule
+			*static_cast<rule_node*>(
+					static_cast<seq_node*>(
+							static_cast<alt_node*>(
+									r.r.shared->e.get()
+								)->a.get()
+						)->b.get()
+				) = r;
+			// Return now-recursive outer rule
+			return expr::make<rule_node>(r);
 		}
 		
 	public:
 		/// Default constructor; builds a derivative parser graph from the given PEG grammar
 		loader(ast::grammar& g, bool dbg = false) {
 			// Read in rules
-			for (ptr<ast::grammar_rule> r : g.rs) {
-				r->m->accept(this);
-				get_rule(r->name).shared->e = std::move(rVal);
+			for (ast::grammar_rule_ptr r : g.rs) {
+				r->m->accept(this);                             // Convert to derivs::expr
+				get_rule(r->name).shared->e = std::move(rVal);  // Bind to shared rule
 			}
 			
 			// Normalize rules
@@ -88,8 +96,6 @@ namespace derivs {
 			}
 			normed.clear();
 			
-			// TODO down to here
-			
 			// Calculate fixed point of match() for all expressions
 			derivs::fixer fix;
 			for (auto rp : rs) {
@@ -99,7 +105,7 @@ namespace derivs {
 			if ( dbg ) {
 				derivs::printer p(std::cout, names);
 				for (auto rp : rs) {
-					p.print(std::static_pointer_cast<derivs::expr>(rp.second));
+					p.print(rp.second);
 				}
 				std::cout << "\n***** DONE LOADING RULES  *****\n" << std::endl;
 				
@@ -107,21 +113,18 @@ namespace derivs {
 		}
 		
 		/// Gets the rules from a grammar
-		std::map<std::string, ptr<rule_expr>>& get_rules() { return rs; }
-		
-		/// Gets the memoization table that goes along with them
-		memo_expr::table& get_memo() { return memo; }
+		std::map<std::string, shared_node>& get_rules() { return rs; }
 		
 		/// Gets the rule names for this grammar
 		std::map<expr*, std::string>& get_names() { return names; }
 		
-		virtual void visit(ast::char_matcher& m) { rVal = expr::make_ptr<char_expr>(m.c); }
+		virtual void visit(ast::char_matcher& m) { rVal = expr::make<char_node>(m.c); }
 		
-		virtual void visit(ast::str_matcher& m) { rVal = expr::make_ptr<str_expr>(m.s); }
+		virtual void visit(ast::str_matcher& m) { rVal = expr::make<str_node>(m.s); }
 		
 		virtual void visit(ast::range_matcher& m) {
 			// Empty alternation is a success
-			if ( m.rs.size() == 0 ) { rVal = expr::make_ptr<eps_expr>(); return; }
+			if ( m.rs.size() == 0 ) { rVal = expr::make<eps_node>(); return; }
 			
 			// Transform last option
 			auto it = m.rs.rbegin();
@@ -130,42 +133,45 @@ namespace derivs {
 			// Transform remaining options
 			while ( ++it != m.rs.rend() ) {
 				auto tVal = make_char_range(*it);
-				rVal = expr::make_ptr<alt_expr>(memo, tVal, rVal);
+				rVal = expr::make<alt_node>(std::move(tVal), std::move(rVal));
 			}
 		}
 		
-		virtual void visit(ast::rule_matcher& m) { rVal = get_rule(m.rule); }
+		virtual void visit(ast::rule_matcher& m) { rVal = expr::make<rule_node>(get_rule(m.rule)); }
 		
-		virtual void visit(ast::any_matcher& m) { rVal = expr::make_ptr<any_expr>(); }
+		virtual void visit(ast::any_matcher& m) { rVal = expr::make<any_node>(); }
 		
-		virtual void visit(ast::empty_matcher& m) { rVal = expr::make_ptr<eps_expr>(); }
+		virtual void visit(ast::empty_matcher& m) { rVal = expr::make<eps_node>(); }
 		
 		virtual void visit(ast::action_matcher& m) {
 			//TODO actually implement this; for the moment, just return success
-			rVal = expr::make_ptr<eps_expr>();
+			rVal = expr::make<eps_node>();
 		}
 		
 		virtual void visit(ast::opt_matcher& m) {
 			// match subexpression or epsilon
 			m.m->accept(this);
-			rVal = expr::make_ptr<alt_expr>(memo, rVal, expr::make_ptr<eps_expr>());
+			rVal = expr::make<alt_node>(std::move(rVal), 
+			                            std::move(expr::make<eps_node>()));
 		}
 		
 		virtual void visit(ast::many_matcher& m) {
 			m.m->accept(this);
-			rVal = make_many(rVal);
+			rVal = make_many(std::move(rVal));
 		}
 		
 		virtual void visit(ast::some_matcher& m) {
 			m.m->accept(this);
-			rVal = expr::make_ptr<seq_expr>(memo, rVal, make_many(rVal));
+			expr tVal = std::move(rVal.clone());
+			rVal = expr::make<seq_node>(std::move(tVal), 
+			                            std::move(make_many(std::move(rVal))));
 		}
 		
 		virtual void visit(ast::seq_matcher& m) {
 			// Convert vector in seq_matcher to cons-list in seq_expr
 			
 			// Empty sequence is a success
-			if ( m.ms.size() == 0 ) { rVal = expr::make_ptr<eps_expr>(); return; }
+			if ( m.ms.size() == 0 ) { rVal = expr::make<eps_node>(); return; }
 			
 			// Transform last option
 			auto it = m.ms.rbegin();
@@ -173,9 +179,9 @@ namespace derivs {
 			
 			// Transform remaining options
 			while ( ++it != m.ms.rend() ) {
-				ptr<expr> tVal = rVal;
+				expr tVal = std::move(rVal);
 				(*it)->accept(this);
-				rVal = expr::make_ptr<seq_expr>(memo, rVal, tVal);
+				rVal = expr::make<seq_node>(std::move(rVal), std::move(tVal));
 			}
 		}
 		
@@ -183,7 +189,7 @@ namespace derivs {
 			// Convert vector in alt_matcher to cons-list in alt_expr
 			
 			// Empty sequence is a success
-			if ( m.ms.size() == 0 ) { rVal = expr::make_ptr<eps_expr>(); return; }
+			if ( m.ms.size() == 0 ) { rVal = expr::make<eps_node>(); return; }
 			
 			// Transform last option
 			auto it = m.ms.rbegin();
@@ -191,20 +197,21 @@ namespace derivs {
 			
 			// Transform remaining options
 			while ( ++it != m.ms.rend() ) {
-				ptr<expr> tVal = rVal;
+				expr tVal = std::move(rVal);
 				(*it)->accept(this);
-				rVal = expr::make_ptr<alt_expr>(memo, rVal, tVal);
+				rVal = expr::make<alt_node>(std::move(rVal), std::move(tVal));
 			}
 		}
 		
 		virtual void visit(ast::look_matcher& m) {
 			m.m->accept(this);
-			rVal = expr::make_ptr<not_expr>(memo, expr::make_ptr<not_expr>(memo, rVal));
+			rVal = expr::make<not_node>(
+				std::move(expr::make<not_node>(std::move(rVal))));
 		}
 		
 		virtual void visit(ast::not_matcher& m) {
 			m.m->accept(this);
-			rVal = expr::make_ptr<not_expr>(memo, rVal);
+			rVal = expr::make<not_node>(std::move(rVal));
 		}
 		
 		virtual void visit(ast::capt_matcher& m) {
@@ -219,7 +226,7 @@ namespace derivs {
 		
 		virtual void visit(ast::fail_matcher& m) {
 			// TODO complete implementation; for the moment ignore the error message
-			rVal = expr::make_ptr<fail_expr>();
+			rVal = expr::make<fail_node>();
 		}
 		
 	private:
@@ -236,19 +243,20 @@ namespace derivs {
 	/// @return true for match, false for failure
 	bool match(loader& l, std::istream& in, std::string rule, bool dbg = false) {
 		auto& rs = l.get_rules();
-		auto& memo = l.get_memo();
 		derivs::printer p(std::cout, l.get_names());
 		
-		// fail on no such rule
+		// Fail on no such rule
 		if ( rs.count(rule) == 0 ) return false;
 		
-		ptr<expr> e = rs[rule]->r;
+		// Clone the rule so we don't break the shared definition
+		expr e = rs.at(rule).clone(0);
 		
 		// Take derivatives until failure, match, or end of input
+		ind i = 0;
 		while ( true ) {
 			if ( dbg ) { p.print(e); }
 			
-			switch ( e->type() ) {
+			switch ( e.type() ) {
 			case fail_type: return false;
 			case inf_type:  return false;
 			case eps_type:  return true;
@@ -257,7 +265,7 @@ namespace derivs {
 			}
 			
 			// Break on a match
-			if ( ! e->match().empty() ) return true;
+			if ( ! e.match(i).empty() ) return true;
 			
 			char x;
 			if ( ! in.get(x) ) { x = '\0'; }  // read character, \0 for EOF
@@ -267,15 +275,15 @@ namespace derivs {
 				          << std::endl;
 			}
 			
-			e = e->d(x);
-			memo.clear(); // clear memoization table after every character
+			// Take derivative and increment input index
+			e.d(x, i++);
 			
 			if ( x == '\0' ) break;
 		}
 		if ( dbg ) { p.print(e); }
 		
 		// Match if final expression matched on terminator char
-		return ! e->match().empty();
+		return ! e.match(i).empty();
 	}
 	
 	/// Recognizes the input

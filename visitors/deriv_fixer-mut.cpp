@@ -31,6 +31,14 @@ namespace derivs {
 		fix_match(x);
 	}
 	
+	void fixer::operator() (shared_node& x) {
+		// Fix contained expression, then copy memization information up
+		if ( fixed.count(&(x.shared->e)) ) return;
+		
+		gen_set match = fix_match(x.shared->e);
+		x.shared->crnt_cache.set_match(match);
+	}
+	
 	gen_set fixer::fix_match(expr& x) {
 		// Fast path for expressions that can't have recursively-defined match set
 		switch ( x.type() ) {
