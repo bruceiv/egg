@@ -167,21 +167,21 @@ namespace derivs {
 	
 	// str_node ////////////////////////////////////////////////////////////////////
 	
-	expr str_expr::make(const std::string& s) {
+	expr str_node::make(const std::string& s) {
 		switch ( s.size() ) {
-		case 0:  return eps_expr::make();
-		case 1:  return char_expr::make(s[0]);
+		case 0:  return eps_node::make();
+		case 1:  return char_node::make(s[0]);
 		default: return expr::make<str_node>(s);
 		}
 	}
 	
-	expr str_expr::clone(ind) const { return expr::make<str_node>(*this); }
+	expr str_node::clone(ind) const { return expr::make<str_node>(*this); }
 	
-	void str_expr::d(expr& self, char x, ind) {
+	void str_node::d(expr& self, char x, ind) {
 		// REMEMBER CHARS IN s ARE IN REVERSE ORDER
 		
 		// Check that the first character matches
-		if ( s.last() != x ) {
+		if ( s.back() != x ) {
 			self.remake<fail_node>();
 			return;
 		}
@@ -196,26 +196,26 @@ namespace derivs {
 		s.pop_back();
 	}
 	
-	gen_set str_expr::match(ind) const { return gen_set{}; }
+	gen_set str_node::match(ind) const { return gen_set{}; }
 	
-	gen_set str_expr::back(ind)  const { return gen_set{0}; }
+	gen_set str_node::back(ind)  const { return gen_set{0}; }
 	
 	// shared_node ///////////////////////////////////////////////////////////////////
 	
 	expr shared_node::make(expr&& e, ind crnt) {
-		return expr::make<shared_node>(e, crnt);
+		return expr::make<shared_node>(std::move(e), crnt);
 	}
 	
 	expr shared_node::clone(ind i) const {
 		if ( i == shared->crnt ) {
-			return expr::make<shared_node>(shared->e.clone(i), i, shared->prev_cache);
+			return expr::make<shared_node>(std::move(shared->e.clone(i)), i, shared->prev_cache);
 		} else {
-			return expr::make<shared_node>(shared->e.clone(i), i);
+			return expr::make<shared_node>(std::move(shared->e.clone(i)), i);
 		}
 	}
 	
 	void shared_node::d(expr&, char x, ind i) {
-		if ( i == shared->crnt; ) {  // Computing current derivative
+		if ( i == shared->crnt ) {  // Computing current derivative
 			// Cache previous values
 			shared->prev_cache.set_back(shared->e.back(i));
 			shared->prev_cache.set_match(shared->e.match(i));
@@ -236,7 +236,7 @@ namespace derivs {
 		} else if ( i == shared->crnt - 1 ) {
 			// Previous generation, read from cache
 			assert(shared->prev_cache.flags.match && "match cached for previous generation");
-			return shared->pref_cache.match;
+			return shared->prev_cache.match;
 		} else {
 			assert(false && "shared node only keeps two generations");
 			return gen_set{};
@@ -250,7 +250,7 @@ namespace derivs {
 		} else if ( i == shared->crnt - 1 ) {
 			// Previous generation, read from cache
 			assert(shared->prev_cache.flags.back && "back cached for previous generation");
-			return shared->pref_cache.back;
+			return shared->prev_cache.back;
 		} else {
 			assert(false && "shared node only keeps two generations");
 			return gen_set{};
@@ -293,17 +293,17 @@ namespace derivs {
 	expr not_node::make(expr&& e, ind i) {
 		switch ( e.type() ) {
 		case fail_type: return look_node::make(1);  // Match on subexpression failure
-		case inf_type:  return e;                   // Propegate infinite loop
+		case inf_type:  return std::move(e);        // Propegate infinite loop
 		default:        break;
 		}
 		
 		// return failure on subexpression success
 		if ( ! e.match(i).empty() ) return fail_node::make();
 		
-		return expr::make<not_expr>(e);
+		return expr::make<not_node>(std::move(e));
 	}
 	
-	expr not_node::clone(ind i) const { return expr::make<not_node>(e.clone(i)); }
+	expr not_node::clone(ind i) const { return expr::make<not_node>(std::move(e.clone(i))); }
 	
 	// Take negative lookahead of subexpression derivative
 	void not_node::d(expr& self, char x, ind i) {
@@ -336,22 +336,22 @@ namespace derivs {
 		
 		switch ( e.type() ) {
 		// Map expression match generation into exit generation
-		case eps_type:  return look_expr::make(eg(0));
-		case look_type: return look_expr::make(eg(e.match(i).max()));
+		case eps_type:  return look_node::make(eg(0));
+		case look_type: return look_node::make(eg(e.match(i).max()));
 		// Propegate fail and infinity errors
-		case fail_type: return s; // a fail node
-		case inf_type:  return s; // an inf node
+		case fail_type: return std::move(e); // a fail node
+		case inf_type:  return std::move(e); // an inf node
 		default:        break; // do nothing
 		}
 		
 		// check if map isn't needed (identity map)
-		if ( gm == eg.max_key() ) return e;
+		if ( gm == eg.max_key() ) return std::move(e);
 		
-		return expr::make<map_node>(e, eg, gm);
+		return expr::make<map_node>(std::move(e), eg, gm);
 	}
 	
 	expr map_node::clone(ind i) const {
-		return expr::make<map_node>(e.clone(i), eg, gm, cache);
+		return expr::make<map_node>(std::move(e.clone(i)), eg, gm, cache);
 	}
 	
 	void map_node::d(expr& self, char x, ind i) {
@@ -375,12 +375,12 @@ namespace derivs {
 	}
 	
 	gen_set map_node::match(ind i) const {
-		if ( ! cache.flags.match ) { cache.set_match( sg(s.match(i)) ); }
+		if ( ! cache.flags.match ) { cache.set_match( eg(e.match(i)) ); }
 		return cache.match;
 	}
 	
 	gen_set map_node::back(ind i) const {
-		if ( ! cache.flags.back ) { cache.set_back( sg(s.back(i)) ); }
+		if ( ! cache.flags.back ) { cache.set_back( eg(e.back(i)) ); }
 		return cache.back;
 	}
 	
@@ -389,19 +389,19 @@ namespace derivs {
 	expr alt_node::make(expr&& a, expr&& b) {
 		switch ( a.type() ) {
 		// if first alternative fails, use second
-		case fail_type: return b;
+		case fail_type: return std::move(b);
 		// if first alternative is infinite loop, propegate
-		case inf_type:  return a;
+		case inf_type:  return std::move(a);
 		default:        break;
 		}
 		
 		// if first alternative matches or second alternative fails, use first
-		if ( b.type() == fail_type || ! a.match().empty() ) return a;
+		if ( b.type() == fail_type || ! a.match(0).empty() ) return std::move(a);
 		
 		bool did_inc = false;
 		gen_map ag = default_back_map(a, did_inc);
 		gen_map bg = default_back_map(b, did_inc);
-		return expr::make<alt_node>(a, b, ag, bg, did_inc ? 1 : 0);
+		return expr::make<alt_node>(std::move(a), std::move(b), ag, bg, did_inc ? 1 : 0);
 	}
 	
 	expr alt_node::make(expr&& a, expr&& b, const gen_map& ag, const gen_map& bg, 
@@ -410,22 +410,23 @@ namespace derivs {
 	    
 		switch ( a.type() ) {
 		// if first alternative fails, use second
-		case fail_type: return map_expr::make(b, gm, bg, i);
+		case fail_type: return map_node::make(std::move(b), bg, gm, i);
 		// if first alternative is infinite loop, propegate
-		case inf_type:  return a;
+		case inf_type:  return std::move(a);
 		default:        break;
 		}
 		
 		// if first alternative matches or second alternative fails, use first
 		if ( b.type() == fail_type || ! a.match(i).empty() ) {
-			return map_expr::make(a, gm, ag, i);
+			return map_node::make(std::move(a), ag, gm, i);
 		}
 		
-		return expr::make<alt_node>(a, b, ag, bg, gm);
+		return expr::make<alt_node>(std::move(a), std::move(b), ag, bg, gm);
 	}
 	
 	expr alt_node::clone(ind i) const {
-		return expr::make<alt_node>(a.clone(i), b.clone(i), ag, bg, gm, cache);
+		return expr::make<alt_node>(std::move(a.clone(i)), std::move(b.clone(i)),
+		                            ag, bg, gm, cache);
 	}
 	
 	void alt_node::d(expr& self, char x, ind i) {
@@ -440,7 +441,7 @@ namespace derivs {
 			gen_type bbm = b.back(i).max(); 
 			b.d(x, i);  // TAKE DERIV OF b
 			update_back_map(bg, bbm, b, gm, i+1);
-			self = map_node::make(b, bg, gm, i+1);
+			self = map_node::make(std::move(b), bg, gm, i+1);
 			return;
 		}
 		case inf_type:  self.remake<inf_node>(); return;
@@ -453,7 +454,7 @@ namespace derivs {
 		
 		// Eliminate second alternative if first matches
 		if ( ! a.match(i+1).empty() ) {
-			self = map_node::make(a, ag, did_inc ? gm+1 : gm, i+1);
+			self = map_node::make(std::move(a), ag, did_inc ? gm+1 : gm, i+1);
 			return;
 		}
 		
@@ -463,7 +464,7 @@ namespace derivs {
 		
 		// Eliminate second alternative if it fails
 		if ( b.type() == fail_type ) {
-			self = map_node::make(a, ag, did_inc ? gm+1 : gm, i+1);
+			self = map_node::make(std::move(a), ag, did_inc ? gm+1 : gm, i+1);
 			return;
 		}
 		update_back_map(bg, bbm, b, gm, did_inc, i+1);
@@ -490,65 +491,63 @@ namespace derivs {
 	expr seq_node::make(expr&& a, expr&& b) {
 		switch ( b.type() ) {
 		// empty second element just leaves first
-		case eps_type:  return a;
+		case eps_type:  return std::move(a);
 		// failing second element propegates
-		case fail_type: return b;
+		case fail_type: return std::move(b);
 		default: break;  // do nothing
 		}
 		
 		switch ( a.type() ) {
 		// empty first element or lookahead success just leaves follower
-		case eps_type:
-		case look_type:
-			return b;
+		case eps_type: case look_type:
+			return std::move(b);
 		// failure or infinite loop propegates
-		case fail_type:
-		case inf_type:
-			return a;
+		case fail_type: case inf_type:
+			return std::move(a);
 		default: break;  // do nothing
 		}
 		
 		bool did_inc = false;
 		
 		// Set up match-fail follower
-		expr c = fail_expr::make();
+		expr c = fail_node::make();
 		gen_map cg{0};
 		
-		gen_set am = a.match();
+		gen_set am = a.match(0);
 		if ( ! am.empty() && am.min() == 0 ) {
-			c = b.clone();
-			update_back_map(cg, 0, b, gm, did_inc, 0);
+			c = b.clone(0);
+			update_back_map(cg, 0, b, 0, did_inc, 0);
 		}
 		
 		// set up lookahead follower
 		look_list bs;
-		if ( a.back().max() > 0 ) {
-			assert(a->back().max() == 1 && "static backtrack gen <= 1");
+		if ( a.back(0).max() > 0 ) {
+			assert(a.back(0).max() == 1 && "static backtrack gen <= 1");
 			
 			gen_type gl = 0;
-			gen_set bm = b.match();
+			gen_set bm = b.match(0);
 			if ( ! bm.empty() && bm.min() == 0 ) {
 				gl = 1;
 				did_inc = true;
 			}
 			
-			bs.emplace_front(1, b.clone(), default_back_map(b, did_inc), gl);
+			bs.emplace_front(1, b.clone(0), default_back_map(b, did_inc), gl);
 		}
 		
-		// return constructed expression
-		return expr::make<seq_node>(a, b, bs, c, cg, did_inc ? 1 : 0);
+		return expr::make<seq_node>(std::move(a), std::move(b), std::move(bs), 
+		                            std::move(c), cg, did_inc ? 1 : 0);
 	}
 		
 	expr seq_node::clone(ind i) const {
 		// clone lookahead list
 		look_list cbs;
 		auto cbt = cbs.before_begin();
-		for (auto bi : bs) {
-			cbt = cbs.emplace_after(cbt, bi.g, bi.s.clone(i), bi.sg, bi.gl);
+		for (const look_back& bi : bs) {
+			cbt = cbs.emplace_after(cbt, bi.g, bi.e.clone(i), bi.eg, bi.gl);
 		}
 		
-		return expr::make<seq_node>(a.clone(i), b.clone(i), cbs, 
-		                            c.clone(i), cg, gm, cache);
+		return expr::make<seq_node>(std::move(a.clone(i)), std::move(b.clone(i)), 
+		                            std::move(cbs), std::move(c.clone(i)), cg, gm, cache);
 	}
 	
 	void seq_node::d(expr& self, char x, ind i) {
@@ -562,12 +561,12 @@ namespace derivs {
 			// Take follower (or follower's end-of-string derivative on end-of-string)
 			if ( x == '\0' ) b.d('\0', i);  // TAKE DERIV OF b
 			gen_map bg = new_back_map(b, gm, i+1);
-			self = map_expr::make(b, bg, gm, i+1);
+			self = map_node::make(std::move(b), bg, gm, i+1);
 			return;
 		} case look_type: {
 			// Take lookahead follower (or lookahead follower match-fail)
 			gen_type g = a.match(i+1).max();
-			for (const look_node& bi : bs) {
+			for (look_back& bi : bs) {
 				// find node in (sorted) generation list
 				if ( bi.g < g ) continue;
 				if ( bi.g > g ) {
@@ -575,10 +574,10 @@ namespace derivs {
 					return;
 				}
 				
-				gen_type bibm = bi.s.back(i).max();
-				bi.s.d(x, i);  // TAKE DERIV OF bi
+				gen_type bibm = bi.e.back(i).max();
+				bi.e.d(x, i);  // TAKE DERIV OF bi
 				
-				if ( bi.s.type() == fail_type ) {  // straight path fails ...
+				if ( bi.e.type() == fail_type ) {  // straight path fails ...
 					if ( bi.gl > 0 ) {                // ... but matched in the past
 						self.remake<look_node>(bi.gl);   // return appropriate lookahead
 						return;
@@ -588,25 +587,26 @@ namespace derivs {
 					}
 				}
 				
-				update_back_map(bi.sg, bibm, bi.s, gm, i+1);
+				update_back_map(bi.eg, bibm, bi.e, gm, i+1);
 				
 				// if there is no failure backtrack (or this generation is it) 
 				// we don't have to track it
-				gen_set dbim = bi.s.match(i+1);
+				gen_set dbim = bi.e.match(i+1);
 				if ( bi.gl == 0 || (! dbim.empty() && dbim.min() == 0) ) {
-					self = map_expr::make(bi.s, bi.sg, gm);
+					self = map_node::make(std::move(bi.e), bi.eg, gm, i+1);
 					return;
 				}
 				
 				// Otherwise return alt-expr of this lookahead and its failure backtrack
-				self = alt_node::make(bi.s, look_node::make(), bi.sg, gen_map{0,bi.gl}, gm);
+				self = alt_node::make(std::move(bi.e), look_node::make(), 
+				                      bi.eg, gen_map{0,bi.gl}, gm);
 				return;
 			}
 			// end-of-string is only case where we can get a lookahead success for an unseen gen
 			if ( x == '\0' ) {
 				b.d('\0', i);  // TAKE DERIV OF b
-				gen_map bg = new_back_map(bn, gm, i+1);
-				self = map_node::make(bn, bg, gm, i+1);
+				gen_map bg = new_back_map(b, gm, i+1);
+				self = map_node::make(std::move(b), bg, gm, i+1);
 				return;
 			}
 			self.remake<fail_node>(); // if lookahead follower not found, fail
@@ -616,7 +616,7 @@ namespace derivs {
 			gen_type cbm = c.back(i).max();
 			c.d(x, i);  // TAKE DERIV OF c
 			update_back_map(cg, cbm, c, gm, i+1);
-			self = map_node::make(c, cg, gm, i+1);
+			self = map_node::make(std::move(c), cg, gm, i+1);
 			return;
 		} case inf_type: {
 			// Propegate infinite loop
@@ -649,7 +649,7 @@ namespace derivs {
 		auto bilt = bs.before_begin();
 
 		while ( dabt != dab.end() && bit != bs.end() ) {
-			const look_node& bi = *bit;
+			look_back& bi = *bit;
 			
 			// erase generations not in the backtrack list
 			if ( bi.g < *dabt ) {
@@ -659,11 +659,11 @@ namespace derivs {
 			assert(bi.g == *dabt && "no generations missing from backtrack list");
 			
 			// take derivative of lookahead
-			gen_type bibm = bi.s.back(i).max();
-			bi.s.d(x, i);  // TAKE DERIV OF bi
-			update_back_map(bi.sg, bibm, bi.s, gm, did_inc, i+1);
+			gen_type bibm = bi.e.back(i).max();
+			bi.e.d(x, i);  // TAKE DERIV OF bi
+			update_back_map(bi.eg, bibm, bi.e, gm, did_inc, i+1);
 			
-			gen_set dbim = bi.match(i+1);
+			gen_set dbim = bi.e.match(i+1);
 			if ( ! dbim.empty() && dbim.min() == 0 ) {  // set new match-fail backtrack if needed
 				++bi.gl;
 				did_inc = true;
@@ -684,8 +684,8 @@ namespace derivs {
 				gl = gm+1;
 				did_inc = true;
 			}
-			dbs.emplace_after(bilt, 
-			                  dabm, b.clone(i+1), new_back_map(b, gm, did_inc, i+1), gl);
+			bs.emplace_after(bilt, 
+			                 dabm, b.clone(i+1), new_back_map(b, gm, did_inc, i+1), gl);
 		}
 		
 		if ( did_inc ) ++gm;
@@ -703,15 +703,15 @@ namespace derivs {
 		auto at = am.begin();
 		auto bit = bs.begin();
 		while ( at != am.end() && bit != bs.end() ) {
-			auto& bi = *bit;
-			auto  ai = *at;
+			const look_back& bi = *bit;
+			gen_type         ai = *at;
 			
 			// Find matching generations
 			if ( bi.g < ai ) { ++bit; continue; }
 			else if ( bi.g > ai ) { ++at; continue; }
 			
 			// Add followers to match set as well as follower match-fail
-			x |= bi.sg(bi.s.match(i));
+			x |= bi.eg(bi.e.match(i));
 			if ( bi.gl > 0 ) x |= bi.gl;
 			
 			++at; ++bit;
@@ -731,8 +731,8 @@ namespace derivs {
 		x |= cg(c.back(i));
 		
 		// Include lookahead follower backtracks
-		for (const look_node& bi : bs) {
-			x |= bi.sg(bi.s.back(i));
+		for (const look_back& bi : bs) {
+			x |= bi.eg(bi.e.back(i));
 			if ( bi.gl > 0 ) x |= bi.gl;
 		}
 		

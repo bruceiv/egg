@@ -99,7 +99,6 @@ namespace derivs {
 	/// A derivative expression
 	class expr {
 		expr(node* n) : n(n) {}
-		
 	public:
 		expr(expr&& t) : n(t.n) { t.n = nullptr; /* prevent temporary from deleting node */ }
 		
@@ -113,9 +112,11 @@ namespace derivs {
 		/// Destroys expression and contained node
 		~expr() { delete n; }
 		
-		/// Makes an expression for a given node
+		/// Makes an expression for a given node.
 		template<typename T, typename... Args>
-		static expr make(Args&&... args) { return expr{new T(args...)}; }
+		static expr make(Args&&... args) {
+			return expr{new T(std::forward<Args>(args)...)};
+		}
 		
 		/// Performs a deep clone of this expression
 		inline expr clone(ind i) const { return n->clone(i); }
@@ -128,7 +129,7 @@ namespace derivs {
 			delete tmp;         // delete old node
 			return *this;
 		}
-		
+				
 		/// Takes the derivative of this expression with respect to x (at i)
 		inline void  d(char x, ind i) { return n->d(*this, x, i); }
 		
@@ -155,8 +156,16 @@ namespace derivs {
 			if ( flags.back ) back = o.back;
 		}
 		
-		inline void set_match(gen_set&& m) const { flags.match = true; match = m; }
-		inline void set_back(gen_set&& b) const { flags.back = true; back = b; }
+		inline void set_match(const gen_set& m) const {
+			flags.match = true;
+			match = m;
+		}
+		
+		inline void set_back(const gen_set& b) const {
+			flags.back = true;
+			back = b;
+		}
+		
 		inline void invalidate() const { flags = {false, false}; }
 		
 		mutable gen_set match;  ///< Stored match set
@@ -418,8 +427,8 @@ namespace derivs {
 	/// A sequence of two expressions
 	class seq_node : public node {
 	public:
-		struct look_node {
-			look_node(gen_type g, expr&& e, gen_map eg, gen_type gl = 0) 
+		struct look_back {
+			look_back(gen_type g, expr&& e, gen_map eg, gen_type gl = 0) 
 				: g(g), e(std::move(e)), eg(eg), gl(gl) {}
 			
 			gen_type  g;   ///< Backtrack generation this follower corresponds to
@@ -427,7 +436,7 @@ namespace derivs {
 			gen_map   eg;  ///< Map of generations from this node to the containing node
 			gen_type  gl;  ///< Generation of last match
 		}; // struct look_list
-		using look_list = std::forward_list<look_node>;
+		using look_list = std::forward_list<look_back>;
 		
 		seq_node(expr&& a, expr&& b)
 			: a(std::move(a)), b(std::move(b)), bs(), 
@@ -436,7 +445,7 @@ namespace derivs {
 		
 		seq_node(expr&& a, expr&& b, look_list&& bs, expr&& c, const gen_map& cg, 
 		         gen_type gm, const node_cache& cache = node_cache{})
-			: a(std::move(a)), b(std::move(b)), bs(bs), 
+			: a(std::move(a)), b(std::move(b)), bs(std::move(bs)), 
 			  c(std::move(c)), cg(cg), gm(gm), cache(cache) {}
 		
 		static expr make(expr&& a, expr&& b);
