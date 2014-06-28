@@ -25,6 +25,7 @@
 #include <istream>
 #include <map>
 #include <string>
+#include <unordered_set>
 #include <utility>
 
 #include "../ast.hpp"
@@ -36,86 +37,14 @@
 
 namespace derivs {
 	
-	/// Rebuilds a set of derivative expressions using their smart constructors
-	class normalizer : derivs::visitor {
-	public:
-		normalizer(memo_expr::table& memo) : rVal(nullptr), memo(memo), rs() {}
-		
-		/// Converts any expression
-		ptr<expr> normalize(ptr<expr> e) {
-			e->accept(this);
-			return rVal;
-		}
-		
-		/// Conversion specialized for rule expressions
-		ptr<rule_expr> normalize(ptr<rule_expr> r) {
-			r->accept(this);
-			return std::static_pointer_cast<rule_expr>(rVal);
-		}
-		
-		void visit(fail_expr& e)  { rVal = fail_expr::make(); }
-		void visit(inf_expr& e)   { rVal = inf_expr::make(); }
-		void visit(eps_expr& e)   { rVal = eps_expr::make(); }
-		void visit(look_expr& e)  { rVal = look_expr::make(e.b); }
-		void visit(char_expr& e)  { rVal = char_expr::make(e.c); }
-		void visit(range_expr& e) { rVal = range_expr::make(e.b, e.e); }
-		void visit(any_expr& e)   { rVal = any_expr::make(); }
-		void visit(str_expr& e)   { rVal = str_expr::make(e.str()); }
-		
-		void visit(rule_expr& e) {
-			auto it = rs.find(&e);
-			if ( it == rs.end() ) {
-				// no stored rule; store one, then update its pointed to rule
-				ptr<rule_expr> r = std::make_shared<rule_expr>(memo, inf_expr::make());
-				rs./*emplace(&e, r)*/insert(std::make_pair(&e, r));
-				e.r->accept(this);
-				r->r = rVal;
-				r->reset_memo();
-				rVal = std::static_pointer_cast<expr>(r);
-			} else {
-				rVal = std::static_pointer_cast<expr>(it->second);
-			}
-		}
-		
-		void visit(not_expr& e) {
-			e.e->accept(this);
-			rVal = not_expr::make(memo, rVal);
-		}
-		
-		void visit(map_expr& e) {
-			// won't appear in un-normalized expression anyway
-			e.e->accept(this);
-			rVal = map_expr::make(memo, rVal, e.gm, e.eg);
-		}
-		
-		void visit(alt_expr& e) {
-			e.a->accept(this);
-			ptr<expr> a = rVal;
-			e.b->accept(this);
-			rVal = alt_expr::make(memo, a, rVal);
-		}
-		
-		void visit(seq_expr& e) {
-			e.a->accept(this);
-			ptr<expr> a = rVal;
-			e.b->accept(this);
-			rVal = seq_expr::make(memo, a, rVal);
-		}
-	
-	private:
-		ptr<expr>                            rVal;  ///< result of last read
-		memo_expr::table&                    memo;  ///< Memoization table
-		std::map<rule_expr*, ptr<rule_expr>> rs;    ///< Unique transformation of rule expressions
-	};  // class normalizer
-	
 	/// Loads a set of derivatives from the grammar AST
 	class loader : ast::visitor {
 		
-		/// Gets the unique rule expression correspoinding to the given name
-		ptr<rule_expr> get_rule(const std::string& s) {
+		/// Gets the shared rule node correspoinding to the given name
+		shared_node get_rule(const std::string& s) {
 			if ( rs.count(s) == 0 ) {
-				ptr<rule_expr> r = std::make_shared<rule_expr>(memo, expr::make_ptr<fail_expr>());
-				rs./*emplace(s, r)*/insert(std::make_pair(s, r));
+				shared_node r{ std::move(expr::make<fail_node>()) };
+				rs.emplace(s, r);
 				return r;
 			} else {
 				return rs.at(s);
@@ -123,21 +52,22 @@ namespace derivs {
 		}
 		
 		/// Converts an AST char range into a derivative expr. char_range
-		ptr<expr> make_char_range(const ast::char_range& r) const {
-			return ( r.from == r.to ) ? 
-				expr::make_ptr<char_expr>(r.from) : 
-				expr::make_ptr<range_expr>(r.from, r.to);
+		expr make_char_range(const ast::char_range& r) const {
+			return ( r.from == r.to ) ? expr::make<char_node>(r.from)
+			                          : expr::make<range_node>(r.from, r.to);
 		}
 		
 		/// Makes a new anonymous nonterminal for a many-expression
-		ptr<expr> make_many(ptr<expr> e) {
-			// make anonymous non-terminal R
-			ptr<expr> r = expr::make_ptr<rule_expr>(memo, expr::make_ptr<fail_expr>());
-			// set non-terminal rule to e R / eps
-			std::static_pointer_cast<rule_expr>(r)->r = 
-				expr::make_ptr<alt_expr>(memo, 
-				                         expr::make_ptr<seq_expr>(memo, e, r),
-				                         expr::make_ptr<eps_expr>());
+		expr make_many(expr&& e) {
+			// Make anonymous non-terminal R
+			rule_node r{ std::move(expr{}) };
+			// Build rule e R / eps for R
+			shared_node s{std::move(
+			                  expr::make<alt_node>(
+			                      expr::make<seq_node>(std::move(e), r),
+			                      expr::make<eps_node>()))};
+			// switch new rule into r
+			r.r = s;
 			return r;
 		}
 		
@@ -146,22 +76,19 @@ namespace derivs {
 		loader(ast::grammar& g, bool dbg = false) {
 			// Read in rules
 			for (ptr<ast::grammar_rule> r : g.rs) {
-				rVal = nullptr;
 				r->m->accept(this);
-				get_rule(r->name)->r = rVal;
+				get_rule(r->name).shared->e = std::move(rVal);
 			}
-			
-			rVal = nullptr;
 			
 			// Normalize rules
-			normalizer n(memo);
-			std::map<std::string, ptr<rule_expr>> nrs;
+			expr_set normed;
 			for (auto rp : rs) {
-				ptr<rule_expr> nr = n.normalize(rp.second);
-				nrs.insert(std::make_pair(rp.first, nr));
-				names.insert(std::make_pair(nr->r.get(), rp.first));
+				rp.second.normalize(normed);
+				names.emplace(rp.second.get(), rp.first);
 			}
-			rs.swap(nrs);
+			normed.clear();
+			
+			// TODO down to here
 			
 			// Calculate fixed point of match() for all expressions
 			derivs::fixer fix;
@@ -296,10 +223,9 @@ namespace derivs {
 		}
 		
 	private:
-		std::map<std::string, ptr<rule_expr>>  rs;     ///< List of rules
-		std::map<expr*, std::string>           names;  ///< Names of rule expressions
-		memo_expr::table                       memo;   ///< Memoization table
-		ptr<expr>                              rVal;   ///< Return value of node visits
+		std::map<std::string, shared_node> rs;     ///< List of rules
+		std::map<expr*, std::string>       names;  ///< Names of rule expressions
+		expr                               rVal;   ///< Return value of node visits
 	};  // class loader
 	
 	/// Recognizes the input

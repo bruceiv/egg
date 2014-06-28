@@ -26,6 +26,7 @@
 #include <list>
 #include <string>
 #include <map>
+#include <typeinfo>
 #include <utility>
 
 #include "../derivs-mut.hpp"
@@ -36,24 +37,24 @@ namespace derivs {
 	/// Visitor with functor-like interface that checks if a node is a compound node
 	class is_compound : visitor {
 	public:
-		is_compound(expr* e) { e->accept(this); }
-		is_compound(ptr<expr> e) { e->accept(this); }
+		is_compound(expr& e) { e.accept(this); }
 		
 		operator bool () { return compound; }
 		
-		void visit(fail_expr& e)  { compound = false; }
-		void visit(inf_expr& e)   { compound = false; }
-		void visit(eps_expr& e)   { compound = false; }
-		void visit(look_expr& e)  { compound = false; }
-		void visit(char_expr& e)  { compound = false; }
-		void visit(range_expr& e) { compound = false; }
-		void visit(any_expr& e)   { compound = false; }
-		void visit(str_expr& e)   { compound = false; }
-		void visit(rule_expr& e)  { compound = false; }
-		void visit(not_expr& e)   { compound = false; }
-		void visit(map_expr& e)   { compound = false; }
-		void visit(alt_expr& e)   { compound = true; }
-		void visit(seq_expr& e)   { compound = true; }
+		void visit(fail_node& e)   { compound = false; }
+		void visit(inf_node& e)    { compound = false; }
+		void visit(eps_node& e)    { compound = false; }
+		void visit(look_node& e)   { compound = false; }
+		void visit(char_node& e)   { compound = false; }
+		void visit(range_node& e)  { compound = false; }
+		void visit(any_node& e)    { compound = false; }
+		void visit(str_node& e)    { compound = false; }
+		void visit(shared_node& e) { compound = false; }
+		void visit(rule_node& e)   { compound = false; }
+		void visit(not_node& e)    { compound = false; }
+		void visit(map_node& e)    { compound = false; }
+		void visit(alt_node& e)    { compound = true; }
+		void visit(seq_node& e)    { compound = true; }
 		
 	private:
 		bool compound;  ///< Is the node a compound node
@@ -61,18 +62,18 @@ namespace derivs {
 	
 	// Pretty printer for derivatives
 	class printer : visitor {
-		void print_braced(ptr<expr> e) {
+		void print_braced(const expr& e) {
 			if ( is_compound(e) ) {
 				out << "(";
-				e->accept(this);
+				e.accept(this);
 				out << ")";
 			} else {
-				e->accept(this);
+				e.accept(this);
 			}
 		}
 		
-		void print_unbraced(ptr<expr> e) {
-			e->accept(this);
+		void print_unbraced(const expr& e) {
+			e.accept(this);
 		}
 		
 		void print_uint_set(const utils::uint_set& s) {
@@ -103,11 +104,11 @@ namespace derivs {
 			out << "]";
 		}
 		
-		void print_fns(expr* e) {
+		void print_fns(const expr& e) {
 			out << "b";
-			print_uint_set(e->back());
+			print_uint_set(e.back(i));
 			out << "m";
-			print_uint_set(e->match());
+			print_uint_set(e.match(i));
 		}
 	public:
 		/// Default printer
@@ -117,7 +118,8 @@ namespace derivs {
 		printer(std::ostream& out, std::map<expr*, std::string>& rs) 
 			: out(out), rs(rs), nc(rs.size()) {}
 		
-		void print_rule(rule_expr& e) {
+		void print_rule(const rule_node& e, ind i = 0) {
+			this->i = i;
 			auto it = rs.find(e.r.get());
 			if ( it == rs.end() ) {
 				out << "{RULE :??} ";
@@ -130,15 +132,16 @@ namespace derivs {
 		}
 		
 		/// Prints the expression
-		void print(ptr<expr> e) {
-			if ( e->type() == rule_type ) {
-				rule_expr* r = static_cast<rule_expr*>(e.get());
+		void print(const expr& e, ind i = 0) {
+			this->i = i;
+			if ( typeid(*e.n) == typeid(rule_node) ) {
+				rule_node* r = static_cast<rule_node*>(e.n);
 				if ( rs.count(r->r.get()) == 0 ) {
 					rs.insert(std::make_pair(r->r.get(), std::to_string(rs.size() - nc)));
 				}
 				pl.push_back(r);
 			} else {
-				e->accept(this);
+				e.accept(this);
 				out << std::endl;
 			}
 			
@@ -152,36 +155,42 @@ namespace derivs {
 		
 		/// Prints the derivative of the expression to the given output stream 
 		//  (with the given named rules)
-		static void print(std::ostream& out, ptr<expr> e, std::map<expr*, std::string>& rs) {
+		static void print(std::ostream& out, const expr& e, 
+		                  std::map<expr*, std::string>& rs, ind i = 0) {
 			printer p(out, rs);
-			p.print(e);
+			p.print(e, i);
 		}
 		
 		/// Prints the derivative expression to the given output stream
-		static void print(std::ostream& out, ptr<expr> e) {
+		static void print(std::ostream& out, expr& e, ind i = 0) {
 			std::map<expr*, std::string> rs;
-			print(out, e, rs);
+			print(out, e, rs, i);
 		}
 		
-		void visit(fail_expr& e)  { out << "{FAIL}"; }
+		void visit(const fail_node& e)  { out << "{FAIL}"; }
 		
-		void visit(inf_expr& e)   { out << "{INF}"; }
+		void visit(const inf_node& e)   { out << "{INF}"; }
 		
-		void visit(eps_expr& e)   { out << "{EPS}"; }
+		void visit(const eps_node& e)   { out << "{EPS}"; }
 		
-		void visit(look_expr& e)  { out << "{LOOK:" << e.b << "}"; }
+		void visit(const look_node& e)  { out << "{LOOK:" << e.b << "}"; }
 		
-		void visit(char_expr& e)  { out << "\'" << strings::escape(e.c) << "\'"; }
+		void visit(const char_node& e)  { out << "\'" << strings::escape(e.c) << "\'"; }
 		
-		void visit(range_expr& e) {
+		void visit(const range_node& e) {
 			out << "[" << strings::escape(e.b) << "-" << strings::escape(e.e) << "]";
 		}
 		
-		void visit(any_expr& e)   { out << "."; }
+		void visit(const any_node& e)   { out << "."; }
 		
-		void visit(str_expr& e)   { out << "\"" << strings::escape(e.str()) << "\""; }
+		void visit(const str_node& e)   { out << "\"" << strings::escape(e.str()) << "\""; }
 		
-		void visit(rule_expr& e)  {
+		void visit(const shared_node& e) {
+			out << "x" << e.shared->refs << " ";
+			print_unbraced(e.shared->e);
+		}
+		
+		void visit(const rule_node& e)  {
 			auto it = rs.find(e.r.get());
 			if ( it == rs.end() ) {  // not printed this rule before
 				unsigned int i = rs.size() - nc;
@@ -198,16 +207,9 @@ namespace derivs {
 			}
 		}
 		
-		void visit(not_expr& e)   { out << "!"; print_unbraced(e.e); }
-/*		void visit(not_expr& e)   {
-			out << "(not:";
-			print_fns(&e);
-			out << " ";
-			print_unbraced(e.e);
-			out << ")";
-		}
-*/		
-		void visit(map_expr& e)   {
+		void visit(const not_node& e)   { out << "!"; print_unbraced(e.e); }
+		
+		void visit(const map_node& e)   {
 			out << "(map:";
 			print_fns(&e);
 			out << "g" << (unsigned int)e.gm;
@@ -218,7 +220,7 @@ namespace derivs {
 			out << ")";
 		}
 		
-		void visit(alt_expr& e)  {
+		void visit(const alt_node& e)  {
 			out << "(alt:";
 			print_fns(&e);
 			out << "g" << (unsigned int)e.gm;
@@ -233,7 +235,7 @@ namespace derivs {
 			out << ")";
 		}
 		
-		void visit(seq_expr& e) {
+		void visit(const seq_node& e) {
 			out << "(seq:";
 			print_fns(&e);
 			out << "g" << (unsigned int)e.gm;
@@ -263,7 +265,7 @@ namespace derivs {
 				}
 				out << ">";
 			}
-			if ( e.c->type() != fail_type ) {
+			if ( e.c.type() != fail_type ) {
 				out << " \\\\ ";
 				print_uint_map(e.cg);
 				out << " ";
@@ -277,6 +279,7 @@ namespace derivs {
 		std::ostream&                out;  ///< output stream
 		std::map<expr*, std::string> rs;   ///< Rule identifiers
 		unsigned int                 nc;   ///< Count of named rules
-		std::list<rule_expr*>        pl;   ///< List of rules to print
+		std::list<rule_node*>        pl;   ///< List of rules to print
+		ind                          i;    ///< Index of current character
 	}; // class printer
 }

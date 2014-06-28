@@ -74,6 +74,8 @@ namespace derivs {
 	
 	expr fail_node::clone(ind) const { return expr::make<fail_node>(); }
 	
+	void fail_node::normalize(expr&, expr_set&) {}
+	
 	void fail_node::d(expr&, char, ind) { /* invariant */ }
 		
 	gen_set fail_node::match(ind) const { return gen_set{}; }
@@ -86,6 +88,8 @@ namespace derivs {
 	
 	expr inf_node::clone(ind) const { return expr::make<inf_node>(); }
 	
+	void inf_node::normalize(expr&, expr_set&) {}
+	
 	void inf_node::d(expr&, char, ind) { /* invariant */ }
 	
 	gen_set inf_node::match(ind) const { return gen_set{}; }
@@ -97,6 +101,8 @@ namespace derivs {
 	expr eps_node::make() { return expr::make<eps_node>(); }
 	
 	expr eps_node::clone(ind) const { return expr::make<eps_node>(); }
+	
+	void eps_node::normalize(expr&, expr_set&) {}
 	
 	void eps_node::d(expr& self, char x, ind) {
 		if ( x != '\0' ) { self.remake<fail_node>(); } // Only match on empty string
@@ -114,6 +120,13 @@ namespace derivs {
 	
 	expr look_node::clone(ind) const { return expr::make<look_node>(b); }
 	
+	void look_node::normalize(expr& self, expr_set&) {
+		if ( b == 0 ) {
+			self.remake<eps_node>();
+			return;
+		}
+	}
+	
 	void look_node::d(expr&, char, ind) { /* invariant (unparsed suffixes okay) */ }
 
 	gen_set look_node::match(ind) const { return gen_set{b}; }
@@ -125,6 +138,8 @@ namespace derivs {
 	expr char_node::make(char c) { return expr::make<char_node>(c); }
 	
 	expr char_node::clone(ind) const { return expr::make<char_node>(c); }
+	
+	void char_node::normalize(expr&, expr_set&) {}
 	
 	void char_node::d(expr& self, char x, ind) {
 		if ( c == x ) { self.remake<eps_node>(); }  // Match on character
@@ -141,6 +156,8 @@ namespace derivs {
 	
 	expr range_node::clone(ind) const { return expr::make<range_node>(b, e); }
 	
+	void range_node::normalize(expr&, expr_set&) {}
+	
 	void range_node::d(expr& self, char x, ind) {
 		if ( b <= x && x <= e ) { self.remake<eps_node>(); }  // Match if in range
 		else { self.remake<fail_node>(); }                    // Fail otherwise
@@ -155,6 +172,8 @@ namespace derivs {
 	expr any_node::make() { return expr::make<any_node>(); }
 	
 	expr any_node::clone(ind) const { return expr::make<any_node>(); }
+	
+	void any_node::normalize(expr&, expr_set&) {}
 	
 	void any_node::d(expr& self, char x, ind) {
 		if ( x == '\0' ) { self.remake<fail_node>(); }  // Fail on no character
@@ -176,6 +195,14 @@ namespace derivs {
 	}
 	
 	expr str_node::clone(ind) const { return expr::make<str_node>(*this); }
+	
+	void str_node::normalize(expr& self, expr_set&) {
+		switch ( s.size() ) {
+		case 0:  self.remake<eps_node>();      return;
+		case 1:  self.remake<char_node>(s[0]); return;
+		default:                               return;
+		}
+	}
 	
 	void str_node::d(expr& self, char x, ind) {
 		// REMEMBER CHARS IN s ARE IN REVERSE ORDER
@@ -212,6 +239,18 @@ namespace derivs {
 		} else {
 			return expr::make<shared_node>(std::move(shared->e.clone(i)), i);
 		}
+	}
+	
+	void shared_node::normalize(expr&, expr_set& normed) {
+		// WARNING rule_node::normalize depends on this not mutating the expr& parameter
+		
+		// Ensure can't enter infinite normalization loop
+		if ( shared->dirty || normed.count(get()) ) return;
+		
+		shared->dirty = true;         // break infinite loop
+		shared->e.normalize(normed);  // normalize subexpression
+		shared->dirty = false;        // lower dirty flag
+		normed.emplace(get());        // mark as normalized
 	}
 	
 	void shared_node::d(expr&, char x, ind i) {
@@ -262,6 +301,11 @@ namespace derivs {
 	// Unlike the usual semantics, we want to reuse the shared rule node and cached functions
 	expr rule_node::clone(ind) const { return expr::make<rule_node>(*this); }
 	
+	void rule_node::normalize(expr& self, expr_set& normed) {
+		// WARNING this depends on shared_node::normalize not mutating self
+		r.normalize(self, normed);
+	}
+	
 	void rule_node::d(expr& self, char x, ind i) {
 		// Break left recursion by returning an inf node
 		if ( r.shared->dirty ) {
@@ -304,6 +348,21 @@ namespace derivs {
 	}
 	
 	expr not_node::clone(ind i) const { return expr::make<not_node>(std::move(e.clone(i))); }
+	
+	void not_node::normalize(expr& self, expr_set& normed) {
+		e.normalize(normed);
+		
+		switch ( e.type() ) {
+		case fail_type: self.remake<look_node>(1); return;
+		case inf_type:  self.remake<inf_node>();   return;
+		default:                                   break;
+		}
+		
+		if ( ! e.match().empty() ) {
+			self.remake<fail_node>();
+			return;
+		}
+	}
 	
 	// Take negative lookahead of subexpression derivative
 	void not_node::d(expr& self, char x, ind i) {
@@ -354,6 +413,20 @@ namespace derivs {
 		return expr::make<map_node>(std::move(e.clone(i)), eg, gm, cache);
 	}
 	
+	void map_node::normalize(expr& self, expr_set& normed) {
+		e.normalize(normed);
+		
+		switch ( e.type() ) {
+		// Map expression match generation into exit generation
+		case eps_type:  self.remake<look_node>(eg(0));               return;
+		case look_type: self.remake<look_node>(eg(e.match().max())); return;
+		// Propegate fail and infinity errors
+		case fail_type: self.remake<fail_node>();                    return;
+		case inf_type:  self.remake<inf_node>();                     return;
+		default:                                                     break;
+		}
+	}
+	
 	void map_node::d(expr& self, char x, ind i) {
 		cache.invalidate();
 		gen_type ebm = e.back(i).max();
@@ -396,7 +469,7 @@ namespace derivs {
 		}
 		
 		// if first alternative matches or second alternative fails, use first
-		if ( b.type() == fail_type || ! a.match(0).empty() ) return std::move(a);
+		if ( b.type() == fail_type || ! a.match().empty() ) return std::move(a);
 		
 		bool did_inc = false;
 		gen_map ag = default_back_map(a, did_inc);
@@ -427,6 +500,25 @@ namespace derivs {
 	expr alt_node::clone(ind i) const {
 		return expr::make<alt_node>(std::move(a.clone(i)), std::move(b.clone(i)),
 		                            ag, bg, gm, cache);
+	}
+	
+	void alt_node::normalize(expr& self, expr_set& normed) {
+		a.normalize(normed);
+		b.normalize(normed);
+		
+		switch ( a.type() ) {
+		// if first alternative fails, use second
+		case fail_type: self = std::move(b);     return;
+		// if first alternative is infinite loop, propegate
+		case inf_type:  self.remake<inf_node>(); return;
+		default:                                 break;
+		}
+		
+		// if first alternative matches or second alternative fails, use first
+		if ( b.type() == fail_type || ! a.match().empty() ) {
+			self = std::move(a);
+			return;
+		}
 	}
 	
 	void alt_node::d(expr& self, char x, ind i) {
@@ -513,31 +605,31 @@ namespace derivs {
 		expr c = fail_node::make();
 		gen_map cg{0};
 		
-		gen_set am = a.match(0);
+		gen_set am = a.match();
 		if ( ! am.empty() && am.min() == 0 ) {
-			c = b.clone(0);
+			c = b.clone();
 			update_back_map(cg, 0, b, 0, did_inc, 0);
 		}
 		
 		// set up lookahead follower
 		look_list bs;
-		if ( a.back(0).max() > 0 ) {
-			assert(a.back(0).max() == 1 && "static backtrack gen <= 1");
+		if ( a.back().max() > 0 ) {
+			assert(a.back().max() == 1 && "static backtrack gen <= 1");
 			
 			gen_type gl = 0;
-			gen_set bm = b.match(0);
+			gen_set bm = b.match();
 			if ( ! bm.empty() && bm.min() == 0 ) {
 				gl = 1;
 				did_inc = true;
 			}
 			
-			bs.emplace_front(1, b.clone(0), default_back_map(b, did_inc), gl);
+			bs.emplace_front(1, b.clone(), default_back_map(b, did_inc), gl);
 		}
 		
 		return expr::make<seq_node>(std::move(a), std::move(b), std::move(bs), 
 		                            std::move(c), cg, did_inc ? 1 : 0);
 	}
-		
+	
 	expr seq_node::clone(ind i) const {
 		// clone lookahead list
 		look_list cbs;
@@ -548,6 +640,59 @@ namespace derivs {
 		
 		return expr::make<seq_node>(std::move(a.clone(i)), std::move(b.clone(i)), 
 		                            std::move(cbs), std::move(c.clone(i)), cg, gm, cache);
+	}
+	
+	void seq_node::normalize(expr& self, expr_set& normed) {
+		a.normalize(normed);
+		b.normalize(normed);
+		
+		switch ( b.type() ) {
+		// empty second element just leaves first
+		case eps_type:  self = std::move(a); return;
+		// failing second element propegates
+		case fail_type: self = std::move(b); return;
+		default:                             break;
+		}
+		
+		switch ( a.type() ) {
+		// empty first element or lookahead success just leaves follower
+		case eps_type: case look_type:
+			self = std::move(b);
+			return;
+		// failure or infinite loop propegates
+		case fail_type: case inf_type:
+			self = std::move(a);
+			return;
+		default: break;
+		}
+		
+		gm = 0;
+		bool did_inc = false;
+		
+		// Set up match-fail follower
+		c.remake<fail_node>();
+		cg = gen_map{0};
+		
+		gen_set am = a.match();
+		if ( ! am.empty() && am.min() == 0 ) {
+			c = b.clone();
+			update_back_map(cg, 0, b, 0, did_inc, 0);
+		}
+		
+		// Set up lookahead follower
+		bs.clear();
+		if ( a.back().max() > 0 ) {
+			assert(a.back().max() == 1 && "static backtrack gen <= 1");
+			
+			gen_type gl = 0;
+			gen_set bm = b.match();
+			if ( ! bm.empty() && bm.min() == 0 ) {
+				gl = 1;
+				did_inc = true;
+			}
+			
+			bs.emplace_front(1, b.clone(), default_back_map(b, did_inc), gl);
+		}
 	}
 	
 	void seq_node::d(expr& self, char x, ind i) {
