@@ -71,7 +71,41 @@ namespace derivs {
 		seq_type
 	}; // enum expr_type
 	
-	class expr;  // forward decl
+	// Forward declarations of node types
+	class expr;
+	class fail_node;
+	class inf_node;
+	class eps_node;
+	class look_node;
+	class char_node;
+	class range_node;
+	class any_node;
+	class str_node;
+	class shared_node;
+	class rule_node;
+	class not_node;
+	class map_node;
+	class alt_node;
+	class seq_node;
+	
+	/// Abstract base class of all derivative visitors
+	class visitor {
+	public:
+		virtual void visit(fail_node&)   = 0;
+		virtual void visit(inf_node&)    = 0;
+		virtual void visit(eps_node&)    = 0;
+		virtual void visit(look_node&)   = 0;
+		virtual void visit(char_node&)   = 0;
+		virtual void visit(range_node&)  = 0;
+		virtual void visit(any_node&)    = 0;
+		virtual void visit(str_node&)    = 0;
+		virtual void visit(shared_node&) = 0;
+		virtual void visit(rule_node&)   = 0;
+		virtual void visit(not_node&)    = 0;
+		virtual void visit(map_node&)    = 0;
+		virtual void visit(alt_node&)    = 0;
+		virtual void visit(seq_node&)    = 0;
+	}; // class visitor
 	
 	/// Abstract base class for expression nodes
 	class node {
@@ -80,6 +114,9 @@ namespace derivs {
 		
 		/// Performs a deep clone of this node
 		virtual expr clone(ind) const = 0;
+		
+		/// Accept visitor
+		virtual void accept(visitor*) = 0;
 		
 		/// Takes the derivative of this expression with respect to x at i; mutating self.
 		virtual void  d(expr& self, char x, ind i) = 0;
@@ -129,6 +166,9 @@ namespace derivs {
 			delete tmp;         // delete old node
 			return *this;
 		}
+		
+		/// Accept visitor
+		inline void accept(visitor* v) { n->accept(v); };
 				
 		/// Takes the derivative of this expression with respect to x (at i)
 		inline void  d(char x, ind i) { return n->d(*this, x, i); }
@@ -183,6 +223,7 @@ namespace derivs {
 		
 		static expr make();
 		virtual expr clone(ind) const;
+		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -197,6 +238,7 @@ namespace derivs {
 		
 		static expr make();
 		virtual expr clone(ind) const;
+		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -211,6 +253,7 @@ namespace derivs {
 		
 		static expr make();
 		virtual expr clone(ind) const;
+		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -225,6 +268,7 @@ namespace derivs {
 		
 		static expr make(gen_type g = 1);
 		virtual expr clone(ind) const;
+		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -241,6 +285,7 @@ namespace derivs {
 		
 		static expr make(char c);
 		virtual expr clone(ind) const;
+		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -257,6 +302,7 @@ namespace derivs {
 		
 		static expr make(char b, char e);
 		virtual expr clone(ind) const;
+		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -274,6 +320,7 @@ namespace derivs {
 		
 		static expr make();
 		virtual expr clone(ind) const;
+		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -289,6 +336,7 @@ namespace derivs {
 		
 		static expr make(const std::string& s);
 		virtual expr clone(ind) const;
+		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -335,6 +383,7 @@ namespace derivs {
 		
 		static expr make(expr&& e, ind crnt = 0);
 		virtual expr clone(ind) const;
+		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -350,6 +399,7 @@ namespace derivs {
 		rule_node(const rule_node& n) = default;
 		
 		virtual expr clone(ind) const;
+		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -367,6 +417,7 @@ namespace derivs {
 		
 		static expr make(expr&& e, ind i = 0);
 		virtual expr clone(ind) const;
+		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -385,6 +436,7 @@ namespace derivs {
 		
 		static expr make(expr&& e, const gen_map& eg, gen_type gm, ind i);
 		virtual expr clone(ind) const;
+		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -410,6 +462,7 @@ namespace derivs {
 		static expr make(expr&& a, expr&& b, const gen_map& ag, const gen_map& bg, 
 		                 gen_type gm, ind i = 0);
 		virtual expr clone(ind) const;
+		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -450,6 +503,7 @@ namespace derivs {
 		
 		static expr make(expr&& a, expr&& b);
 		virtual expr clone(ind) const;
+		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
