@@ -28,6 +28,7 @@
 #include <cstdlib> // for std::size_t
 #include <forward_list>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "utils/uint_pfn.hpp"
@@ -70,16 +71,18 @@ namespace derivs {
 		seq_type
 	}; // enum expr_type
 	
+	class expr;  // forward decl
+	
 	/// Abstract base class for expression nodes
 	class node {
 	public:
 		virtual ~node() = default;
 		
 		/// Performs a deep clone of this node
-		virtual expr clone() const = 0;
+		virtual expr clone(ind) const = 0;
 		
-		/// Takes the derivative of this expression; mutates where possible
-		virtual void  d(expr&, char, ind) = 0;
+		/// Takes the derivative of this expression with respect to x at i; mutating self.
+		virtual void  d(expr& self, char x, ind i) = 0;
 		
 		/// At what backtracking generations does this expression match?
 		virtual gen_set match(ind) const = 0;
@@ -102,8 +105,9 @@ namespace derivs {
 		
 		expr& operator= (expr&& t) {
 			delete n;
-			n = o.n;
+			n = t.n;
 			t.n = nullptr; // prevent temporary from deleting node
+			return *this;
 		}
 		
 		/// Destroys expression and contained node
@@ -114,7 +118,7 @@ namespace derivs {
 		static expr make(Args&&... args) { return expr{new T(args...)}; }
 		
 		/// Performs a deep clone of this expression
-		inline expr clone() const { return n->clone(); }
+		inline expr clone(ind i) const { return n->clone(i); }
 		
 		/// Swaps the node for a new one
 		template<typename T, typename... Args>
@@ -145,7 +149,7 @@ namespace derivs {
 	/// Caches results of possibly expensive match() and back() computations
 	class node_cache {
 	public:
-		node_cache() { flags = {false, false} }
+		node_cache() { flags = {false, false}; }
 		node_cache(const node_cache& o) : flags(o.flags) {
 			if ( flags.match ) match = o.match;
 			if ( flags.back ) back = o.back;
@@ -169,7 +173,7 @@ namespace derivs {
 		fail_node() = default;
 		
 		static expr make();
-		virtual expr clone() const;
+		virtual expr clone(ind) const;
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -183,7 +187,7 @@ namespace derivs {
 		inf_node() = default;
 		
 		static expr make();
-		virtual expr clone() const;
+		virtual expr clone(ind) const;
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -197,7 +201,7 @@ namespace derivs {
 		eps_node() = default;
 		
 		static expr make();
-		virtual expr clone() const;
+		virtual expr clone(ind) const;
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -211,7 +215,7 @@ namespace derivs {
 		look_node(gen_type g = 1) : b{g} {}
 		
 		static expr make(gen_type g = 1);
-		virtual expr clone() const;
+		virtual expr clone(ind) const;
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -227,7 +231,7 @@ namespace derivs {
 		char_node(char c) : c(c) {}
 		
 		static expr make(char c);
-		virtual expr clone() const;
+		virtual expr clone(ind) const;
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -243,7 +247,7 @@ namespace derivs {
 		range_node(char b, char e) : b(b), e(e) {}
 		
 		static expr make(char b, char e);
-		virtual expr clone() const;
+		virtual expr clone(ind) const;
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -260,7 +264,7 @@ namespace derivs {
 		any_node() = default;
 		
 		static expr make();
-		virtual expr clone() const;
+		virtual expr clone(ind) const;
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -275,7 +279,7 @@ namespace derivs {
 		str_node(const str_node& o) = default;
 		
 		static expr make(const std::string& s);
-		virtual expr clone() const;
+		virtual expr clone(ind) const;
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -294,7 +298,8 @@ namespace derivs {
 	public:
 		struct impl {
 			impl(expr&& e, ind crnt = 0, node_cache prev_cache = node_cache{}) 
-				: e(e), crnt(crnt), refs(1), prev_cache(prev_cache), dirty(false) {}
+				: e(std::move(e)), crnt(crnt), refs(1), 
+				  prev_cache(prev_cache), dirty(false) {}
 			
 			expr e;                 ///< Shared expression
 			ind crnt;               ///< Index of the current state of the expression
@@ -305,7 +310,7 @@ namespace derivs {
 		impl* shared;  ///< Pointer to this node's shared block
 			
 		shared_node(expr&& e, ind crnt = 0, node_cache prev_cache = node_cache{}) 
-			: shared(new impl(e, crnt, prev_cache)) {}
+			: shared(new impl(std::move(e), crnt, prev_cache)) {}
 		
 		shared_node(const shared_node& o) : shared(o.shared) { ++(shared->refs); }
 		
@@ -320,10 +325,7 @@ namespace derivs {
 		~shared_node() { if ( --(shared->refs) == 0 ) { delete shared; } }
 		
 		static expr make(expr&& e, ind crnt = 0);
-		virtual expr clone() const;
-		
-		/// Clone and set the current index of the clone to i
-		expr clone(ind i) const;
+		virtual expr clone(ind) const;
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -335,10 +337,10 @@ namespace derivs {
 	/// A non-terminal node
 	class rule_node : public node {
 	public:
-		rule_node(expr&& e) : r(e) {}
+		rule_node(expr&& e) : r(std::move(e)) {}
 		rule_node(const rule_node& n) = default;
 		
-		virtual expr clone() const;
+		virtual expr clone(ind) const;
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -352,34 +354,36 @@ namespace derivs {
 	/// A negative lookahead node
 	class not_node : public node {
 	public:
-		not_node(const expr& s) : s(s) {}
+		not_node(expr&& e) : e(std::move(e)) {}
 		
-		static expr make(const expr& s, ind i = 0);
-		virtual expr clone() const;
+		static expr make(expr&& e, ind i = 0);
+		virtual expr clone(ind) const;
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
 		virtual gen_set   back(ind)  const;
 		virtual expr_type type()     const { return not_type; }
 		
-		expr s;  ///< Subexpression to negatively match
+		expr e;  ///< Subexpression to negatively match
 	}; // class not_node
 
 	/// Maintains generation mapping from collapsed alternation expression	
 	class map_node : public node {
 	public:
-		map_node(const expr& s, const gen_map& sg, gen_type gm) : s(s), sg(sg), gm(gm) {}
+		map_node(expr&& e, const gen_map& eg, gen_type gm, 
+		         const node_cache& cache = node_cache{}) 
+			: e(std::move(e)), eg(eg), gm(gm), cache(cache) {}
 		
-		static expr make(const expr& s, const gen_map& sg, gen_type gm, ind i = 0);
-		virtual expr clone() const;
+		static expr make(expr&& e, const gen_map& eg, gen_type gm, ind i);
+		virtual expr clone(ind) const;
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
 		virtual gen_set   back(ind)  const;
 		virtual expr_type type()     const { return map_type; }
 		
-		expr       s;      ///< Subexpression to map
-		gen_map    sg;     ///< Generation flags for subexpression
+		expr       e;      ///< Subexpression to map
+		gen_map    eg;     ///< Generation flags for subexpression
 		gen_type   gm;     ///< Maximum generation from source expresssion
 		node_cache cache;  ///< Caches match and back 
 	}; // class map_node
@@ -387,16 +391,16 @@ namespace derivs {
 	/// An ordered choice between two expressions
 	class alt_node : public node {
 	public:
-		alt_node(const expr& a, const expr& b, 
+		alt_node(expr&& a, expr&& b, 
 		         const gen_map& ag = gen_map{0}, const gen_map& bg = gen_map{0}, 
-		         gen_type gm = 0) 
-			: a(a), b(b), ag(ag), bg(bg), gm(gm) {}
+		         gen_type gm = 0, const node_cache& cache = node_cache{}) 
+			: a(std::move(a)), b(std::move(b)), ag(ag), bg(bg), 
+			  gm(gm), cache(cache) {}
 		
-		static expr make(const expr& a, const expr& b);
-		static expr make(const expr& a, const expr& b, 
-		                 const gen_map& ag, const gen_map& bg, 
+		static expr make(expr&& a, expr&& b);
+		static expr make(expr&& a, expr&& b, const gen_map& ag, const gen_map& bg, 
 		                 gen_type gm, ind i = 0);
-		virtual expr clone() const;
+		virtual expr clone(ind) const;
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
@@ -415,33 +419,36 @@ namespace derivs {
 	class seq_node : public node {
 	public:
 		struct look_node {
-			look_node(gen_type g, const expr& s, gen_map eg, gen_type gl = 0) 
-				: g(g), s(s), sg(sg), gl(gl) {}
+			look_node(gen_type g, expr&& e, gen_map eg, gen_type gl = 0) 
+				: g(g), e(std::move(e)), eg(eg), gl(gl) {}
 			
 			gen_type  g;   ///< Backtrack generation this follower corresponds to
-			expr      s;   ///< Follower expression for this lookahead generation
-			gen_map   sg;  ///< Map of generations from this node to the containing node
+			expr      e;   ///< Follower expression for this lookahead generation
+			gen_map   eg;  ///< Map of generations from this node to the containing node
 			gen_type  gl;  ///< Generation of last match
 		}; // struct look_list
 		using look_list = std::forward_list<look_node>;
 		
-		seq_node(const expr& a, const expr& b)
-			: a(a), b(b), bs(), c(fail_expr::make()), cg(gen_map{0}), gm(0) {}
+		seq_node(expr&& a, expr&& b)
+			: a(std::move(a)), b(std::move(b)), bs(), 
+			  c(fail_node::make()), cg(gen_map{0}), 
+			  gm(0), cache(node_cache{}) {}
 		
-		seq_node(const expr& a, const expr& b, look_list bs, 
-		         const expr& c, const gen_map& cg, gen_type gm)
-			: a(a), b(b), bs(bs), c(c), cg(cg), gm(gm) {}
+		seq_node(expr&& a, expr&& b, look_list&& bs, expr&& c, const gen_map& cg, 
+		         gen_type gm, const node_cache& cache = node_cache{})
+			: a(std::move(a)), b(std::move(b)), bs(bs), 
+			  c(std::move(c)), cg(cg), gm(gm), cache(cache) {}
 		
-		static expr make(const expr& a, const expr& b);
-		virtual expr clone() const;
+		static expr make(expr&& a, expr&& b);
+		virtual expr clone(ind) const;
 		
 		virtual void      d(expr&, char, ind);
 		virtual gen_set   match(ind) const;
 		virtual gen_set   back(ind)  const;
 		virtual expr_type type()     const { return seq_type; }
 		
-		expr&      a;      ///< First subexpression
-		expr&      b;      ///< Gen-zero follower
+		expr       a;      ///< First subexpression
+		expr       b;      ///< Gen-zero follower
 		look_list  bs;     ///< List of following subexpressions for each backtrack generation
 		expr       c;      ///< Matching backtrack value
 		gen_map    cg;     ///< Backtrack map for c
