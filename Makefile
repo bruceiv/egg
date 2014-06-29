@@ -33,14 +33,26 @@ CXXFLAGS = -O0 -ggdb --std=c++0x
 CXXFLAGS = -O3 --std=c++0x -DNDEBUG
 
 OBJS = derivs.o
+OBJS_MUT = derivs-mut.o deriv_fixer-mut.o
 
 derivs.o:  derivs.cpp derivs.hpp utils/uint_pfn.hpp utils/uint_set.hpp
 	$(CXX) $(CXXFLAGS) -c derivs.cpp
+
+derivs-mut.o:  derivs-mut.cpp derivs-mut.hpp utils/uint_pfn.hpp utils/uint_set.hpp
+	$(CXX) $(CXXFLAGS) -c derivs-mut.cpp
+
+deriv_fixer-mut.o:  derivs-mut.o
+	$(CXX) $(CXXFLAGS) -c visitors/deriv_fixer-mut.cpp
 
 egg:  main.cpp $(OBJS) egg.hpp parser.hpp \
       visitors/printer.hpp visitors/compiler.hpp visitors/interpreter.hpp visitors/normalizer.hpp \
       visitors/deriv_printer.hpp
 	$(CXX) $(CXXFLAGS) -o egg main.cpp $(OBJS) $(LDFLAGS)
+
+egg-mut:  main.cpp $(OBJS_MUT) egg.hpp parser.hpp \
+      visitors/printer.hpp visitors/compiler.hpp visitors/interpreter-mut.hpp visitors/normalizer.hpp \
+      visitors/deriv_printer-mut.hpp
+	$(CXX) $(CXXFLAGS) -DEGG_MUT -o egg-mut main.cpp $(OBJS_MUT) $(LDFLAGS)
 
 clean:  
 	-rm derivs.o

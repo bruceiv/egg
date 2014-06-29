@@ -32,7 +32,11 @@
 #include "visitors/compiler.hpp"
 #include "visitors/normalizer.hpp"
 #include "visitors/printer.hpp"
+#ifdef EGG_MUT
+#include "visitors/interpreter-mut.hpp"
+#else
 #include "visitors/interpreter.hpp"
+#endif
 
 /** Egg version */
 static const char* VERSION = "0.3.1";
