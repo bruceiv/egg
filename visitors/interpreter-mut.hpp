@@ -97,10 +97,10 @@ namespace derivs {
 			normed.clear();
 			
 			// Calculate fixed point of match() for all expressions
-			derivs::fixer fix;
-			for (auto rp : rs) {
-				fix(rp.second);
-			}
+//			derivs::fixer fix;
+//			for (auto rp : rs) {
+//				fix(rp.second);
+//			}
 			
 			if ( dbg ) {
 				derivs::printer p(std::cout, names);

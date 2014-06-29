@@ -329,13 +329,23 @@ namespace derivs {
 		self = std::move(e); return;
 	}
 	
-	gen_set rule_node::match(ind) const {
-		assert(cache.flags.match && "Rule match() pre-computed");
+	gen_set rule_node::match(ind i) const {
+		if ( ! cache.flags.match ) {
+			// Ensure no infinite recursion
+			cache.set_match( gen_set{} );
+			// Calculate match
+			cache.set_match( r.match(i) );
+		}
 		return cache.match;
 	}
 	
-	gen_set rule_node::back(ind)  const {
-		assert(cache.flags.back && "Rule back() pre-computed");
+	gen_set rule_node::back(ind i)  const {
+		if ( ! cache.flags.back ) {
+			// Ensure no infinite recursion
+			cache.set_back( gen_set{0} );
+			// Calculate match
+			cache.set_back( r.back(i) );
+		}
 		return cache.back;
 	}
 	
