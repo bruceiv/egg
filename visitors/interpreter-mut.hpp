@@ -254,7 +254,7 @@ namespace derivs {
 		// Take derivatives until failure, match, or end of input
 		ind i = 0;
 		while ( true ) {
-			if ( dbg ) { p.print(e); }
+			if ( dbg ) { p.print(e, i); }
 			
 			switch ( e.type() ) {
 			case fail_type: return false;
@@ -280,7 +280,7 @@ namespace derivs {
 			
 			if ( x == '\0' ) break;
 		}
-		if ( dbg ) { p.print(e); }
+		if ( dbg ) { p.print(e, i); }
 		
 		// Match if final expression matched on terminator char
 		return ! e.match(i).empty();
