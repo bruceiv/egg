@@ -899,7 +899,7 @@ namespace derivs {
 		}
 		
 		cache.set_back(x);
-		return cache.match;
+		return cache.back;
 	}
 	
 } // namespace derivs
