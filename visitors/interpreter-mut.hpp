@@ -253,7 +253,8 @@ namespace derivs {
 		
 		// Take derivatives until failure, match, or end of input
 		ind i = 0;
-		while ( true ) {
+		char x = '\0';
+		do {
 			if ( dbg ) { p.print(e, i); }
 			
 			switch ( e.type() ) {
@@ -267,7 +268,6 @@ namespace derivs {
 			// Break on a match
 			if ( ! e.match(i).empty() ) return true;
 			
-			char x;
 			if ( ! in.get(x) ) { x = '\0'; }  // read character, \0 for EOF
 			
 			if ( dbg ) {
@@ -277,9 +277,7 @@ namespace derivs {
 			
 			// Take derivative and increment input index
 			e.d(x, i++);
-			
-			if ( x == '\0' ) break;
-		}
+		} while ( x != '\0' );
 		if ( dbg ) { p.print(e, i); }
 		
 		// Match if final expression matched on terminator char
