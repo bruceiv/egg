@@ -267,18 +267,29 @@ namespace derivs {
 	
 	void shared_node::d(expr&, char x, ind i) {
 		if ( i == shared->crnt ) {  // Computing current derivative
-			// Cache previous values
-			node_cache prev_cache = shared->crnt_cache;
-			if ( ! prev_cache.flags.back ) { prev_cache.set_back(shared->e.back(i)); }
-			if ( ! prev_cache.flags.match ) { prev_cache.set_match(shared->e.match(i)); }
+/*			// Cache previous values
+			node_cache i_cache = shared->crnt_cache;
+			if ( ! i_cache.flags.back ) { i_cache.set_back(shared->e.back(i)); }
+			if ( ! i_cache.flags.match ) { i_cache.set_match(shared->e.match(i)); }
 			
 			// Compute derivative
 			shared->e.d(x, i);
 			
 			// Invalidate old values
 			++(shared->crnt);
-			shared->prev_cache = prev_cache;
+			shared->prev_cache = i_cache;
 			shared->crnt_cache.invalidate();
+*/			
+			// Step cache one forward [will not call back(i-1) or match(i-1) again]
+			shared->prev_cache.set_back( back(i) );
+			shared->prev_cache.set_match( match(i) );
+			
+			// Increment current and invalidate old current cache
+			++(shared->crnt);
+			shared->crnt_cache.invalidate();
+					
+			// Update with derivative; if calls self.d() recursively will not break assertion below
+			shared->e.d(x, i);
 		} else assert(i == shared->crnt - 1 && "shared node only keeps two generations");
 		
 		// if we reach here than we know that the previously-computed derivative 
