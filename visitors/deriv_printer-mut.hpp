@@ -155,7 +155,7 @@ namespace derivs {
 		
 		/// Prints a shared expression
 		void print(shared_node& e, ind i = 0) {
-			out << "x" << e.shared->refs << " ";
+			out << "x" << e.shared->refs << "g" << e.shared->crnt << " ";
 			print(e.shared->e, i);
 		}
 		
@@ -192,7 +192,7 @@ namespace derivs {
 		void visit(str_node& e)   { out << "\"" << strings::escape(e.str()) << "\""; }
 		
 		void visit(shared_node& e) {
-			out << "x" << e.shared->refs << " ";
+			out << "x" << e.shared->refs << "g" << e.shared->crnt << " ";
 			print_unbraced(e.shared->e);
 		}
 		
