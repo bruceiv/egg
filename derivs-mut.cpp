@@ -737,10 +737,17 @@ namespace derivs {
 		switch ( a.type() ) {
 		case eps_type: {
 			// Take follower (or follower's end-of-string derivative on end-of-string)
-			if ( x == '\0' ) b.d('\0', i);  // TAKE DERIV OF b
-			gen_map bg = new_back_map(b, gm, i+1);
-			self = map_node::make(std::move(b), bg, gm, i+1);
-			return;
+			if ( x == '\0' ) {
+				b.d('\0', i);  // TAKE DERIV OF b
+				gen_map bg = new_back_map(b, gm, i+1);
+				self = map_node::make(std::move(b), bg, gm, i+1);
+				return;
+			} else {
+				expr bn = b.clone(i+1);
+				gen_map bg = new_back_map(bn, gm, i+1);
+				self = map_node::make(std::move(bn), bg, gm, i+1);
+				return;
+			}
 		} case look_type: {
 			// Take lookahead follower (or lookahead follower match-fail)
 			gen_type g = a.match(i+1).max();
