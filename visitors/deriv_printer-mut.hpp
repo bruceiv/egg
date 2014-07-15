@@ -147,7 +147,7 @@ namespace derivs {
 			
 			auto it = pl.begin();
 			while ( it != pl.end() ) {
-				print_rule(**it);
+				print_rule(**it, i);
 				++it;
 			}
 			pl.clear();

@@ -234,11 +234,24 @@ namespace derivs {
 	}
 	
 	expr shared_node::clone(ind i) const {
-		if ( i == shared->crnt ) {
+		switch ( i - shared->crnt ) {
+		case 0: { // crnt == i
 			return expr::make<shared_node>(std::move(shared->e.clone(i)), i, 
 			                               shared->crnt_cache, shared->prev_cache);
-		} else {
+		} case ind(-1): { // crnt - 1 == i
+			return expr::make<shared_node>(std::move(shared->e.clone(i)), i, 
+			                               shared->prev_cache);
+		} case 1: { // crnt + 1 == i
+			// Cache existing back and match
+			node_cache& prev_cache = shared->crnt_cache;
+			if ( ! prev_cache.flags.back ) { prev_cache.set_back(shared->e.back(i-1)); }
+			if ( ! prev_cache.flags.match ) { prev_cache.set_match(shared->e.match(i-1)); }
+			
+			return expr::make<shared_node>(std::move(shared->e.clone(i)), i, 
+			                               node_cache{}, prev_cache);
+		} default: {
 			return expr::make<shared_node>(std::move(shared->e.clone(i)), i);
+		}
 		}
 	}
 	
@@ -300,6 +313,9 @@ namespace derivs {
 			// Previous generation, read from cache
 			assert(shared->prev_cache.flags.back && "back cached for previous generation");
 			return shared->prev_cache.back;
+		} else if ( i == shared->crnt + 1 ) {
+			assert(false && "requested not-yet-computed backtrack generation");
+			return gen_set{};
 		} else {
 			assert(false && "shared node only keeps two generations");
 			return gen_set{};
@@ -899,7 +915,7 @@ namespace derivs {
 		}
 		
 		cache.set_back(x);
-		return cache.match;
+		return cache.back;
 	}
 	
 } // namespace derivs
