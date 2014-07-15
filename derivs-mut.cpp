@@ -360,8 +360,8 @@ namespace derivs {
 		if ( ! cache.flags.match ) {
 			// Ensure no infinite recursion
 			cache.set_match( gen_set{} );
-			// Calculate match
-			cache.set_match( r.match(i) );
+			// Calculate match on contained gen-0 rule
+			cache.set_match( r.match(0) );
 		}
 		return cache.match;
 	}
@@ -370,8 +370,8 @@ namespace derivs {
 		if ( ! cache.flags.back ) {
 			// Ensure no infinite recursion
 			cache.set_back( gen_set{0} );
-			// Calculate match
-			cache.set_back( r.back(i) );
+			// Calculate back on contained gen-0 rule
+			cache.set_back( r.back(0) );
 		}
 		return cache.back;
 	}
