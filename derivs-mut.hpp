@@ -35,6 +35,8 @@
 
 #include "utils/uint_pfn.hpp"
 
+#include <iostream>
+
 /**
  * Implements derivative parsing for parsing expression grammars, according to the algorithm 
  * described by Aaron Moss in 2014 (http://arxiv.org/abs/1405.4841).
@@ -151,6 +153,7 @@ namespace derivs {
 	/// A derivative expression
 	class expr {
 		expr(node* n) : n(n) {}
+		
 	public:
 		expr() : n(nullptr) {}
 		expr(expr&& t) : n(t.n) { t.n = nullptr; /* prevent temporary from deleting node */ }
@@ -177,14 +180,19 @@ namespace derivs {
 		/// Swaps the node for a new one
 		template<typename T, typename... Args>
 		expr& remake(Args&&... args) {
-			node* tmp = n;      // backup n so that we can defer destruction
-			n = new T(args...); // set new node
-			delete tmp;         // delete old node
+			node* tmp = n;                          // backup n so that we can defer destruction
+			n = new T(std::forward<Args>(args)...); // set new node
+			delete tmp;                             // delete old node
 			return *this;
 		}
 		
-		/// Clears the expression
-		inline void reset() { delete n; }
+		/// Resets the expression to contain a new value (default nothing)
+		inline void reset(node* m = nullptr) {
+			if ( n == m ) return;
+			node* tmp = n;
+			n = m;
+			delete tmp;
+		}
 		
 		/// Normalizes an existing node.
 		/// Should only be called as part of the construction process.
@@ -207,7 +215,7 @@ namespace derivs {
 		inline expr_type type() const { return n->type(); }
 		
 		/// Returns the contained node.
-		inline node* get() { return n; }
+		inline node* const get() { return n; }
 		
 	private:
 		node* n;  ///< Contained node; owned by and destructed by expr
@@ -432,7 +440,7 @@ namespace derivs {
 		virtual expr_type type()     const { return shared->e.type(); }
 		
 		/// Returns a view of the contained pointer
-		inline expr* get() const { return &(shared->e); }
+		inline expr* const get() const { return &(shared->e); }
 	}; // class shared_node
 	
 	/// A non-terminal node

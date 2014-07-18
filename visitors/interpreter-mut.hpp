@@ -45,11 +45,35 @@ namespace derivs {
 		shared_node get_rule(const std::string& s) {
 			if ( rs.count(s) == 0 ) {
 				shared_node r{ std::move(expr::make<fail_node>()) };
+std::cerr << "\tget `" << s << "`: 'init placeholder' refs=" << r.shared->refs << std::endl;
 				rs.emplace(s, r);
+//std::cerr << "\tget `" << s << "`: 'store placeholder' refs=" << r.shared->refs << std::endl;
 				return r;
 			} else {
-				return rs.at(s);
+//				return rs.at(s);
+shared_node r = rs.at(s);
+//std::cerr << "\tget `" << s << "`: 'from map' refs=" << r.shared->refs << std::endl;
+return r;
 			}
+		}
+		
+		/// Makes a new anonymous non-terminal for a many-expression
+		expr make_many(expr&& e) {
+			// Init empty shared_node
+			shared_node s{ std::move(expr{}) };
+std::cerr << "\tmake many: 'init s' refs=" << s.shared->refs << std::endl;
+			
+			// Build up rule around empty node pointer
+			expr r = expr::make<rule_node>(s);
+//std::cerr << "\tmake many: 'init inner rule' refs=" << s.shared->refs << std::endl;
+			expr q = expr::make<seq_node>(std::move(e), std::move(r));
+//std::cerr << "\tmake many: 'move inner rule' refs=" << s.shared->refs << std::endl;
+			expr a = expr::make<alt_node>(std::move(q), std::move(expr::make<eps_node>()));
+			
+			// Re-bind shared node to rule and return
+			s.shared->e = std::move(a);
+std::cerr << "\tmake many: 'rebind rule' refs=" << s.shared->refs << std::endl;
+			return expr::make<rule_node>(s);
 		}
 		
 		/// Converts an AST char range into a derivative expr. char_range
@@ -57,35 +81,17 @@ namespace derivs {
 			return ( r.from == r.to ) ? expr::make<char_node>(r.from)
 			                          : expr::make<range_node>(r.from, r.to);
 		}
-		
-		/// Makes a new anonymous nonterminal for a many-expression
-		expr make_many(expr&& e) {
-			// Build the outer rule e R / eps
-			rule_node r{std::move(
-			                expr::make<alt_node>(
-			                    expr::make<seq_node>(
-			                        std::move(e),
-			                        std::move(expr::make<rule_node>(std::move(expr{})))),
-			                    std::move(expr::make<eps_node>())))};
-			// Rebind inner rule to outer rule
-			*static_cast<rule_node*>(
-					static_cast<seq_node*>(
-							static_cast<alt_node*>(
-									r.r.shared->e.get()
-								)->a.get()
-						)->b.get()
-				) = r;
-			// Return now-recursive outer rule
-			return expr::make<rule_node>(r);
-		}
-		
+				
 	public:
 		/// Default constructor; builds a derivative parser graph from the given PEG grammar
 		loader(ast::grammar& g, bool dbg = false) {
 			// Read in rules
 			for (ast::grammar_rule_ptr r : g.rs) {
 				r->m->accept(this);                             // Convert to derivs::expr
-				get_rule(r->name).shared->e = std::move(rVal);  // Bind to shared rule
+//				get_rule(r->name).shared->e = std::move(rVal);  // Bind to shared rule
+shared_node r2 = get_rule(r->name);
+std::cerr << "\tget `" << r->name << "`: 'bind rule' refs=" << r2.shared->refs << std::endl;
+r2.shared->e = std::move(rVal);
 			}
 			
 			// Normalize rules
@@ -137,7 +143,9 @@ namespace derivs {
 			}
 		}
 		
-		virtual void visit(ast::rule_matcher& m) { rVal = expr::make<rule_node>(get_rule(m.rule)); }
+		virtual void visit(ast::rule_matcher& m) { rVal = expr::make<rule_node>(get_rule(m.rule)); 
+std::cerr << "\tget `" << m.rule << "`: 'match rule' refs=" << static_cast<rule_node*>(rVal.get())->r.shared->refs << std::endl;
+		}
 		
 		virtual void visit(ast::any_matcher& m) { rVal = expr::make<any_node>(); }
 		
@@ -158,6 +166,7 @@ namespace derivs {
 		virtual void visit(ast::many_matcher& m) {
 			m.m->accept(this);
 			rVal = make_many(std::move(rVal));
+// std::cerr << "\tmake many: 'return rule' refs=" << static_cast<rule_node*>(rVal.get())->r.shared->refs << std::endl;
 		}
 		
 		virtual void visit(ast::some_matcher& m) {

@@ -250,9 +250,9 @@ public:
 	}
 
 	~args() {
-		if ( in != nullptr ) in->close();
-		if ( out != nullptr ) out->close();
-		if ( src != nullptr ) src->close();
+		if ( in != nullptr ) { in->close(); delete in; }
+		if ( out != nullptr ) { out->close(); delete out; }
+		if ( src != nullptr ) { src->close(); delete src; }
 	}
 
 	std::istream& input() { if ( in ) return *in; else return std::cin; }
