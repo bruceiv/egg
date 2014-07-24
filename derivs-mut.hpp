@@ -159,9 +159,10 @@ namespace derivs {
 		expr(expr&& t) : n(t.n) { t.n = nullptr; /* prevent temporary from deleting node */ }
 		
 		expr& operator= (expr&& t) {
-			delete n;
-			n = t.n;
-			t.n = nullptr; // prevent temporary from deleting node
+			node* tmp = n;  // backup n so that we can defer destruction
+			n = t.n;        // set new node
+			t.n = nullptr;  // prevent t from deleting our node
+			delete tmp;     // delete old node (if recursive should have broken cycle with previous line)
 			return *this;
 		}
 		

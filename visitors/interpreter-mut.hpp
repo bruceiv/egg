@@ -45,9 +45,7 @@ namespace derivs {
 		shared_node& get_rule(const std::string& s) {
 			if ( rs.count(s) == 0 ) {
 				shared_node r{ std::move(expr::make<fail_node>()) };
-std::cerr << "\tget `" << s << "`: 'init placeholder' refs=" << r.shared->refs << std::endl;
 				rs.emplace(s, r);
-//				return r;
 				return rs.at(s);
 			} else {
 				return rs.at(s);
@@ -58,7 +56,6 @@ std::cerr << "\tget `" << s << "`: 'init placeholder' refs=" << r.shared->refs <
 		expr make_many(expr&& e) {
 			// Init empty shared_node
 			shared_node s{ std::move(expr{}) };
-std::cerr << "\tmake many: 'init s' refs=" << s.shared->refs << std::endl;
 			
 			// Build up rule around empty node pointer
 			expr r = expr::make<rule_node>(s);
@@ -67,7 +64,6 @@ std::cerr << "\tmake many: 'init s' refs=" << s.shared->refs << std::endl;
 			
 			// Re-bind shared node to rule and return
 			s.shared->e = std::move(a);
-std::cerr << "\tmake many: 'rebind rule' refs=" << s.shared->refs << std::endl;
 			return expr::make<rule_node>(s);
 		}
 		
@@ -83,10 +79,7 @@ std::cerr << "\tmake many: 'rebind rule' refs=" << s.shared->refs << std::endl;
 			// Read in rules
 			for (ast::grammar_rule_ptr r : g.rs) {
 				r->m->accept(this);                             // Convert to derivs::expr
-//				get_rule(r->name).shared->e = std::move(rVal);  // Bind to shared rule
-shared_node& r2 = get_rule(r->name);
-std::cerr << "\tget `" << r->name << "`: 'bind rule' refs=" << r2.shared->refs << std::endl;
-r2.shared->e = std::move(rVal);
+				get_rule(r->name).shared->e = std::move(rVal);  // Bind to shared rule
 			}
 			
 			// Normalize rules
@@ -138,9 +131,7 @@ r2.shared->e = std::move(rVal);
 			}
 		}
 		
-		virtual void visit(ast::rule_matcher& m) { rVal = expr::make<rule_node>(get_rule(m.rule)); 
-std::cerr << "\tget `" << m.rule << "`: 'match rule' refs=" << static_cast<rule_node*>(rVal.get())->r.shared->refs << std::endl;
-		}
+		virtual void visit(ast::rule_matcher& m) { rVal = expr::make<rule_node>(get_rule(m.rule)); }
 		
 		virtual void visit(ast::any_matcher& m) { rVal = expr::make<any_node>(); }
 		
@@ -161,7 +152,6 @@ std::cerr << "\tget `" << m.rule << "`: 'match rule' refs=" << static_cast<rule_
 		virtual void visit(ast::many_matcher& m) {
 			m.m->accept(this);
 			rVal = make_many(std::move(rVal));
-// std::cerr << "\tmake many: 'return rule' refs=" << static_cast<rule_node*>(rVal.get())->r.shared->refs << std::endl;
 		}
 		
 		virtual void visit(ast::some_matcher& m) {
