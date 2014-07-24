@@ -42,18 +42,15 @@ namespace derivs {
 	class loader : ast::visitor {
 		
 		/// Gets the shared rule node correspoinding to the given name
-		shared_node get_rule(const std::string& s) {
+		shared_node& get_rule(const std::string& s) {
 			if ( rs.count(s) == 0 ) {
 				shared_node r{ std::move(expr::make<fail_node>()) };
 std::cerr << "\tget `" << s << "`: 'init placeholder' refs=" << r.shared->refs << std::endl;
 				rs.emplace(s, r);
-//std::cerr << "\tget `" << s << "`: 'store placeholder' refs=" << r.shared->refs << std::endl;
-				return r;
+//				return r;
+				return rs.at(s);
 			} else {
-//				return rs.at(s);
-shared_node r = rs.at(s);
-//std::cerr << "\tget `" << s << "`: 'from map' refs=" << r.shared->refs << std::endl;
-return r;
+				return rs.at(s);
 			}
 		}
 		
@@ -65,9 +62,7 @@ std::cerr << "\tmake many: 'init s' refs=" << s.shared->refs << std::endl;
 			
 			// Build up rule around empty node pointer
 			expr r = expr::make<rule_node>(s);
-//std::cerr << "\tmake many: 'init inner rule' refs=" << s.shared->refs << std::endl;
 			expr q = expr::make<seq_node>(std::move(e), std::move(r));
-//std::cerr << "\tmake many: 'move inner rule' refs=" << s.shared->refs << std::endl;
 			expr a = expr::make<alt_node>(std::move(q), std::move(expr::make<eps_node>()));
 			
 			// Re-bind shared node to rule and return
@@ -89,14 +84,14 @@ std::cerr << "\tmake many: 'rebind rule' refs=" << s.shared->refs << std::endl;
 			for (ast::grammar_rule_ptr r : g.rs) {
 				r->m->accept(this);                             // Convert to derivs::expr
 //				get_rule(r->name).shared->e = std::move(rVal);  // Bind to shared rule
-shared_node r2 = get_rule(r->name);
+shared_node& r2 = get_rule(r->name);
 std::cerr << "\tget `" << r->name << "`: 'bind rule' refs=" << r2.shared->refs << std::endl;
 r2.shared->e = std::move(rVal);
 			}
 			
 			// Normalize rules
 			expr_set normed;
-			for (auto rp : rs) {
+			for (auto& rp : rs) {
 				rp.second.normalize(normed);
 				names.emplace(rp.second.get(), rp.first);
 			}
@@ -104,7 +99,7 @@ r2.shared->e = std::move(rVal);
 			
 			// Calculate fixed point of match() for all expressions
 //			derivs::fixer fix;
-//			for (auto rp : rs) {
+//			for (auto& rp : rs) {
 //				fix(rp.second);
 //			}
 			
