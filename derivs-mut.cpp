@@ -785,7 +785,7 @@ namespace derivs {
 				
 				// Otherwise return alt-expr of this lookahead and its failure backtrack
 				self = alt_node::make(std::move(bi.e), look_node::make(), 
-				                      bi.eg, gen_map{0,bi.gl}, gm);
+				                      bi.eg, gen_map{0,bi.gl}, gm, i+1);
 				return;
 			}
 			// end-of-string is only case where we can get a lookahead success for an unseen gen
