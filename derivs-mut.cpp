@@ -27,8 +27,6 @@
 
 #include "derivs-mut.hpp"
 
-#include <iostream> // FIXME
-
 namespace derivs {
 	
 	// UTILITY /////////////////////////////////////////////////////////////////////
@@ -421,7 +419,6 @@ namespace derivs {
 	// map_node ////////////////////////////////////////////////////////////////////
 	
 	expr map_node::make(expr&& e, const gen_map& eg, gen_type gm, ind i) {
-std::cerr << "\tmap_node::make(eg:["; for (auto p : eg) std::cerr << " " << p.first << ":" << p.second; std::cerr << " ] gm:" << gm << ")" << std::endl;
 		// account for unmapped generations
 		assert(!eg.empty() && "non-empty generation map");
 		assert(e.back(i).max() <= eg.max_key() && "no unmapped generations");
@@ -727,6 +724,9 @@ std::cerr << "\tmap_node::make(eg:["; for (auto p : eg) std::cerr << " " << p.fi
 			
 			bs.emplace_front(1, b.clone(), default_back_map(b, did_inc), gl);
 		}
+		
+		// Fix gm
+		if ( did_inc ) ++gm;
 	}
 	
 	void seq_node::d(expr& self, char x, ind i) {
