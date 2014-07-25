@@ -27,6 +27,8 @@
 
 #include "derivs-mut.hpp"
 
+#include <iostream> // FIXME
+
 namespace derivs {
 	
 	// UTILITY /////////////////////////////////////////////////////////////////////
@@ -267,19 +269,6 @@ namespace derivs {
 	
 	void shared_node::d(expr&, char x, ind i) {
 		if ( i == shared->crnt ) {  // Computing current derivative
-/*			// Cache previous values
-			node_cache i_cache = shared->crnt_cache;
-			if ( ! i_cache.flags.back ) { i_cache.set_back(shared->e.back(i)); }
-			if ( ! i_cache.flags.match ) { i_cache.set_match(shared->e.match(i)); }
-			
-			// Compute derivative
-			shared->e.d(x, i);
-			
-			// Invalidate old values
-			++(shared->crnt);
-			shared->prev_cache = i_cache;
-			shared->crnt_cache.invalidate();
-*/			
 			// Step cache one forward [will not call back(i-1) or match(i-1) again]
 			shared->prev_cache.set_back( back(i) );
 			shared->prev_cache.set_match( match(i) );
@@ -432,6 +421,7 @@ namespace derivs {
 	// map_node ////////////////////////////////////////////////////////////////////
 	
 	expr map_node::make(expr&& e, const gen_map& eg, gen_type gm, ind i) {
+std::cerr << "\tmap_node::make(eg:["; for (auto p : eg) std::cerr << " " << p.first << ":" << p.second; std::cerr << " ] gm:" << gm << ")" << std::endl;
 		// account for unmapped generations
 		assert(!eg.empty() && "non-empty generation map");
 		assert(e.back(i).max() <= eg.max_key() && "no unmapped generations");
