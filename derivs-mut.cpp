@@ -855,7 +855,7 @@ namespace derivs {
 			
 				gen_set dbim = bi.e.match(i+1);
 				if ( ! dbim.empty() && dbim.min() == 0 ) {  // set new match-fail backtrack if needed
-					++bi.gl;  // TODO maybe this should be bi.gl = gm + 1; ???
+					bi.gl = gm + 1;
 					did_inc = true;
 				}
 			
