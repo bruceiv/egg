@@ -831,47 +831,52 @@ namespace derivs {
 		auto dabt = dab.begin();
 		assert(dabt != dab.end() && "backtrack set non-empty");
 		if ( *dabt == 0 ) { ++dabt; }  // skip backtrack generation 0
-		auto bit = bs.begin();
-		auto bilt = bs.before_begin();
-
-		while ( dabt != dab.end() && bit != bs.end() ) {
-			look_back& bi = *bit;
-			
-			// erase generations not in the backtrack list
-			if ( bi.g < *dabt ) {
-				bit = bs.erase_after(bilt);
-				continue;
-			}
-			assert(bi.g == *dabt && "no generations missing from backtrack list");
-			
-			// take derivative of lookahead
-			gen_type bibm = bi.e.back(i).max();
-			bi.e.d(x, i);  // TAKE DERIV OF bi
-			update_back_map(bi.eg, bibm, bi.e, gm, did_inc, i+1);
-			
-			gen_set dbim = bi.e.match(i+1);
-			if ( ! dbim.empty() && dbim.min() == 0 ) {  // set new match-fail backtrack if needed
-				++bi.gl;
-				did_inc = true;
-			}
-			
-			++dabt; bilt = bit; ++bit;
-		}
 		
-		// Add new lookahead backtrack if needed
-		if ( dabt != dab.end() ) {
-			gen_type dabm = *dabt;
-			assert(dabm > abm && "leftover generation greater than previous");
-			assert(++dabt == dab.end() && "only one new lookahead backtrack");
+		if ( dabt == dab.end() ) {
+			bs.clear();  // clear backtracks if not needed		
+		} else {
+			auto bit = bs.begin();
+			auto bilt = bs.before_begin();
+
+			while ( dabt != dab.end() && bit != bs.end() ) {
+				look_back& bi = *bit;
 			
-			gen_type gl = 0;
-			gen_set bm = b.match(i);
-			if ( ! bm.empty() && bm.min() == 0 ) {  // set new match-fail backtrack if needed
-				gl = gm+1;
-				did_inc = true;
+				// erase generations not in the backtrack list
+				if ( bi.g < *dabt ) {
+					bit = bs.erase_after(bilt);
+					continue;
+				}
+				assert(bi.g == *dabt && "no generations missing from backtrack list");
+			
+				// take derivative of lookahead
+				gen_type bibm = bi.e.back(i).max();
+				bi.e.d(x, i);  // TAKE DERIV OF bi
+				update_back_map(bi.eg, bibm, bi.e, gm, did_inc, i+1);
+			
+				gen_set dbim = bi.e.match(i+1);
+				if ( ! dbim.empty() && dbim.min() == 0 ) {  // set new match-fail backtrack if needed
+					++bi.gl;  // TODO maybe this should be bi.gl = gm + 1; ???
+					did_inc = true;
+				}
+			
+				++dabt; bilt = bit; ++bit;
 			}
-			bs.emplace_after(bilt, 
-			                 dabm, b.clone(i+1), new_back_map(b, gm, did_inc, i+1), gl);
+		
+			// Add new lookahead backtrack if needed
+			if ( dabt != dab.end() ) {
+				gen_type dabm = *dabt;
+				assert(dabm > abm && "leftover generation greater than previous");
+				assert(++dabt == dab.end() && "only one new lookahead backtrack");
+			
+				gen_type gl = 0;
+				gen_set bm = b.match(i);
+				if ( ! bm.empty() && bm.min() == 0 ) {  // set new match-fail backtrack if needed
+					gl = gm+1;
+					did_inc = true;
+				}
+				bs.emplace_after(bilt, 
+					             dabm, b.clone(i+1), new_back_map(b, gm, did_inc, i+1), gl);
+			}
 		}
 		
 		if ( did_inc ) ++gm;
