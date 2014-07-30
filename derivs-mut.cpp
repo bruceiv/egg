@@ -230,6 +230,18 @@ namespace derivs {
 	// shared_node ///////////////////////////////////////////////////////////////////
 	
 	expr shared_node::make(expr&& e, ind crnt) {
+		// Don't share fixed size nodes
+		switch ( e.type() ) {
+		case fail_type: return expr::make<fail_node>();
+		case inf_type:  return expr::make<inf_node>();
+		case eps_type:  return expr::make<eps_node>();
+		case look_type: return expr::make<look_node>(e.match().max());
+		}
+		
+		if ( typeid(*e.get()) == typeid(shared_node) ) {  // avoid layering shared nodes
+			return expr::make<shared_node>(*static_cast<shared_node*>(e.get()));
+		}
+		
 		return expr::make<shared_node>(std::move(e), crnt);
 	}
 	
@@ -255,17 +267,51 @@ namespace derivs {
 		}
 	}
 	
+	void shared_node::normalize(expr& self, expr_set& normed) {
+		// Ensure we can't enter infinite normalization loop
+		if ( shared->dirty || normed.count(get()) ) return;
+		
+		// Normalize subexpression
+		shared->dirty = true;         // break infinite loop
+		shared->e.normalize(normed);  // normalize subexpression
+		shared->dirty = false;        // lower dirty flag
+		
+		// Unshare fixed value nodes
+		switch ( shared->e.type() ) {
+		case fail_type: self.remake<fail_node>(); return;
+		case inf_type:  self.remake<inf_node>();  return;
+		case eps_type:  self.remake<eps_node>();  return;
+		case look_type: self.remake<look_node>(shared->e.match().max()); return;
+		}
+		
+		// Avoid layering shared nodes
+		if ( typeid(*(shared->e.get())) == typeid(shared_node) ) {
+			*this = *static_cast<shared_node*>(shared->e.get());
+			return;
+		}
+		
+		normed.emplace(get());        // mark as normalized
+	}
+	
 	void shared_node::normalize(expr_set& normed) {
 		// Ensure can't enter infinite normalization loop
 		if ( shared->dirty || normed.count(get()) ) return;
 		
+		// Normalize subexpression
 		shared->dirty = true;         // break infinite loop
 		shared->e.normalize(normed);  // normalize subexpression
 		shared->dirty = false;        // lower dirty flag
+		
+		// Avoid layering shared nodes
+		if ( typeid(*(shared->e.get())) == typeid(shared_node) ) {
+			*this = *static_cast<shared_node*>(shared->e.get());
+			return;
+		}
+		
 		normed.emplace(get());        // mark as normalized
 	}
 	
-	void shared_node::d(expr&, char x, ind i) {
+	void shared_node::d(expr& self, char x, ind i) {
 		if ( i == shared->crnt ) {  // Computing current derivative
 			// Step cache one forward [will not call back(i-1) or match(i-1) again]
 			shared->prev_cache.set_back( back(i) );
@@ -281,6 +327,20 @@ namespace derivs {
 		
 		// if we reach here than we know that the previously-computed derivative 
 		// was requested, and it's already stored
+		
+		// Unshare fixed value nodes
+		switch ( shared->e.type() ) {
+		case fail_type: self.remake<fail_node>(); return;
+		case inf_type:  self.remake<inf_node>();  return;
+		case eps_type:  self.remake<eps_node>();  return;
+		case look_type: self.remake<look_node>(shared->e.match().max()); return;
+		}
+		
+		// Avoid layering shared nodes
+		if ( typeid(*(shared->e.get())) == typeid(shared_node) ) {
+			*this = *static_cast<shared_node*>(shared->e.get());
+			return;
+		}
 	}
 		
 	gen_set shared_node::match(ind i) const {
