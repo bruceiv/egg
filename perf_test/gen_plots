@@ -6,7 +6,7 @@ pxml=( output/packrat-*-xml.csv(om[1]) )
 pjson=( output/packrat-*-json.csv(om[1]) )
 dxml=( output/deriv-*-xml.csv(om[1]) )
 djson=( output/deriv-*-json.csv(om[1]) )
-mxml=( output/deriv-mut-*-xml.csv(om[1]) )
-mjson=( output/deriv-mut-*-json.csv(om[1]) )
+mxml=( output/mut-deriv-*-xml.csv(om[1]) )
+mjson=( output/mut-deriv-*-json.csv(om[1]) )
 
 gnuplot -e "nxml='${nxml}'; njson='${njson}'; pxml='${pxml}'; pjson='${pjson}'; dxml='${dxml}'; djson='${djson}'; mxml='${mxml}'; mjson='${mjson}'" plots.plg
