@@ -1,5 +1,5 @@
 # Plots output data from egg performance tests
-# requires parameters nxml, njson, pxml, pjson, dxml, djson; the files to plot
+# requires parameters nxml, njson, pxml, pjson, dxml, djson, mxml, mjson; the files to plot
 
 set datafile separator ","
 
@@ -22,21 +22,29 @@ set style line 7 lt rgb '#729fcf' lw 1.5 pt 4
 set style line 8 lt rgb '#3465a4' lw 1.5 pt 6
 set style line 9 lt rgb '#204a87' lw 1.5 pt 8
 
-plot nxml using 7:3 with linespoints title 'Naive XML' ls 1, \
-     njson using 7:3 with linespoints title 'Naive JSON' ls 2, \
+set style line 10 lt rgb '#ad7fa8' lw 1.5 pt 10
+set style line 11 lt rgb '#75507b' lw 1.5 pt 11
+set style line 12 lt rgb '#5c3566' lw 1.5 pt 12
+
+plot nxml using 7:3 with linespoints title 'Recursive XML' ls 1, \
+     njson using 7:3 with linespoints title 'Recursive JSON' ls 2, \
      pxml using 7:3 with linespoints title 'Packrat XML' ls 4, \
      pjson using 7:3 with linespoints title 'Packrat JSON' ls 5, \
-     dxml using 7:3 with linespoints title 'Derivative XML' ls 7, \
-     djson using 7:3 with linespoints title 'Derivative JSON' ls 8
+     dxml using 7:3 with linespoints title 'Derivative(F) XML' ls 7, \
+     djson using 7:3 with linespoints title 'Derivative(F) JSON' ls 8, \
+     mxml using 7:3 with linespoints title 'Derivative(M) XML' ls 10, \
+     mjson using 7:3 with linespoints title 'Derivative(M) JSON' ls 11
 
 set output 'plots/mem-use.pdf'
 set ylabel 'Maximum RAM Use (KB)'
 
-plot nxml using 7:6 with linespoints title 'Packrat XML' ls 1, \
-     njson using 7:6 with linespoints title 'Packrat JSON' ls 2, \
+plot nxml using 7:6 with linespoints title 'Recursive XML' ls 1, \
+     njson using 7:6 with linespoints title 'Recursive JSON' ls 2, \
      pxml using 7:6 with linespoints title 'Packrat XML' ls 4, \
      pjson using 7:6 with linespoints title 'Packrat JSON' ls 5, \
-     dxml using 7:6 with linespoints title 'Derivative XML' ls 7, \
-     djson using 7:6 with linespoints title 'Derivative JSON' ls 8
+     dxml using 7:6 with linespoints title 'Derivative(F) XML' ls 7, \
+     djson using 7:6 with linespoints title 'Derivative(F) JSON' ls 8, \
+     mxml using 7:6 with linespoints title 'Derivative(M) XML' ls 10, \
+     mjson using 7:6 with linespoints title 'Derivative(M) JSON' ls 11
 
 set output
