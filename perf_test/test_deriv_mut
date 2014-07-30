@@ -1,6 +1,6 @@
 #!/bin/zsh
 
-outname="output/deriv-mut-`date +%y%m%d%H%M`-`git describe --tags --long`"
+outname="output/mut-deriv-`date +%y%m%d%H%M`-`git describe --tags --long`"
 
 outfile="${outname}-xml.csv"
 echo '"filename","output","user(s)","sys(s)","wall(s)","max-mem(KB)","size(B)"' | tee $outfile
