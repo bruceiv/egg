@@ -35,8 +35,6 @@
 
 #include "utils/uint_pfn.hpp"
 
-#include <iostream>
-
 /**
  * Implements derivative parsing for parsing expression grammars, according to the algorithm 
  * described by Aaron Moss in 2014 (http://arxiv.org/abs/1405.4841).
@@ -419,9 +417,12 @@ namespace derivs {
 		
 		shared_node& operator= (const shared_node& o) {
 			if ( shared == o.shared ) return *this;
-			if ( --(shared->refs) == 0 ) { delete shared; }
+			
+			impl* tmp = shared;  // defer destruction of previous node in case it contains new one
 			shared = o.shared;
 			++(shared->refs);
+			if ( --(tmp->refs) == 0 ) { delete tmp; }
+
 			return *this;
 		}
 		
@@ -431,7 +432,7 @@ namespace derivs {
 		virtual expr clone(ind) const;
 		/// Special overload that doesn't need a containing expression
 		void normalize(expr_set&);
-		virtual void normalize(expr&, expr_set& normed) { normalize(normed); }
+		virtual void normalize(expr&, expr_set& normed);
 		virtual void accept(visitor* v) { v->visit(*this); }
 		
 		virtual void      d(expr&, char, ind);
