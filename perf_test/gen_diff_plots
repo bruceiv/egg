@@ -1,8 +1,8 @@
 #!/bin/zsh
 
-oxml=( output/deriv-*-xml.csv(om[2]) )
-ojson=( output/deriv-*-json.csv(om[2]) )
-nxml=( output/deriv-*-xml.csv(om[1]) )
-njson=( output/deriv-*-json.csv(om[1]) )
+oxml=( output/mut-deriv-*-xml.csv(om[2]) )
+ojson=( output/mut-deriv-*-json.csv(om[2]) )
+nxml=( output/mut-deriv-*-xml.csv(om[1]) )
+njson=( output/mut-deriv-*-json.csv(om[1]) )
 
 gnuplot -e "oxml='${oxml}'; ojson='${ojson}'; nxml='${nxml}'; njson='${njson}'" diff_plots.plg
