@@ -879,18 +879,11 @@ namespace derivs {
 		
 		bool did_inc = false;
 		
-		// Update match-fail follower
+		// Mark whether there is a shared match-fail and lookahead-backtrack
 		gen_set dam = a.match(i+1);
-		if ( ! dam.empty() && dam.min() == 0 ) {
-			// new failure backtrack
-			c = b.clone(i+1);
-			cg = new_back_map(b, gm, did_inc, i+1);
-		} else {
-			// continue previous failure backtrack
-			gen_type cbm = c.back(i).max();
-			c.d(x, i);  // TAKE DERIV OF c
-			update_back_map(cg, cbm, c, gm, did_inc, i+1);
-		}
+		bool update_match_fail = !dam.empty() && dam.min() == 0;
+		bool add_lookahead_backtrack = false;
+		shared_node shared_backtrack{expr{}};
 		
 		// Build derivatives of lookahead backtracks
 		gen_set dab = a.back(i+1);
@@ -933,16 +926,37 @@ namespace derivs {
 				gen_type dabm = *dabt;
 				assert(dabm > abm && "leftover generation greater than previous");
 				assert(++dabt == dab.end() && "only one new lookahead backtrack");
-			
+				
 				gen_type gl = 0;
 				gen_set bm = b.match(i);
 				if ( ! bm.empty() && bm.min() == 0 ) {  // set new match-fail backtrack if needed
 					gl = gm+1;
 					did_inc = true;
 				}
-				bs.emplace_after(bilt, 
-					             dabm, b.clone(i+1), new_back_map(b, gm, did_inc, i+1), gl);
+				
+				if ( update_match_fail ) {
+					add_lookahead_backtrack = true;
+					shared_backtrack = expr::make<shared_node>(b.clone(i+1));
+					bs.emplace_after(bilt,
+					                 dabm, expr::make<shared_node>(shared_backtrack), 
+					                 new_back_map(b, gm, did_inc, i+1), gl);
+				} else {
+					bs.emplace_after(bilt, 
+						             dabm, b.clone(i+1), new_back_map(b, gm, did_inc, i+1), gl);
+				}
 			}
+		}
+		
+		// Update match-fail follower
+		if ( update_match_fail ) {
+			// new failure backtrack
+			c = add_lookahead_backtrack ? expr::make<shared_node>(shared_backtrack) : b.clone(i+1);
+			cg = new_back_map(b, gm, did_inc, i+1);
+		} else {
+			// continue previous failure backtrack
+			gen_type cbm = c.back(i).max();
+			c.d(x, i);  // TAKE DERIV OF c
+			update_back_map(cg, cbm, c, gm, did_inc, i+1);
 		}
 		
 		if ( did_inc ) ++gm;
