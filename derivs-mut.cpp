@@ -323,6 +323,12 @@ namespace derivs {
 					
 			// Update with derivative; if calls self.d() recursively will not break assertion below
 			shared->e.d(x, i);
+			
+			// Unshare nodes that only exist in one place
+			if ( shared->refs == 1 ) {
+				self = std::move(shared->e);
+				return;
+			}
 		} else assert(i == shared->crnt - 1 && "shared node only keeps two generations");
 		
 		// if we reach here than we know that the previously-computed derivative 
