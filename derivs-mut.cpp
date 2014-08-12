@@ -55,16 +55,31 @@ namespace derivs {
 	}
 	
 	void update_back_map(gen_map& eg, gen_type ebm, const expr& de, gen_type& gm, ind i) {
-		gen_type debm = de.back(i).max();
-		if ( debm > ebm ) { eg.add_back(debm, ++gm); }
+//		gen_type debm = de.back(i).max();
+//		if ( debm > ebm ) { eg.add_back(debm, ++gm); }
+
+		gen_set deb = de.back(i);
+		if ( deb.max() > ebm ) {
+			eg.trim_not_in(deb, deb.max(), ++gm);
+		} else {
+			eg.trim_not_in(deb);
+		}
 	}
 	
 	void update_back_map(gen_map& eg, gen_type ebm, const expr& de, 
 	                     gen_type gm, bool& did_inc, ind i) {
-		gen_type debm = de.back(i).max();
-		if ( debm > ebm ) {
+//		gen_type debm = de.back(i).max();
+//		if ( debm > ebm ) {
+//			did_inc = true;
+//			eg.add_back(debm, gm+1);
+//		}
+	
+		gen_set deb = de.back(i);
+		if ( deb.max() > ebm ) {
 			did_inc = true;
-			eg.add_back(debm, gm+1);
+			eg.trim_not_in(deb, deb.max(), gm+1);
+		} else {
+			eg.trim_not_in(deb);
 		}
 	}
 	
@@ -705,7 +720,12 @@ namespace derivs {
 		gen_set am = a.match();
 		if ( ! am.empty() && am.min() == 0 ) {
 			c = b.clone();
-			update_back_map(cg, 0, b, 0, did_inc, 0);
+			gen_type bbm = b.back().max();
+			if ( bbm > 0 ) {
+				assert(bbm == 1 && "static lookahead gen <= 1");
+				did_inc = true;
+				cg.add_back(1, 1);
+			}
 		}
 		
 		// set up lookahead follower
@@ -773,7 +793,12 @@ namespace derivs {
 		gen_set am = a.match();
 		if ( ! am.empty() && am.min() == 0 ) {
 			c = b.clone();
-			update_back_map(cg, 0, b, 0, did_inc, 0);
+			gen_type bbm = b.back().max();
+			if ( bbm > 0 ) {
+				assert(bbm == 1 && "static lookahead gen <= 1");
+				did_inc = true;
+				cg.add_back(1, 1);
+			}
 		}
 		
 		// Set up lookahead follower
