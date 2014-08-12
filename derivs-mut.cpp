@@ -55,23 +55,36 @@ namespace derivs {
 	}
 	
 	void update_back_map(gen_map& eg, gen_type ebm, const expr& de, gen_type& gm, ind i) {
-		gen_set deb = de.back(i);
-		if ( deb.max() > ebm ) {
-			eg.trim_not_in(deb, deb.max(), ++gm);
-		} else {
-			eg.trim_not_in(deb);
+		gen_type debm = de.back(i).max();
+		if ( debm > ebm ) {
+			eg.add_back(debm, ++gm);
 		}
+
+// REVERTED DUE TO PERFORMANCE REGRESSION
+//		gen_set deb = de.back(i);
+//		if ( deb.max() > ebm ) {
+//			eg.trim_not_in(deb, deb.max(), ++gm);
+//		} else {
+//			eg.trim_not_in(deb);
+//		}
 	}
 	
 	void update_back_map(gen_map& eg, gen_type ebm, const expr& de, 
 	                     gen_type gm, bool& did_inc, ind i) {
-		gen_set deb = de.back(i);
-		if ( deb.max() > ebm ) {
+		gen_type debm = de.back(i).max();
+		if ( debm > ebm ) {
 			did_inc = true;
-			eg.trim_not_in(deb, deb.max(), gm+1);
-		} else {
-			eg.trim_not_in(deb);
+			eg.add_back(debm, gm+1);
 		}
+
+// REVERTED DUE TO PERFORMANCE REGRESSION
+//		gen_set deb = de.back(i);
+//		if ( deb.max() > ebm ) {
+//			did_inc = true;
+//			eg.trim_not_in(deb, deb.max(), gm+1);
+//		} else {
+//			eg.trim_not_in(deb);
+//		}
 	}
 	
 	// fail_node ///////////////////////////////////////////////////////////////////
