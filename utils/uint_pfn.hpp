@@ -28,6 +28,8 @@
 
 #include "uint_set.hpp"
 
+#include <iostream> // FIXME
+
 namespace utils {
 
 /// A partial function from unsigned int to unsigned int; assumed to be monotonically increasing.
@@ -63,6 +65,67 @@ public:
 	inline void add_back(value_type i, value_type fi) {
 		assert(fm.empty() || (i > fm.back().first && fi > fm.back().second) && "adds in strict order");
 		fm.emplace_back(i, fi);
+	}
+	
+	/// Trims domain to intersection with s
+	void trim_not_in(const set_type& s) {
+//std::cerr << "\ttrim ["; for (auto p : fm) std::cerr << " " << p.first << ":" << p.second; std::cerr << " ] not in ["; for (auto i : s) std::cerr << " " << i; std::cerr << " ]" << std::endl;
+		auto fr = fm.begin(); auto sr = s.begin();
+		
+		// Read through shared prefix
+		for (; fr != fm.end() && sr != s.end() && fr->first == *sr; ++fr, ++sr) ;
+		
+		// Write pairs back to earlier locations in the array
+		auto fw = fr;
+		while ( fr != fm.end() && sr != s.end() ) {
+			if ( fr->first < *sr ) { ++fr; continue; }
+			assert(fr->first == *sr && "Index must be in pfn");
+			*fw = *fr;
+			++fw; ++fr; ++sr;
+		}
+		
+		// No change if write index is past end
+		if ( fw == fm.end() ) return;
+		
+		// Otherwise trim to size
+		fm.resize(fw - fm.begin());
+	}
+	
+	/// Trims domain to intersection with s, adding the new mapping from i to fi
+	void trim_not_in(const set_type& s, value_type i, value_type fi) {
+//std::cerr << "\ttrim ["; for (auto p : fm) std::cerr << " " << p.first << ":" << p.second; std::cerr << " ] not in ["; for (auto i : s) std::cerr << " " << i; std::cerr << " ] add " << i << ":" << fi << std::endl;
+		assert(fm.empty() || (i > fm.back().first && fi > fm.back().second) && "adds in strict order");
+		
+		auto fr = fm.begin(); auto sr = s.begin();
+		
+		// Read through shared prefix
+		for (; fr != fm.end() && sr != s.end() && fr->first == *sr; ++fr, ++sr) ;
+		
+		// Write pairs back to earlier locations in the array
+		auto fw = fr;
+		while ( fr != fm.end() && sr != s.end() ) {
+			if ( fr->first < *sr ) { ++fr; continue; }
+			assert(fr->first == *sr && "Index must be in pfn");
+			*fw = *fr;
+			++fw; ++fr; ++sr;
+		}
+		
+		// Add pair
+		if ( fw == fm.end() ) {
+			// Add new mapping to end of array
+			fm.emplace_back(i, fi);
+			return;
+		}
+		
+		// Write pair to write location
+		*fw = std::make_pair(i, fi);
+		++fw;
+		
+		// No change if write index is past end
+		if ( fw == fm.end() ) return;
+		
+		// Otherwise trim to size
+		fm.resize(fw - fm.begin());
 	}
 	
 	/// Gets the value of the function for i (undefined if i not in)
