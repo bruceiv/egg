@@ -55,9 +55,6 @@ namespace derivs {
 	}
 	
 	void update_back_map(gen_map& eg, gen_type ebm, const expr& de, gen_type& gm, ind i) {
-//		gen_type debm = de.back(i).max();
-//		if ( debm > ebm ) { eg.add_back(debm, ++gm); }
-
 		gen_set deb = de.back(i);
 		if ( deb.max() > ebm ) {
 			eg.trim_not_in(deb, deb.max(), ++gm);
@@ -68,12 +65,6 @@ namespace derivs {
 	
 	void update_back_map(gen_map& eg, gen_type ebm, const expr& de, 
 	                     gen_type gm, bool& did_inc, ind i) {
-//		gen_type debm = de.back(i).max();
-//		if ( debm > ebm ) {
-//			did_inc = true;
-//			eg.add_back(debm, gm+1);
-//		}
-	
 		gen_set deb = de.back(i);
 		if ( deb.max() > ebm ) {
 			did_inc = true;
@@ -251,6 +242,7 @@ namespace derivs {
 		case inf_type:  return expr::make<inf_node>();
 		case eps_type:  return expr::make<eps_node>();
 		case look_type: return expr::make<look_node>(e.match().max());
+		default: break;
 		}
 		
 		if ( typeid(*e.get()) == typeid(shared_node) ) {  // avoid layering shared nodes
@@ -297,6 +289,7 @@ namespace derivs {
 		case inf_type:  self.remake<inf_node>();  return;
 		case eps_type:  self.remake<eps_node>();  return;
 		case look_type: self.remake<look_node>(shared->e.match().max()); return;
+		default: break;
 		}
 		
 		// Avoid layering shared nodes
@@ -355,6 +348,7 @@ namespace derivs {
 		case inf_type:  self.remake<inf_node>();  return;
 		case eps_type:  self.remake<eps_node>();  return;
 		case look_type: self.remake<look_node>(shared->e.match().max()); return;
+		default: break;
 		}
 		
 		// Avoid layering shared nodes
