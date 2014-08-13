@@ -36,3 +36,4 @@ public class IntInit {
 		} //outer for
 	} //main()
 } //IntInit class
+

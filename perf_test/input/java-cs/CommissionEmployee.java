@@ -45,3 +45,4 @@ public class CommissionEmployee extends Employee
 		return (int)(pay + 0.5);
 	} //end weeklyPay() method
 } //end CommissionEmployee class
+

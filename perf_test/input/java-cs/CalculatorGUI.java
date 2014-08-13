@@ -172,3 +172,4 @@ public class CalculatorGUI extends JFrame
 		overwrite = true; //puts the screen in overwrite mode
 	}
 } //CalculatorGUI class
+

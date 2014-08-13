@@ -118,3 +118,4 @@ public class LineSegment
 		}
 	}
 } //end LineSegment class
+

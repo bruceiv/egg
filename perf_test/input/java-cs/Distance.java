@@ -136,3 +136,4 @@ public class Distance
 		return -1; //if this is reached, the specified city name has not been found
 	} // returnIndex()
 } //Distance class
+
