@@ -91,3 +91,4 @@ public class Battleship extends Applet
 		} //end radar button events
 	} //end ActionPerformed method
 } //end Battleship class
+

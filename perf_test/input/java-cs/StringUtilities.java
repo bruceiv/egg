@@ -101,3 +101,4 @@ public class StringUtilities
 			return -1;
 	}
 } //end StringUtilities class
+
