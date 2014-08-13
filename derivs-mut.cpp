@@ -55,36 +55,23 @@ namespace derivs {
 	}
 	
 	void update_back_map(gen_map& eg, gen_type ebm, const expr& de, gen_type& gm, ind i) {
-		gen_type debm = de.back(i).max();
-		if ( debm > ebm ) {
-			eg.add_back(debm, ++gm);
+		gen_set deb = de.back(i);
+		if ( deb.max() > ebm ) {
+			eg.trim_not_in(deb, deb.max(), ++gm);
+		} else {
+			eg.trim_not_in(deb);
 		}
-
-// REVERTED DUE TO PERFORMANCE REGRESSION
-//		gen_set deb = de.back(i);
-//		if ( deb.max() > ebm ) {
-//			eg.trim_not_in(deb, deb.max(), ++gm);
-//		} else {
-//			eg.trim_not_in(deb);
-//		}
 	}
 	
 	void update_back_map(gen_map& eg, gen_type ebm, const expr& de, 
 	                     gen_type gm, bool& did_inc, ind i) {
-		gen_type debm = de.back(i).max();
-		if ( debm > ebm ) {
+		gen_set deb = de.back(i);
+		if ( deb.max() > ebm ) {
 			did_inc = true;
-			eg.add_back(debm, gm+1);
+			eg.trim_not_in(deb, deb.max(), gm+1);
+		} else {
+			eg.trim_not_in(deb);
 		}
-
-// REVERTED DUE TO PERFORMANCE REGRESSION
-//		gen_set deb = de.back(i);
-//		if ( deb.max() > ebm ) {
-//			did_inc = true;
-//			eg.trim_not_in(deb, deb.max(), gm+1);
-//		} else {
-//			eg.trim_not_in(deb);
-//		}
 	}
 	
 	// fail_node ///////////////////////////////////////////////////////////////////
@@ -543,6 +530,12 @@ namespace derivs {
 		case fail_type: self.remake<fail_node>();                    return;
 		case inf_type:  self.remake<inf_node>();                     return;
 		default:                                                     break;
+		}
+		
+		// check if map isn't needed (identity map)
+		if ( gm == eg.max_key() ) {
+			self = std::move(e);
+			return;
 		}
 	}
 	
