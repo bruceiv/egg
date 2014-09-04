@@ -28,8 +28,6 @@
 
 #include "uint_set.hpp"
 
-#include <iostream> // FIXME
-
 namespace utils {
 
 /// A partial function from unsigned int to unsigned int; assumed to be monotonically increasing.
@@ -69,7 +67,6 @@ public:
 	
 	/// Trims domain to intersection with s
 	void trim_not_in(const set_type& s) {
-//std::cerr << "\ttrim ["; for (auto p : fm) std::cerr << " " << p.first << ":" << p.second; std::cerr << " ] not in ["; for (auto i : s) std::cerr << " " << i; std::cerr << " ]" << std::endl;
 		auto fr = fm.begin(); auto sr = s.begin();
 		
 		// Read through shared prefix
@@ -93,7 +90,6 @@ public:
 	
 	/// Trims domain to intersection with s, adding the new mapping from i to fi
 	void trim_not_in(const set_type& s, value_type i, value_type fi) {
-//std::cerr << "\ttrim ["; for (auto p : fm) std::cerr << " " << p.first << ":" << p.second; std::cerr << " ] not in ["; for (auto i : s) std::cerr << " " << i; std::cerr << " ] add " << i << ":" << fi << std::endl;
 		assert(fm.empty() || (i > fm.back().first && fi > fm.back().second) && "adds in strict order");
 		
 		auto fr = fm.begin(); auto sr = s.begin();
@@ -128,18 +124,22 @@ public:
 		fm.resize(fw - fm.begin());
 	}
 	
-	/// Gets the value of the function for i (undefined if i not in)
+	/// Gets the value of the function for i (undefined if i not in domain)
 	value_type operator() (value_type i) const {
-		size_type begin = 0, end = fm.size();
+		size_type begin = 0, end = fm.size() - 1;
 		while ( begin < end ) {
 			size_type mid = (begin+end)/2;
-			value_type j = fm[mid].first;
-			if ( i == j ) return fm[mid].second;
-			if ( i < j ) { end = mid; }
-			else /* if ( i > j ) */ { begin = mid; }
+			if ( fm[mid].first < i ) { begin = mid + 1; }
+			else { end = mid; }
+//			value_type j = fm[mid].first;
+//			if ( i == j ) return fm[mid].second;
+//			if ( i < j ) { end = mid; }
+//			else /* if ( i > j ) */ { begin = mid; }
 		}
-		assert(false && "Index must be in pfn");
-		return (value_type)-1;
+		assert(begin == end && fm[begin].first == i && "Index must be in pfn");
+		return fm[begin].second;
+//		assert(false && "Index must be in pfn");
+//		return (value_type)-1;
 	}
 	
 	/// Gets the values of the function for a set of indices (undefined if s not subset of domain)
