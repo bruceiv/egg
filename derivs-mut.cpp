@@ -548,8 +548,13 @@ namespace derivs {
 		switch ( e.type() ) {
 		// Map subexpression match into exit generation
 		case eps_type:  self = look_node::make(eg(0));                  return;
-		case look_type: self = look_node::make(eg(e.match(i+1).max())); return;
-		// Propegate fail and infinity errors
+		case look_type: {
+			// Need to special case this in case the lookahead gens were modified
+			ind demm = e.match(i+1).max();
+			self = look_node::make(demm <= ebm ? eg(demm) : gm+1);
+			return;
+			//self = look_node::make(eg(e.match(i+1).max())); return;
+		} // Propegate fail and infinity errors
 		case fail_type: self.remake<fail_node>();                       return;
 		case inf_type:  self.remake<inf_node>();                        return;
 		default:                                                        break;
