@@ -9,8 +9,14 @@ pjava=( output/packrat-*-java.csv(om[1]) )
 dxml=( output/deriv-*-xml.csv(om[1]) )
 djson=( output/deriv-*-json.csv(om[1]) )
 djava=( output/deriv-*-java.csv(om[1]) )
-mxml=( output/mut-deriv-*-xml.csv(om[1]) )
-mjson=( output/mut-deriv-*-json.csv(om[1]) )
-mjava=( output/mut-deriv-*-java.csv(om[1]) )
 
-gnuplot -e "nxml='${nxml}'; njson='${njson}'; njava='${njava}'; pxml='${pxml}'; pjson='${pjson}'; pjava='${pjava}'; dxml='${dxml}'; djson='${djson}'; djava='${djava}'; mxml='${mxml}'; mjson='${mjson}'; mjava='${mjava}'" plots.plg
+join -t ',' $nxml $pxml > pxml-join.csv
+join -t ',' $njson $pjson > pjson-join.csv
+join -t ',' $njava $pjava > pjava-join.csv
+join -t ',' $nxml $dxml > dxml-join.csv
+join -t ',' $njson $djson > djson-join.csv
+join -t ',' $njava $djava > djava-join.csv
+
+gnuplot -e "nxml='${nxml}'; njson='${njson}'; njava='${njava}'; pxml='${pxml}'; pjson='${pjson}'; pjava='${pjava}'; dxml='${dxml}'; djson='${djson}'; djava='${djava}'" plots.plg
+
+rm {p,d}{xml,json,java}-join.csv

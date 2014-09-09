@@ -22,7 +22,7 @@
 CXX = g++
 
 # Development
-CXXFLAGS = -O0 -ggdb --std=c++0x
+#CXXFLAGS = -O0 -ggdb --std=c++0x
 
 # Profiling
 #CXXFLAGS = -O0 -ggdb --std=c++0x -DNDEBUG
@@ -30,7 +30,7 @@ CXXFLAGS = -O0 -ggdb --std=c++0x
 
 # Release
 #CXXFLAGS = -O2 --std=c++0x -DNDEBUG
-#CXXFLAGS = -O3 --std=c++0x -DNDEBUG
+CXXFLAGS = -O3 --std=c++0x -DNDEBUG
 
 parser.hpp:  
 	ln -s ../parser.hpp .
