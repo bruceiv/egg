@@ -138,7 +138,7 @@ namespace derivs {
 			std::static_pointer_cast<rule_expr>(r)->r = 
 				expr::make_ptr<alt_expr>(memo, 
 				                         expr::make_ptr<seq_expr>(memo, e, r),
-				                         expr::make_ptr<eps_expr>());
+				                         eps_expr::make());
 			return r;
 		}
 		
@@ -195,7 +195,7 @@ namespace derivs {
 		
 		virtual void visit(ast::range_matcher& m) {
 			// Empty alternation is a success
-			if ( m.rs.size() == 0 ) { rVal = expr::make_ptr<eps_expr>(); return; }
+			if ( m.rs.size() == 0 ) { rVal = eps_expr::make(); return; }
 			
 			// Transform last option
 			auto it = m.rs.rbegin();
@@ -212,17 +212,17 @@ namespace derivs {
 		
 		virtual void visit(ast::any_matcher& m) { rVal = expr::make_ptr<any_expr>(); }
 		
-		virtual void visit(ast::empty_matcher& m) { rVal = expr::make_ptr<eps_expr>(); }
+		virtual void visit(ast::empty_matcher& m) { rVal = eps_expr::make(); }
 		
 		virtual void visit(ast::action_matcher& m) {
 			//TODO actually implement this; for the moment, just return success
-			rVal = expr::make_ptr<eps_expr>();
+			rVal = eps_expr::make();
 		}
 		
 		virtual void visit(ast::opt_matcher& m) {
 			// match subexpression or epsilon
 			m.m->accept(this);
-			rVal = expr::make_ptr<alt_expr>(memo, rVal, expr::make_ptr<eps_expr>());
+			rVal = expr::make_ptr<alt_expr>(memo, rVal, eps_expr::make());
 		}
 		
 		virtual void visit(ast::many_matcher& m) {
@@ -239,7 +239,7 @@ namespace derivs {
 			// Convert vector in seq_matcher to cons-list in seq_expr
 			
 			// Empty sequence is a success
-			if ( m.ms.size() == 0 ) { rVal = expr::make_ptr<eps_expr>(); return; }
+			if ( m.ms.size() == 0 ) { rVal = eps_expr::make(); return; }
 			
 			// Transform last option
 			auto it = m.ms.rbegin();
@@ -257,7 +257,7 @@ namespace derivs {
 			// Convert vector in alt_matcher to cons-list in alt_expr
 			
 			// Empty sequence is a success
-			if ( m.ms.size() == 0 ) { rVal = expr::make_ptr<eps_expr>(); return; }
+			if ( m.ms.size() == 0 ) { rVal = eps_expr::make(); return; }
 			
 			// Transform last option
 			auto it = m.ms.rbegin();

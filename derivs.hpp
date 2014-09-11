@@ -301,9 +301,16 @@ namespace derivs {
 	
 	/// An empty success parsing expression
 	class eps_expr : public expr {
-	public:
+		// implements singleton pattern; access through make()
 		eps_expr() = default;
-	
+		eps_expr(const eps_expr&) = delete;
+		eps_expr(eps_expr&&) = delete;
+		
+		eps_expr& operator = (const eps_expr&) = delete;
+		eps_expr& operator = (eps_expr&&) = delete;
+	public:
+		~eps_expr() = default;
+		
 		static ptr<expr> make();
 		void accept(visitor* v) { v->visit(*this); }
 		

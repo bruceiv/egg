@@ -341,8 +341,12 @@ namespace derivs {
 	
 	// eps_expr ////////////////////////////////////////////////////////////////////
 	
-	ptr<expr> eps_expr::make() { return expr::make_ptr<eps_expr>(); }
-	
+	ptr<expr> eps_expr::make() {
+		static ptr<expr> singleton = std::static_pointer_cast<expr>(
+			ptr<eps_expr>{new eps_expr});
+		return singleton;
+	}
+		
 	// Only succeeds if string is empty
 	ptr<expr> eps_expr::d(char x) const {
 		return ( x == '\0' ) ? eps_expr::make() : fail_expr::make();
@@ -355,7 +359,7 @@ namespace derivs {
 	// look_expr ///////////////////////////////////////////////////////////////////
 	
 	ptr<expr> look_expr::make(gen_type g) {
-		return (g == 0) ? expr::make_ptr<eps_expr>() : expr::make_ptr<look_expr>(g);
+		return (g == 0) ? eps_expr::make() : expr::make_ptr<look_expr>(g);
 	}
 	
 	// No prefixes to remove from language containing the empty string; all fail
