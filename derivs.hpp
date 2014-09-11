@@ -35,8 +35,6 @@
 
 #include "utils/uint_pfn.hpp"
 
-#include <iostream>
-
 /**
  * Implements derivative parsing for parsing expression grammars, according to the algorithm 
  * described by Aaron Moss in 2014 (http://arxiv.org/abs/1405.4841).
@@ -261,8 +259,8 @@ namespace derivs {
 	
 	/// A failure parsing expression
 	class fail_expr : public expr {
+		// implements singleton pattern; access through make()
 		fail_expr() = default;
-		//fail_expr() { std::cout << "\tNEW FAIL_EXPR" << std::endl; }
 		fail_expr(const fail_expr&) = delete;
 		fail_expr(fail_expr&&) = delete;
 		
@@ -270,7 +268,6 @@ namespace derivs {
 		fail_expr& operator = (fail_expr&&) = delete;
 	public:
 		~fail_expr() = default;
-		//~fail_expr() { std::cout << "\tDELETE FAIL_EXPR" << std::endl; }
 
 		static ptr<expr> make();
 		void accept(visitor* v) { v->visit(*this); }
@@ -283,8 +280,15 @@ namespace derivs {
 	
 	/// An infinite loop failure parsing expression
 	class inf_expr : public expr {
-	public:
+		// implements singleton pattern; access through make()
 		inf_expr() = default;
+		inf_expr(const inf_expr&) = delete;
+		inf_expr(inf_expr&&) = delete;
+		
+		inf_expr& operator = (const inf_expr&) = delete;
+		inf_expr& operator = (inf_expr&&) = delete;
+	public:
+		~inf_expr() = default;
 		
 		static ptr<expr> make();
 		void accept(visitor* v) { v->visit(*this); }
