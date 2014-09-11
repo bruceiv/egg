@@ -61,6 +61,7 @@ plot nxml using ($7/1000):($6/1000) with linespoints title 'Recursive XML' ls 1,
 
 set output 'plots/speedup.pdf'
 set key top left
+set ytics 0.2
 set ylabel 'Speedup vs. Recursive'
 
 plot 1 title 'Recursive' ls 2, \
@@ -84,6 +85,7 @@ plot 1 title 'Packrat' ls 5, \
 
 #set output 'plots/mem-use-multi.pdf'
 #set size 1,0.5
+#set ytics autofreq
 #set multiplot layout 1,2
 #
 #plot nxml using ($7/1000):($6/1000) with linespoints title 'Recursive XML' ls 1, \
