@@ -35,6 +35,8 @@
 
 #include "utils/uint_pfn.hpp"
 
+#include <iostream>
+
 /**
  * Implements derivative parsing for parsing expression grammars, according to the algorithm 
  * described by Aaron Moss in 2014 (http://arxiv.org/abs/1405.4841).
@@ -145,7 +147,9 @@ namespace derivs {
 	public:
 		template<typename T, typename... Args>
 		static ptr<expr> make_ptr(Args&&... args) {
-			return std::static_pointer_cast<expr>(std::make_shared<T>(args...));
+			return std::static_pointer_cast<expr>(
+					std::make_shared<T>(
+						std::forward<Args>(args)...));
 		}
 		
 		/// Derivative of this expression with respect to x
@@ -257,9 +261,17 @@ namespace derivs {
 	
 	/// A failure parsing expression
 	class fail_expr : public expr {
-	public:
 		fail_expr() = default;
+		//fail_expr() { std::cout << "\tNEW FAIL_EXPR" << std::endl; }
+		fail_expr(const fail_expr&) = delete;
+		fail_expr(fail_expr&&) = delete;
 		
+		fail_expr& operator = (const fail_expr&) = delete;
+		fail_expr& operator = (fail_expr&&) = delete;
+	public:
+		~fail_expr() = default;
+		//~fail_expr() { std::cout << "\tDELETE FAIL_EXPR" << std::endl; }
+
 		static ptr<expr> make();
 		void accept(visitor* v) { v->visit(*this); }
 		

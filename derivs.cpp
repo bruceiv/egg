@@ -310,7 +310,14 @@ namespace derivs {
 	
 	// fail_expr ///////////////////////////////////////////////////////////////////
 	
-	ptr<expr> fail_expr::make() { return expr::make_ptr<fail_expr>(); }
+	//ptr<expr> fail_expr::make() { return expr::make_ptr<fail_expr>(); }
+	ptr<expr> fail_expr::make() {
+		static ptr<expr> singleton = std::static_pointer_cast<expr>(
+				ptr<fail_expr>{new fail_expr});
+		return singleton;
+		//static ptr<fail_expr> singleton{new fail_expr};
+		//return std::static_pointer_cast<expr>(singleton);
+	}
 	
 	// A failure expression can't un-fail - no strings to match with any prefix
 	ptr<expr> fail_expr::d(char) const { return fail_expr::make(); }

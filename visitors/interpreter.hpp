@@ -115,7 +115,7 @@ namespace derivs {
 		/// Gets the unique rule expression correspoinding to the given name
 		ptr<rule_expr> get_rule(const std::string& s) {
 			if ( rs.count(s) == 0 ) {
-				ptr<rule_expr> r = std::make_shared<rule_expr>(memo, expr::make_ptr<fail_expr>());
+				ptr<rule_expr> r = std::make_shared<rule_expr>(memo, fail_expr::make());
 				rs./*emplace(s, r)*/insert(std::make_pair(s, r));
 				return r;
 			} else {
@@ -133,7 +133,7 @@ namespace derivs {
 		/// Makes a new anonymous nonterminal for a many-expression
 		ptr<expr> make_many(ptr<expr> e) {
 			// make anonymous non-terminal R
-			ptr<expr> r = expr::make_ptr<rule_expr>(memo, expr::make_ptr<fail_expr>());
+			ptr<expr> r = expr::make_ptr<rule_expr>(memo, fail_expr::make());
 			// set non-terminal rule to e R / eps
 			std::static_pointer_cast<rule_expr>(r)->r = 
 				expr::make_ptr<alt_expr>(memo, 
@@ -293,7 +293,7 @@ namespace derivs {
 		
 		virtual void visit(ast::fail_matcher& m) {
 			// TODO complete implementation; for the moment ignore the error message
-			rVal = expr::make_ptr<fail_expr>();
+			rVal = fail_expr::make();
 		}
 		
 	private:
