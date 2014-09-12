@@ -471,7 +471,7 @@ namespace derivs {
 		str_node s;         ///< Internal string representation
 		unsigned long len;  ///< length of internal string
 	}; // class str_expr
-#else
+#elif 0
 	/// A parsing expression representing a character string
 	class str_expr : public expr {
 	public:
@@ -490,6 +490,28 @@ namespace derivs {
 		
 	private:
 		std::string s;
+	}; // class str_expr
+#else
+	/// A parsing expression representing a character string
+	class str_expr : public expr {
+		str_expr(ptr<std::string> sp, unsigned long i) : sp(sp), i(i) {}
+	public:
+		str_expr(const std::string& s) : sp{std::make_shared<std::string>(s)}, i{0} {}
+		str_expr(std::string&& s) : sp{std::make_shared<std::string>(s)}, i{0} {}
+		
+		static ptr<expr> make(const std::string& s);
+		void accept(visitor* v) { v->visit(*this); }
+		
+		virtual ptr<expr> d(char) const;
+		virtual gen_set   match() const;
+		virtual gen_set   back()  const;
+		virtual expr_type type()  const { return str_type; }
+		
+		std::string str() const { return std::string{*sp, i}; }
+		unsigned long size() const { return sp->size() - i; }
+	private:
+		ptr<std::string> sp;  ///< Pointer to interred string
+		unsigned long i;      ///< Index into interred string
 	}; // class str_expr
 #endif
 	

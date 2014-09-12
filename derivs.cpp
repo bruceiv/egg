@@ -410,7 +410,7 @@ namespace derivs {
 	
 	// str_expr ////////////////////////////////////////////////////////////////////
 	
-	ptr<expr> str_expr::make(std::string s) {
+	ptr<expr> str_expr::make(const std::string& s) {
 		switch ( s.size() ) {
 		case 0:  return eps_expr::make();
 		case 1:  return char_expr::make(s[0]);
@@ -420,13 +420,12 @@ namespace derivs {
 	
 	ptr<expr> str_expr::d(char x) const {
 		// Check that the first character matches
-		if ( s[0] != x ) return fail_expr::make();
+		if ( (*sp)[i] != x ) return fail_expr::make();
 		
-		// Otherwise return a character or string expression, as appropriate
-		if ( s.size() == 2 ) return char_expr::make(s[1]);
+		// Otherwise return string or epsilon expression, as appropriate
+		if ( sp->size() == i+1 ) return eps_expr::make();
 		
-		std::string t(s, 1);
-		return expr::make_ptr<str_expr>(t);
+		return ptr<expr>{new str_expr(sp, i+1)};
 	}
 	
 	gen_set str_expr::match() const { return gen_set{}; }
