@@ -486,12 +486,15 @@ namespace derivs {
 	gen_set not_expr::back_set() const { return gen_set{1}; }
 	
 	// map_expr ////////////////////////////////////////////////////////////////////
-	
+
 	ptr<expr> map_expr::make(memo_expr::table& memo, ptr<expr> e, gen_type gm, gen_map eg) {
 		// account for unmapped generations
 		assert(!eg.empty() && "non-empty generation map");
 		assert(e->back().max() <= eg.max_key() && "no unmapped generations");
 		assert(eg.max() <= gm && "max is actually max");
+		
+		// check if map isn't needed (identity map)
+		if ( gm == eg.max_key() ) return e;
 		
 		switch ( e->type() ) {
 		// Map expression match generation into exit generation
@@ -500,11 +503,13 @@ namespace derivs {
 		// Propegate fail and infinity errors
 		case fail_type: return e; // a fail_expr
 		case inf_type:  return e; // an inf_expr
+		case map_type: {
+			map_expr& m = *std::static_pointer_cast<map_expr>(e);
+			// Compose contained map into this one
+			return expr::make_ptr<map_expr>(memo, m.e, gm, eg(m.eg));
+		} 
 		default:        break; // do nothing
 		}
-		
-		// check if map isn't needed (identity map)
-		if ( gm == eg.max_key() ) return e;
 		
 		return expr::make_ptr<map_expr>(memo, e, gm, eg);
 	}
@@ -520,6 +525,31 @@ namespace derivs {
 		// Propegate fail and infinity errors
 		case fail_type: return de; // a fail_expr
 		case inf_type:  return de; // an inf_expr
+		case map_type: {
+			map_expr& m = *std::static_pointer_cast<map_expr>(de);
+			
+			gen_map deg;
+			auto et = eg.begin();
+			auto mt = m.eg.begin();
+
+			// Compose generations before end
+			while ( et != eg.end() && mt != m.eg.end() ) {
+				if ( et->first < mt->second ) { ++et; continue; }
+				assert(et->first == mt->second && "Index must be in pfn");
+				deg.add_back(mt->first, et->second);
+				++et; ++mt;
+			}
+			
+			// Update gm, if needed
+			if ( mt != m.eg.end() ) {
+				auto mm = *mt;
+				assert(mm.second > e.back().max() && "leftover generations are new");
+				assert(++mt == m.eg.end() && "only one leftover generation");
+				deg.add_back(mm.first, gm+1);
+				
+				return expr::make_ptr<map_expr>(memo, m.e, gm+1, deg);
+			} else return expr::make_ptr<map_expr>(memo, m.e, gm, deg);
+		}
 		default:        break; // do nothing
 		}
 		
