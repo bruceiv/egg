@@ -312,8 +312,7 @@ namespace derivs {
 	
 	//ptr<expr> fail_expr::make() { return expr::make_ptr<fail_expr>(); }
 	ptr<expr> fail_expr::make() {
-		static ptr<expr> singleton = std::static_pointer_cast<expr>(
-				ptr<fail_expr>{new fail_expr});
+		static ptr<expr> singleton{new fail_expr};
 		return singleton;
 	}
 	
@@ -327,8 +326,7 @@ namespace derivs {
 	// inf_expr ////////////////////////////////////////////////////////////////////
 	
 	ptr<expr> inf_expr::make() {
-		static ptr<expr> singleton = std::static_pointer_cast<expr>(
-				ptr<inf_expr>{new inf_expr});
+		static ptr<expr> singleton{new inf_expr};
 		return singleton;	
 	}
 	
@@ -342,8 +340,7 @@ namespace derivs {
 	// eps_expr ////////////////////////////////////////////////////////////////////
 	
 	ptr<expr> eps_expr::make() {
-		static ptr<expr> singleton = std::static_pointer_cast<expr>(
-			ptr<eps_expr>{new eps_expr});
+		static ptr<expr> singleton{new eps_expr};
 		return singleton;
 	}
 		
