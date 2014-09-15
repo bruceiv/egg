@@ -26,12 +26,12 @@
 //#define NDEBUG
 #include <cassert>
 
-#include <forward_list>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 #include "utils/uint_pfn.hpp"
 
@@ -167,7 +167,7 @@ namespace derivs {
 	}; // class expr
 	
 	/// List of expression pointers
-	using expr_list = std::forward_list<ptr<expr>>;
+	using expr_list = std::vector<ptr<expr>>;
 	
 	/// Abstract base class for memoized parsing expressions
 	class memo_expr : public expr {
@@ -472,7 +472,7 @@ namespace derivs {
 			ptr<expr> e;   ///< Subexpression
 			gen_map   eg;  ///< Generation flags for subexpression
 		};  // struct alt_node
-		using alt_list = std::forward_list<alt_node>;
+		using alt_list = std::vector<alt_node>;
 		
 		alt_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
 		         gen_map ag = gen_map{0}, gen_map bg = gen_map{0}, gen_type gm = 0)
@@ -511,7 +511,7 @@ namespace derivs {
 			ptr<expr> e;   ///< Follower expression for this lookahead generation
 			gen_type  gl;  ///< Generation of last match
 		}; // struct look_node
-		using look_list = std::forward_list<look_node>;
+		using look_list = std::vector<look_node>;
 		
 		seq_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b)
 			: memo_expr(memo), a(a), b(b), bs(), c(fail_expr::make()), cg(gen_map{0}), gm(0) {}

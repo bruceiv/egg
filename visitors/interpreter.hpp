@@ -91,13 +91,10 @@ namespace derivs {
 		
 		void visit(alt_expr& e) {
 			expr_list es;
-			auto et = es.before_begin();
-			
 			for (auto& x : e.es) {
 				x.e->accept(this);
-				et = es.emplace_after(et, rVal);
+				es.emplace_back(rVal);
 			}
-
 			rVal = alt_expr::make(memo, es);
 		}
 		
@@ -264,12 +261,10 @@ namespace derivs {
 			
 			// Transform options to expression list
 			expr_list es;
-			auto et = es.before_begin();
 			for (auto& mi : m.ms) {
 				mi->accept(this);
-				et = es.emplace_after(et, rVal);
+				es.emplace_back(rVal);
 			}
-
 			rVal = alt_expr::make(memo, es);
 		}
 		

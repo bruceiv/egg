@@ -618,9 +618,6 @@ namespace derivs {
 		bool did_inc = false;
 		
 		alt_list nes;
-		auto net = nes.before_begin();
-		alt_list::size_type nen = 0;
-		
 		for (auto& e : es) {
 			expr_type ety = e->type();
 			// skip failing nodes
@@ -628,17 +625,16 @@ namespace derivs {
 
 			// Set default generation map and add to list
 			gen_map eg = expr::default_back_map(e, did_inc);
-			net = nes.emplace_after(net, e, eg);
-			++nen;
+			nes.emplace_back(e, eg);
 			
 			// infinite loops and matching nodes end the alternation
 			if ( ety == inf_type || ! e->match().empty() ) break;
 		}
 
 		// Eliminate alternation node if not enough nodes left
-		switch ( nen ) {
+		switch ( nes.size() ) {
 		case 0: return fail_expr::make();
-		case 1: return map_expr::make(memo, net->e, 0 + did_inc, net->eg);
+		case 1: return map_expr::make(memo, nes[0].e, 0 + did_inc, nes[0].eg);
 		default: return expr::make_ptr<alt_expr>(memo, nes, 0 + did_inc);
 		}
 	}
@@ -647,9 +643,6 @@ namespace derivs {
 		bool did_inc = false;
 		
 		alt_list des;
-		auto det = des.before_begin();
-		alt_list::size_type den = 0;
-
 		for (auto& e : es) {
 			// Take derivative
 			ptr<expr> de = e.e->d(x);
@@ -658,21 +651,20 @@ namespace derivs {
 			// skip failing nodes
 			if ( dety == fail_type ) continue;
 			// infinite loops end the alternation
-			if ( dety == inf_type ) { det = des.emplace_after(det, de, e.eg); ++den; break; }
+			if ( dety == inf_type ) { des.emplace_back(de, e.eg); break; }
 			
 			// Update generation map and add to list
 			gen_map deg = expr::update_back_map(e.e, de, e.eg, gm, did_inc);
-			det = des.emplace_after(det, de, deg);
-			++den;
+			des.emplace_back(de, deg);
 
 			// matching nodes also end the alternation
 			if ( ! de->match().empty() ) break;
 		}
 		
 		// Eliminate alternation node if not enough nodes left
-		switch ( den ) {
+		switch ( des.size() ) {
 		case 0: return fail_expr::make();
-		case 1: return map_expr::make(memo, det->e, gm + did_inc, det->eg);
+		case 1: return map_expr::make(memo, des[0].e, gm + did_inc, des[0].eg);
 		default: return expr::make_ptr<alt_expr>(memo, des, gm + did_inc);
 		}
 	}
@@ -739,7 +731,7 @@ namespace derivs {
 				did_inc = true;
 			}
 			
-			bs.emplace_front(1, expr::default_back_map(b, did_inc), b, gl);
+			bs.emplace_back(1, expr::default_back_map(b, did_inc), b, gl);
 		}
 		
 		// return constructed expression
@@ -828,7 +820,6 @@ namespace derivs {
 		auto bit = bs.begin();
 
 		look_list dbs;
-		auto dbt = dbs.before_begin();
 		while ( dabt != dab.end() && bit != bs.end() ) {
 			const look_node& bi = *bit;
 			if ( bi.g < *dabt ) { ++bit; continue; }  // skip generations not in backtrack list
@@ -842,7 +833,7 @@ namespace derivs {
 				dgl = gm+1;
 				did_inc = true;
 			}
-			dbt = dbs.emplace_after(dbt, bi.g, dbig, dbi, dgl);
+			dbs.emplace_back(bi.g, dbig, dbi, dgl);
 			
 			++dabt; ++bit;
 		}
@@ -858,7 +849,7 @@ namespace derivs {
 				gl = gm+1;
 				did_inc = true;
 			}
-			dbt = dbs.emplace_after(dbt, dabm, expr::new_back_map(b, gm, did_inc), b, gl);
+			dbs.emplace_back(dabm, expr::new_back_map(b, gm, did_inc), b, gl);
 		}
 		
 		return expr::make_ptr<seq_expr>(memo, da, b, dbs, dc, dcg, gm + did_inc);
