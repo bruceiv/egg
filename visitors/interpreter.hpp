@@ -259,21 +259,18 @@ namespace derivs {
 		}
 		
 		virtual void visit(ast::alt_matcher& m) {
-			// Convert vector in alt_matcher to cons-list in alt_expr
-			
 			// Empty sequence is a success
 			if ( m.ms.size() == 0 ) { rVal = eps_expr::make(); return; }
 			
-			// Transform last option
-			auto it = m.ms.rbegin();
-			(*it)->accept(this);
-			
-			// Transform remaining options
-			while ( ++it != m.ms.rend() ) {
-				ptr<expr> tVal = rVal;
-				(*it)->accept(this);
-				rVal = expr::make_ptr<alt_expr>(memo, rVal, tVal);
+			// Transform options to expression list
+			expr_list es;
+			auto et = es.before_begin();
+			for (auto& mi : m.ms) {
+				mi->accept(this);
+				et = es.emplace_after(et, rVal);
 			}
+
+			rVal = alt_expr::make(memo, es);
 		}
 		
 		virtual void visit(ast::look_matcher& m) {
