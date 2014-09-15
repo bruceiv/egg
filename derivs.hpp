@@ -383,115 +383,6 @@ namespace derivs {
 		virtual expr_type type()  const { return any_type; }
 	}; // class any_expr
 
-#if 0
-	/// A parsing expression representing a character string
-	class str_expr : public expr {
-		/// Ref-counted cons-list representation of a string
-		struct str_node {
-			char c;              ///< Character in node
-			ptr<str_node> next;  ///< Next node
-			
-			/// Constructs a new string node with a null next character
-			str_node(char c) : c(c), next() {}
-			
-			/// Constructs a new string node with the given next character
-			str_node(char c, ptr<str_node> next) : c(c), next(next) {}
-			
-			/// Constructs a new series of string nodes for the given string.
-			/// Warning: string should have length of at least one
-			str_node(const std::string& s) {
-				// make node for end of string
-				auto it = s.rbegin();
-				ptr<str_node> last = std::make_shared<str_node>(*it);
-				
-				// make nodes for internal characters
-				++it;
-				while ( it != s.rend() ) {
-					last = std::make_shared<str_node>(*it, last);
-					++it;
-				}
-				
-				// setup this node
-				c = last->c;
-				next = last->next;
-			}
-			
-			/// Gets the string of the given length out of a list of nodes
-			std::string str(unsigned long len) const {
-				const str_node* n = this;
-				
-				char a[len];
-				for (unsigned long i = 0; i < len; ++i) {
-					a[i] = n->c;
-					n = n->next.get();
-				}
-				
-				return std::string(a, len);
-			}
-		}; // struct str_node
-		
-	public:
-		/// Constructs a string expression from a string node and a length
-		str_expr(str_node s, unsigned long len) : s(s), len(len) {}
-		/// Constructs a string expression from a standard string (should be non-empty)
-		str_expr(std::string t) : s(t), len(t.size()) {}
-		
-		/// Makes an appropriate expression node for the length of the string
-		static ptr<expr> make(std::string s) {
-			switch ( s.size() ) {
-			case 0:  return eps_expr::make();
-			case 1:  return char_expr::make(s[0]);
-			default: return expr::make_ptr<str_expr>(s);
-			}
-		}
-		
-		void accept(visitor* v) { v->visit(*this); }
-		
-		virtual ptr<expr> d(char x) const {
-			// Check that the first character matches
-			if ( s.c != x ) return fail_expr::make();
-			
-			// Otherwise return a character or string expression, as appropriate
-			return ( len == 2 ) ? 
-				char_expr::make(s.next->c) :
-				expr::make_ptr<str_expr>(*s.next, len - 1);
-		}
-		
-		virtual nbl_mode  nbl()  const { return SHFT; }
-		virtual lk_mode   lk()   const { return READ; }
-		virtual gen_type  gen()  const { return gen_type(0); }
-		virtual expr_type type() const { return str_type; }
-		
-		/// Gets the string represented by this node
-		std::string str() const { return s.str(len); }
-		/// Gets the length of the string represented by this node
-		unsigned long size() const { return len; }
-		
-	private:
-		str_node s;         ///< Internal string representation
-		unsigned long len;  ///< length of internal string
-	}; // class str_expr
-#elif 0
-	/// A parsing expression representing a character string
-	class str_expr : public expr {
-	public:
-		str_expr(std::string s) : s(s) {}
-		
-		static ptr<expr> make(std::string s);
-		void accept(visitor* v) { v->visit(*this); }
-		
-		virtual ptr<expr> d(char) const;
-		virtual gen_set   match() const;
-		virtual gen_set   back()  const;
-		virtual expr_type type()  const { return str_type; }
-		
-		std::string str() const { return s; }
-		unsigned long size() const { return s.size(); }
-		
-	private:
-		std::string s;
-	}; // class str_expr
-#else
 	/// A parsing expression representing a character string
 	class str_expr : public expr {
 		str_expr(ptr<std::string> sp, unsigned long i) : sp(sp), i(i) {}
@@ -513,7 +404,6 @@ namespace derivs {
 		ptr<std::string> sp;  ///< Pointer to interred string
 		unsigned long i;      ///< Index into interred string
 	}; // class str_expr
-#endif
 	
 	/// A parsing expression representing a non-terminal
 	class rule_expr : public memo_expr {
