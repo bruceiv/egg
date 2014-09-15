@@ -1,0 +1,19 @@
+#!/bin/zsh
+
+echo '"filename","output","user(s)","sys(s)","wall(s)","max-mem(KB)","size(B)"'
+
+file=input/ijs-elan2.0/stra-sl.tei
+echo -n "\"`basename $file`\",\"" 
+/usr/bin/time -f "\",%U,%S,%e,%M," ../egg match XML.egg Document < $file 2>&1 | tr -d '\n' 
+stat -c %s $file
+
+file=input/json-ijs-elan2.0/stra-sl.tei.json
+echo -n "\"`basename $file`\",\""
+/usr/bin/time -f "\",%U,%S,%e,%M," ../egg match JSON.egg JSON < $file 2>&1 | tr -d '\n'
+stat -c %s $file
+
+file=input/javacc/CobolParser.java
+echo -n "\"`basename $file`\",\""
+/usr/bin/time -f "\",%U,%S,%e,%M," ../egg match Java.egg CompilationUnit < $file 2>&1 | tr -d '\n'
+stat -c %s $file
+
