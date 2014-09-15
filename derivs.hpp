@@ -26,7 +26,7 @@
 //#define NDEBUG
 #include <cassert>
 
-#include <list>
+#include <forward_list>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -573,6 +573,10 @@ namespace derivs {
 	/// A parsing expression representing the alternation of two parsing expressions
 	class alt_expr : public memo_expr {
 	public:
+		//struct alt_node {
+		//	
+		//};  // struct alt_node
+		
 		alt_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
 		         gen_map ag = gen_map{0}, gen_map bg = gen_map{0}, gen_type gm = 0)
 			: memo_expr(memo), a(a), b(b), ag(ag), bg(bg), gm(gm) {}
@@ -607,8 +611,8 @@ namespace derivs {
 			gen_map   eg;  ///< Map of generations from this node to the containing node
 			ptr<expr> e;   ///< Follower expression for this lookahead generation
 			gen_type  gl;  ///< Generation of last match
-		}; // struct look_list
-		using look_list = std::list<look_node>;
+		}; // struct look_node
+		using look_list = std::forward_list<look_node>;
 		
 		seq_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b)
 			: memo_expr(memo), a(a), b(b), bs(), c(fail_expr::make()), cg(gen_map{0}), gm(0) {}

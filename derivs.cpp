@@ -692,7 +692,7 @@ namespace derivs {
 				did_inc = true;
 			}
 			
-			bs.emplace_back(1, expr::default_back_map(b, did_inc), b, gl);
+			bs.emplace_front(1, expr::default_back_map(b, did_inc), b, gl);
 		}
 		
 		// return constructed expression
@@ -781,6 +781,7 @@ namespace derivs {
 		auto bit = bs.begin();
 
 		look_list dbs;
+		auto dbt = dbs.before_begin();
 		while ( dabt != dab.end() && bit != bs.end() ) {
 			const look_node& bi = *bit;
 			if ( bi.g < *dabt ) { ++bit; continue; }  // skip generations not in backtrack list
@@ -794,7 +795,7 @@ namespace derivs {
 				dgl = gm+1;
 				did_inc = true;
 			}
-			dbs.emplace_back(bi.g, dbig, dbi, dgl);
+			dbt = dbs.emplace_after(dbt, bi.g, dbig, dbi, dgl);
 			
 			++dabt; ++bit;
 		}
@@ -810,7 +811,7 @@ namespace derivs {
 				gl = gm+1;
 				did_inc = true;
 			}
-			dbs.emplace_back(dabm, expr::new_back_map(b, gm, did_inc), b, gl);
+			dbt = dbs.emplace_after(dbt, dabm, expr::new_back_map(b, gm, did_inc), b, gl);
 		}
 		
 		return expr::make_ptr<seq_expr>(memo, da, b, dbs, dc, dcg, gm + did_inc);
