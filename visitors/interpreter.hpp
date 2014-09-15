@@ -90,10 +90,15 @@ namespace derivs {
 		}
 		
 		void visit(alt_expr& e) {
-			e.a->accept(this);
-			ptr<expr> a = rVal;
-			e.b->accept(this);
-			rVal = alt_expr::make(memo, a, rVal);
+			expr_list es;
+			auto et = es.before_begin();
+			
+			for (auto& x : e.es) {
+				x.e->accept(this);
+				et = es.emplace_after(et, rVal);
+			}
+
+			rVal = alt_expr::make(memo, es);
 		}
 		
 		void visit(seq_expr& e) {

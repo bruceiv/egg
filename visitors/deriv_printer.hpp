@@ -222,14 +222,22 @@ namespace derivs {
 			out << "(alt:";
 			print_fns(&e);
 			out << "g" << (unsigned int)e.gm;
-			out << " ";
-			print_uint_map(e.ag);
-			out << " ";
-			print_unbraced(e.a);
-			out << " / ";
-			print_uint_map(e.bg);
-			out << " ";
-			print_unbraced(e.b);
+			
+			auto et = e.es.begin();
+			if ( et != e.es.end() ) {
+				out << " ";
+				print_uint_map(et->eg);
+				out << " ";
+				print_unbraced(et->e);
+			}
+
+			while ( ++et != e.es.end() ) {
+				out << " / ";
+				print_uint_map(et->eg);
+				out << " ";
+				print_unbraced(et->e);
+			}
+
 			out << ")";
 		}
 		

@@ -247,8 +247,13 @@ namespace derivs {
 		std::unordered_set<ptr<expr>>& visited = *(this->visited);
 		
 		// Calculate and cache match set
-		match = x.memo_match = x.ag(iter_match(x.a, changed, visited)) 
-		                       | x.bg(iter_match(x.b, changed, visited));
+		gen_set m;
+		
+		for (auto& e : x.es) {
+			m |= e.eg(iter_match(e.e, changed, visited));
+		}
+		
+		match = x.memo_match = m;
 		x.flags.match = true;
 	}
 	
@@ -605,42 +610,84 @@ namespace derivs {
 		
 		return expr::make_ptr<alt_expr>(memo, a, b, ag, bg, gm);
 	}
+
+	ptr<expr> alt_expr::make(memo_expr::table& memo, const expr_list& es) {
+		// Empty alternation list is an epsilon-rule; all failing list is a fail-rule
+		if ( es.empty() ) return eps_expr::make();
+
+		bool did_inc = false;
+		
+		alt_list nes;
+		auto net = nes.before_begin();
+		alt_list::size_type nen = 0;
+		
+		for (auto& e : es) {
+			expr_type ety = e->type();
+			// skip failing nodes
+			if ( ety == fail_type ) continue;
+
+			// Set default generation map and add to list
+			gen_map eg = expr::default_back_map(e, did_inc);
+			net = nes.emplace_after(net, e, eg);
+			++nen;
+			
+			// infinite loops and matching nodes end the alternation
+			if ( ety == inf_type || ! e->match().empty() ) break;
+		}
+
+		// Eliminate alternation node if not enough nodes left
+		switch ( nen ) {
+		case 0: return fail_expr::make();
+		case 1: return map_expr::make(memo, net->e, 0 + did_inc, net->eg);
+		default: return expr::make_ptr<alt_expr>(memo, nes, 0 + did_inc);
+		}
+	}
 	
 	ptr<expr> alt_expr::deriv(char x) const {
 		bool did_inc = false;
 		
-		// Calculate derivative and map in new lookahead generations
-		ptr<expr> da = a->d(x);
-		
-		// Check conditions on a before we calculate dx(b) [same as make()]
-		switch ( da->type() ) {
-		case fail_type: {
-			ptr<expr> db = b->d(x);
-			gen_map dbg = expr::update_back_map(b, db, bg, gm, did_inc);
-			return map_expr::make(memo, db, gm + did_inc, dbg);
+		alt_list des;
+		auto det = des.before_begin();
+		alt_list::size_type den = 0;
+
+		for (auto& e : es) {
+			// Take derivative
+			ptr<expr> de = e.e->d(x);
+			
+			expr_type dety = de->type();
+			// skip failing nodes
+			if ( dety == fail_type ) continue;
+			// infinite loops end the alternation
+			if ( dety == inf_type ) { det = des.emplace_after(det, de, e.eg); ++den; break; }
+			
+			// Update generation map and add to list
+			gen_map deg = expr::update_back_map(e.e, de, e.eg, gm, did_inc);
+			det = des.emplace_after(det, de, deg);
+			++den;
+
+			// matching nodes also end the alternation
+			if ( ! de->match().empty() ) break;
 		}
-		case inf_type:  return da; // an inf_expr
-		default:        break; // do nothing
+		
+		// Eliminate alternation node if not enough nodes left
+		switch ( den ) {
+		case 0: return fail_expr::make();
+		case 1: return map_expr::make(memo, det->e, gm + did_inc, det->eg);
+		default: return expr::make_ptr<alt_expr>(memo, des, gm + did_inc);
 		}
-		
-		// Map in new lookahead generations for derivative
-		gen_map dag = expr::update_back_map(a, da, ag, gm, did_inc);
-		
-		if ( ! da->match().empty() ) {
-			return map_expr::make(memo, da, gm + did_inc, dag);
-		}
-		
-		// Calculate other derivative and map in new lookahead generations
-		ptr<expr> db = b->d(x);
-		if ( db->type() == fail_type ) return map_expr::make(memo, da, gm + did_inc, dag);
-		gen_map dbg = expr::update_back_map(b, db, bg, gm, did_inc);
-				
-		return expr::make_ptr<alt_expr>(memo, da, db, dag, dbg, gm + did_inc);
 	}
 	
-	gen_set alt_expr::match_set() const { return ag(a->match()) | bg(b->match()); }
+	gen_set alt_expr::match_set() const {
+		gen_set x;
+		for (auto& e : es) { x |= e.eg(e.e->match()); }
+		return x;
+	}
 	
-	gen_set alt_expr::back_set() const { return ag(a->back()) | bg(b->back()); }
+	gen_set alt_expr::back_set() const {
+		gen_set x;
+		for (auto& e : es) { x |= e.eg(e.e->back()); }
+		return x;
+	}
 	
 	// seq_expr ////////////////////////////////////////////////////////////////////
 	

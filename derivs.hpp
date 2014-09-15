@@ -166,6 +166,9 @@ namespace derivs {
 		virtual expr_type type() const = 0;
 	}; // class expr
 	
+	/// List of expression pointers
+	using expr_list = std::forward_list<ptr<expr>>;
+	
 	/// Abstract base class for memoized parsing expressions
 	class memo_expr : public expr {
 	friend class fixer;
@@ -463,19 +466,28 @@ namespace derivs {
 	/// A parsing expression representing the alternation of two parsing expressions
 	class alt_expr : public memo_expr {
 	public:
-		//struct alt_node {
-		//	
-		//};  // struct alt_node
+		struct alt_node {
+			alt_node(ptr<expr> e, gen_map eg) : e(e), eg(eg) {}
+
+			ptr<expr> e;   ///< Subexpression
+			gen_map   eg;  ///< Generation flags for subexpression
+		};  // struct alt_node
+		using alt_list = std::forward_list<alt_node>;
 		
 		alt_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
 		         gen_map ag = gen_map{0}, gen_map bg = gen_map{0}, gen_type gm = 0)
-			: memo_expr(memo), a(a), b(b), ag(ag), bg(bg), gm(gm) {}
+			: memo_expr(memo), es{alt_node{a, ag}, alt_node{b, bg}}, gm(gm) {}
+		
+		alt_expr(memo_expr::table& memo, const alt_list& es, gen_type gm) 
+			: memo_expr(memo), es(es), gm(gm) {}
 		
 		/// Make an expression using the default generation rules
 		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
 		/// Make an expression with the given generation maps
 		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
 		                      gen_map ag, gen_map bg, gen_type gm);
+		/// Make an expression using the default generation rules
+		static ptr<expr> make(memo_expr::table& memo, const expr_list& es);
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char) const;
@@ -483,10 +495,7 @@ namespace derivs {
 		virtual gen_set   back_set()  const;
 		virtual expr_type type()      const { return alt_type; }
 		
-		ptr<expr> a;   ///< First subexpression
-		ptr<expr> b;   ///< Second subexpression
-		gen_map   ag;  ///< Generation flags for a
-		gen_map   bg;  ///< Generation flags for b
+		alt_list  es;  ///< List of subexpressions, ordered by priority
 		gen_type  gm;  ///< Maximum generation
 	}; // class alt_expr
 	
