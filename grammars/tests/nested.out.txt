@@ -1,0 +1,8 @@
+`()' MATCHES
+`(hello(world))' MATCHES
+`((foo)bar(baz))' MATCHES
+`()()(())(()()(()))' MATCHES
+`(' DOESN'T MATCH  @1
+`(()' DOESN'T MATCH  @3
+`())' DOESN'T MATCH  @2
+`' MATCHES

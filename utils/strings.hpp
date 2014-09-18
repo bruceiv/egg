@@ -31,7 +31,7 @@ namespace strings {
 
 	/** Returns a string representing the given character with all special 
 	 *  characters '\n', '\r', '\t', '\\', '\'', and '\"' backslash-escaped. */
-	string escape(const char c) {
+	static string escape(const char c) {
 		switch ( c ) {
 		case '\n': return "\\n";
 		case '\r': return "\\r";
@@ -44,13 +44,13 @@ namespace strings {
 	}
 	
 	/** Returns escape(c) surrounded by single quotes */
-	string quoted_escape(const char c) {
+	static string quoted_escape(const char c) {
 		return "\'" + escape(c) + "\'";
 	}
 
 	/** Returns a string representing the given string with all special 
 	 *  characters '\n', '\r', '\t', '\\', '\'', and '\"' backslash-escaped. */
-	string escape(const string& s) {
+	static string escape(const string& s) {
 		stringstream ss;
 		for (auto iter = s.begin(); iter != s.end(); ++iter) {
 			ss << escape(*iter);
@@ -75,7 +75,7 @@ namespace strings {
 	}
 
 	/** Converts escape sequences in a string to their character values. */
-	string unescape(const string& s) {
+	static string unescape(const string& s) {
 		stringstream ss;
 		for (auto it = s.begin(); it != s.end(); ++it) {
 			char c = *it;
@@ -92,7 +92,7 @@ namespace strings {
 	}
 	
 	/** Converts escape sequences in an Egg error string to their character values. */
-	string unescape_error(const string& s) {
+	static string unescape_error(const string& s) {
 		stringstream ss;
 		for (auto it = s.begin(); it != s.end(); ++it) {
 			char c = *it;
@@ -108,7 +108,7 @@ namespace strings {
 	}
 
 	/** Replaces all sequences of newlines with spaces. */
-	string single_line(const string& s) {
+	static string single_line(const string& s) {
 		stringstream ss;
 		bool hadLineBreak = false;
 		for (auto iter = s.begin(); iter != s.end(); ++iter) {

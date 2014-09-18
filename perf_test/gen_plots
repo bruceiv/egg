@@ -1,0 +1,22 @@
+#!/bin/zsh
+
+nxml=( output/naive-*-xml.csv(om[1]) )
+njson=( output/naive-*-json.csv(om[1]) )
+njava=( output/naive-*-java.csv(om[1]) )
+pxml=( output/packrat-*-xml.csv(om[1]) )
+pjson=( output/packrat-*-json.csv(om[1]) )
+pjava=( output/packrat-*-java.csv(om[1]) )
+dxml=( output/dlf-*-xml.csv(om[1]) )
+djson=( output/dlf-*-json.csv(om[1]) )
+djava=( output/dlf-*-java.csv(om[1]) )
+
+join -t ',' $nxml $pxml > pxml-join.csv
+join -t ',' $njson $pjson > pjson-join.csv
+join -t ',' $njava $pjava > pjava-join.csv
+join -t ',' $nxml $dxml > dxml-join.csv
+join -t ',' $njson $djson > djson-join.csv
+join -t ',' $njava $djava > djava-join.csv
+
+gnuplot -e "nxml='${nxml}'; njson='${njson}'; njava='${njava}'; pxml='${pxml}'; pjson='${pjson}'; pjava='${pjava}'; dxml='${dxml}'; djson='${djson}'; djava='${djava}'" plots.plg
+
+rm {p,d}{xml,json,java}-join.csv

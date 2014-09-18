@@ -1,0 +1,45 @@
+#!/bin/zsh
+
+outname="output/naive-`date +%y%m%d%H%M`-`git describe --tags --long`"
+
+outfile="${outname}-xml.csv"
+echo '"filename","output","user(s)","sys(s)","wall(s)","max-mem(KB)","size(B)"' | tee $outfile
+# Iterate XML files sorted increasing by size
+for file in input/ijs-elan2.0/*(oL); do
+	echo -n "\"`basename $file`\",\"" | tee -a $outfile
+	/usr/bin/time -f "\",%U,%S,%e,%M," ../grammars/xml-nomemo < $file 2>&1 | tr -d '\n' | tee -a $outfile
+	stat -c %s $file | tee -a $outfile
+done
+
+echo
+
+outfile="${outname}-json.csv"
+echo '"filename","output","user(s)","sys(s)","wall(s)","max-mem(KB)","size(B)"' | tee $outfile
+# Iterate JSON files sorted increasing by size
+for file in input/json-ijs-elan2.0/*(oL); do
+	echo -n "\"`basename $file`\",\"" | tee -a $outfile
+	/usr/bin/time -f "\",%U,%S,%e,%M," ../grammars/json-nomemo < $file 2>&1 | tr -d '\n' | tee -a $outfile
+	stat -c %s $file | tee -a $outfile
+done
+
+echo
+
+outfile="${outname}-java.csv"
+echo '"filename","output","user(s)","sys(s)","wall(s)","max-mem(KB)","size(B)"' | tee $outfile
+# Iterate Java files sorted increasing by size
+for file in input/java-cs/*(oL); do
+	echo -n "\"`basename $file`\",\"" | tee -a $outfile
+	/usr/bin/time -f "\",%U,%S,%e,%M," ../grammars/java-nomemo < $file 2>&1 | tr -d '\n' | tee -a $outfile
+	stat -c %s $file | tee -a $outfile
+done
+
+#echo
+#
+#outfile="${outname}-java.csv"
+#echo '"filename","output","user(s)","sys(s)","wall(s)","max-mem(KB)","size(B)"' | tee $outfile
+## Iterate Java files sorted increasing by size
+#for file in input/javacc/*(oL); do
+#	echo -n "\"`basename $file`\",\"" | tee -a $outfile
+#	/usr/bin/time -f "\",%U,%S,%e,%M," ../grammars/java-nomemo < $file 2>&1 | tr -d '\n' | tee -a $outfile
+#	stat -c %s $file | tee -a $outfile
+#done

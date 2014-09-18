@@ -1,0 +1,154 @@
+<TEI.2 id="ligs" lang="en-sl">
+<teiHeader id="ligs.H" type="text"
+  creator="ET" status="update"
+  date.created="1999-04-06" date.updated="2002-04-01">
+<fileDesc>
+ <titleStmt>
+  <title lang="en">Linux Installation and Getting Started</title>
+  <title lang="sl">Namestitev in za&ccaron;etek dela z Linuxom</title>
+  <author>Matt Welsh, Phil Hughes, David Bandel, Boris Beletsky,
+Sean Dreilinger, Robert Kiesling, Evan Liebovitch, Henry Pierce</author>
+  <author>Translator: Roman Maurer</author>
+  <respStmt>
+   <name>Roman Maurer</name>
+   <resp lang="en">Translation, alignment</resp>
+   <resp lang="sl">Prevod, poravnava</resp>
+  </respStmt>
+  <respStmt>
+   <name>Peter Holozan, Amebis</name>
+   <resp lang="sl">Leksikalne oznake</resp>
+   <resp lang="en">Lexical annotation</resp>
+  </respStmt>
+  <respStmt>
+   <name>Toma&zcaron; Erjavec, IJS</name>
+   <resp lang="sl">Tokenizacija, tagiranje, pretvorba v TEI</resp>
+   <resp lang="en">Tokenisation, tagging, conversion to TEI</resp>
+  </respStmt>
+ </titleStmt>
+ <editionStmt><edition>Version 2.0</edition></editionStmt>
+ <extent>3044 Kb, 173 kW</extent>
+  <publicationStmt>
+  <distributor lang="sl">
+    Odsek za inteligentne sisteme
+    Institut "Jo&zcaron;ef Stefan"
+    Jamova 39
+    1000 Ljubljana
+  </distributor>
+  <distributor lang="en">
+    Dept. of Intelligent Systems,
+    Jozef &Scaron;tefan Institute
+    Jamova 39
+    SI-1000 Ljubljana
+    Slovenia
+  </distributor>
+  <pubPlace><xptr url="http://nl.ijs.si/elan/"/></pubPlace>
+  <availability>
+   <p lang="en">This text of the corpus is available according to the 
+    GNU General Public License, by the Free Software Foundation.</p>
+   <p lang="sl">To besedilo korpusa je dostopno po
+    GNU General Public License, spisano pri Free Software Foundation.</p>
+  </availability>
+    </publicationStmt>
+    <sourceDesc>
+      <listBibl>
+      <bibl lang="en" default="YES">
+        <title lang="en">Linux Installation and Getting Started</title>
+        <author>Matt Welsh, Phil Hughes, David Bandel, Boris Beletsky,
+Sean Dreilinger, Robert Kiesling, Evan Liebovitch, Henry Pierce</author>
+        <publisher>Specialized Systems Consultants
+          <xptr url="http://www.ssc.com/"/>
+        </publisher>
+        <xptr url="http://metalab.unc.edu/LDP/LDP/gs/gs.html"/>
+        <xptr url="ftp://metalab.unc.edu/pub/Linux/docs/linux-doc-project/install-guide/"/>
+      </bibl>
+      <bibl lang="sl" default="NO">
+        <title lang="sl">Namestitev in za&ccaron;etek dela z Linuxom</title>
+        <author>Translator: Roman Maurer</author>
+        <publisher>LUGOS: Linux User Group Of Slovenia
+          <xptr url="http://www.lugos.si/"/>
+        </publisher>
+        <xptr url="http://www.lugos.si/delo/slo/LIGS-sl/"/>
+        <xptr url="ftp://ftp.lugos.si/pub/lugos/doc/install-guide-sl/"/>
+      </bibl>
+      </listBibl>
+    </sourceDesc>
+  </fileDesc>
+  <encodingDesc>
+   <projectDesc>
+    <p>
+     This text is part of the LJU1 site contribution to the
+     EU MLIS project ELAN: European Language Activity Network
+     <xptr url="http://nl.ijs.si/elan/"/>.
+    </p>
+   </projectDesc>
+    <editorialDecl>
+      <normalization>
+        <p>All formatting removed.</p>
+      </normalization>
+      <quotation>
+        <p>All quotation marks converted to "</p>
+      </quotation>
+      <segmentation>
+        <p>Manual into translation segments, with mtseg into tokens.</p>
+      </segmentation>
+   <interpretation>
+    <p>Words automatically marked with context disambiguated lemma and
+     MULTEXT-East morphosyntactic description. English words
+     additionally tagged with BROWN-like tagset by two taggers (TnT,QTAG).</p>
+   </interpretation>
+    </editorialDecl>
+   <tagsDecl>
+   <tagUsage gi="text" occurs="3"></tagUsage>
+   <tagUsage gi="group" occurs="1"></tagUsage>
+   <tagUsage gi="body" occurs="2"></tagUsage>
+   <tagUsage gi="seg" occurs="11546"></tagUsage>
+   <tagUsage gi="w" occurs="173481"></tagUsage>
+   <tagUsage gi="c" occurs="28993"></tagUsage>
+   </tagsDecl>
+ </encodingDesc>
+ <revisionDesc>
+  <change>
+   <date>1999-05-16</date>
+   <respStmt>
+    <name>Toma&zcaron; Erjavec</name>
+    <resp>Editor</resp>
+   </respStmt>
+   <item>Some more patches to tokenisation (URLs, email), V1.0 Header</item>
+  </change>
+  <change>
+   <date>1999-06-22</date>
+   <respStmt>
+    <name>Toma&zcaron; Erjavec</name> <resp>Editor</resp>
+   </respStmt>
+   <item>Some more errors of tokenisation corrected.
+     Availability statement changed.</item>
+  </change>
+  <change>
+   <date>2001-09-06</date>
+   <respStmt>
+    <name>Toma&zcaron; Erjavec</name> <resp>Editor</resp>
+   </respStmt>
+   <item>Slovene texts tagged with TnT trained on "1984" and
+     bettered with other resources. English texts also tagged with TnT 
+     trained on "1984" and additionaly with TnT trained on the Penn Treebank
+     and QTag email service.
+   </item>
+  </change>
+  <change>
+   <date>2002-04-01</date>
+   <respStmt>
+    <name>Toma&zcaron; Erjavec</name> <resp>Editor</resp>
+   </respStmt>
+   <item>Recoded in P4/XML and prepared V2.0 for distribution.
+   </item>
+  </change>
+ </revisionDesc>
+</teiHeader>
+
+  <text id="ligs." lang="en-sl">
+    <group>
+      &ligs-sl;
+      &ligs-en;
+    </group>
+  </text>
+</TEI.2>

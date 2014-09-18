@@ -43,11 +43,9 @@ namespace parser {
 	
 	typedef unsigned long ind;  /**< unsigned index type */
 	
-	class state;
-	
 	/** Human-readable position type */
 	struct posn {
-	friend state;
+	friend class state;
 	private:
 		// constructor only available to state; discourages messing with posn
 		posn(ind index, ind line, ind col) : i(index), ln(line), cl(col) {}
@@ -94,8 +92,8 @@ namespace parser {
 		 *  Uses Bryan Ford's heuristic of "furthest forward error information".
 		 */
 		error& operator |= (const error& o) {
-			if ( pos > o.pos || o.empty() ) return *this;
-			if ( pos < o.pos || empty() ) return *this = o;
+			if ( pos > o.pos ) return *this;
+			if ( pos < o.pos ) return *this = o;
 			
 			expected.insert(o.expected.begin(), o.expected.end());
 			messages.insert(o.messages.begin(), o.messages.end());
@@ -501,6 +499,12 @@ namespace parser {
 			err |= e;
 		}
 		
+		/** Adds an unexplained error at the current position */
+		void fail() {
+			struct error e; e.pos = pos;
+			err |= e;
+		}
+		
 		/** Attempts to match a character at the current position */
 		bool matches(value_type c) {
 			if ( (*this)() != c ) return false;
@@ -585,7 +589,12 @@ namespace parser {
 	
 	/** Character literal parser */
 	combinator literal(state::value_type c) {
-		return [c](state& ps) { return ps.matches(c); };
+		return [c](state& ps) {
+			if ( ps.matches(c) ) { return true; }
+			
+			ps.fail();
+			return false;
+		};
 	}
 	
 	/** Character literal parser 
@@ -594,37 +603,63 @@ namespace parser {
 	combinator literal(state::value_type c, state::value_type& psVal) {
 		return [c,&psVal](state& ps) {
 			if ( ps.matches(c) ) { psVal = c; return true; }
-			else return false;
+			
+			ps.fail();
+			return false;
 		};
 	}
 	
 	/** String literal parser */
 	combinator literal(const state::string_type& s) {
-		return [&s](state& ps) { return ps.matches(s); };
+		return [&s](state& ps) {
+			if ( ps.matches(s) ) { return true; }
+			
+			ps.fail();
+			return false;
+		};
 	}
 	
 	/** Any character parser */
 	combinator any() {
-		return [](state& ps) { return ps.matches_any(); };
+		return [](state& ps) {
+			if ( ps.matches_any() ) { return true; }
+			ps.fail();
+			return false;
+		};
 	}
 	
 	/** Any character parser
 	 *  @param psVal    Will be bound to the character matched
 	 */
 	combinator any(state::value_type& psVal) {
-		return [&psVal](state& ps) { return ps.matches_any(psVal); };
+		return [&psVal](state& ps) {
+			if ( ps.matches_any(psVal) ) { return true; }
+			
+			ps.fail();
+			return false;
+		};
 	}
 	
 	/** Character range parser parser */
 	combinator between(state::value_type s, state::value_type e) {
-		return [s,e](state& ps) { return ps.matches_in(s, e); };
+		return [s,e](state& ps) {
+			if ( ps.matches_in(s, e) ) { return true; }
+			
+			ps.fail();
+			return false;
+		};
 	}
 	
 	/** Character range parser
 	 *  @param psVal    Will be bound to the character matched
 	 */
 	combinator between(state::value_type s, state::value_type e, state::value_type& psVal) {
-		return [s,e,&psVal](state& ps) { return ps.matches_in(s, e, psVal); };
+		return [s,e,&psVal](state& ps) {
+			if ( ps.matches_in(s, e, psVal) ) { return true; }
+			
+			ps.fail();
+			return false;
+		};
 	}
 	
 	/** Matches all or none of a sequence of parsers */
@@ -772,7 +807,7 @@ namespace parser {
 	/** Memoizes a some-matcher */
 	combinator memoize_some(ind id, const combinator& f) {
 		return [id,&f](state& ps) {
-			posn psStart;
+			posn psStart = ps.posn();
 			many_memoized(id, f, ps);
 			return ( ps.posn() > psStart );
 		};

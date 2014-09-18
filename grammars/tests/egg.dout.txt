@@ -1,0 +1,3 @@
+Rule `grammar` matched "A=B C=D"
+Rule `grammar` DID NOT match "A=B C="
+Rule `grammar` matched "R = I O E  E = I N"

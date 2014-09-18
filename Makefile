@@ -18,11 +18,19 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+CXX = clang++
+#CXX = g++
+
+# Development
 #CXXFLAGS = -O0 -ggdb --std=c++0x
-CXXFLAGS = -O0 --std=c++0x
-#CXXFLAGS = -O1 --std=c++0x
-#CXXFLAGS = -O2 --std=c++0x
-#CXXFLAGS = -O3 --std=c++0x
+
+# Profiling
+#CXXFLAGS = -O0 -ggdb --std=c++0x -DNDEBUG
+CXXFLAGS = -O2 -ggdb --std=c++0x -DNDEBUG
+
+# Release
+#CXXFLAGS = -O2 --std=c++0x -DNDEBUG
+CXXFLAGS = -O3 --std=c++0x -DNDEBUG
 
 egg:  main.cpp egg.hpp parser.hpp visitors/printer.hpp visitors/compiler.hpp visitors/normalizer.hpp
 	$(CXX) $(CXXFLAGS) -o egg main.cpp $(OBJS) $(LDFLAGS)
