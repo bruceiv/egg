@@ -116,7 +116,7 @@ uint64_t first(const uint64_t* a, uint64_t n) {
 }
 
 /// gets the index of the next bit set after i
-uint64_t next(const uint64_t& x, uint64_t i) {
+uint64_t next(uint64_t x, uint64_t i) {
 	uint64_t t = x & (mask(i)-1);
 	return ( t == 0 ) ? -1 : first(t);
 }
@@ -177,11 +177,11 @@ uint64_t count(const uint64_t* a, uint64_t n) {
 }
 
 /// gets the number of set bits of a before i
-inline uint64_t rank(const uint64_t& x, uint64_t i) { return count(x & ~((mask(i) << 1)-1)); }
+inline uint64_t rank(uint64_t x, uint64_t i) { return count(x & ~((mask(i) << 1)-1)); }
 inline uint64_t rank(const uint64_t* a, uint64_t i) { return count(a, el(i)) + rank(a[el(i)], i); }
 
 /// gets the index of the j'th bit
-uint64_t select(const uint64_t& x, uint64_t s) {
+uint64_t select(uint64_t x, uint64_t s) {
 	uint64_t i = first(x);
 	for (uint64_t r = 1; i != -1 && r < s; ++r) i = next(x, i);
 	return i;
@@ -204,7 +204,7 @@ inline void clear(uint64_t& x) { x = UINT64_C(0); }
 inline void clear(uint64_t* a, uint64_t n) { for (uint64_t i = 0; i < n; ++i) clear(a[i]); }
 
 /// true if the i'th bit of a is set
-inline bool get(const uint64_t& x, uint64_t i) { return (x & mask(i)) != 0; }
+inline bool get(uint64_t x, uint64_t i) { return (x & mask(i)) != 0; }
 inline bool get(const uint64_t* a, uint64_t i) { return get(a[el(i)], i); }
 
 /// sets the i'th bit of a
@@ -220,26 +220,26 @@ inline void flip(uint64_t& x, uint64_t i) { x ^= mask(i); }
 inline void flip(uint64_t* a, uint64_t i) { flip(a[el(i)], i); }
 
 /// checks if the bitflags are zeroed
-inline bool is_zero(const uint64_t& x) { return x == 0; }
+inline bool is_zero(uint64_t x) { return x == 0; }
 inline bool is_zero(const uint64_t* a, uint64_t n) {
 	for (uint64_t i = 0; i < n; ++i) if ( a[i] != 0 ) return false;
 	return true;
 }
 
 /// takes the union of two sets of bitflags a and b, writing it into c
-inline void set_union(const uint64_t& x, const uint64_t& y, uint64_t& z) { z = x | y; }
+inline void set_union(uint64_t x, uint64_t y, uint64_t& z) { z = x | y; }
 inline void set_union(const uint64_t* a, const uint64_t* b, uint64_t* c, uint64_t n) {
 	for (uint64_t i = 0; i < n; ++i) set_union(a[i], b[i], c[i]);
 }
 
 /// takes the intersection of two sets of bitflags a and b, writing it into c
-inline void set_intersection(const uint64_t& x, const uint64_t& y, uint64_t& z) { z = x & y; }
+inline void set_intersection(uint64_t x, uint64_t y, uint64_t& z) { z = x & y; }
 inline void set_intersection(const uint64_t* a, const uint64_t* b, uint64_t* c, uint64_t n) {
 	for (uint64_t i = 0; i < n; ++i) set_intersection(a[i], b[i], c[i]);
 }
 
 /// takes the set difference of two sets of bitflags a and b, writing it into c
-inline void set_difference(const uint64_t& x, const uint64_t& y, uint64_t& z) { z = x & ~y; }
+inline void set_difference(uint64_t x, uint64_t y, uint64_t& z) { z = x & ~y; }
 inline void set_difference(const uint64_t* a, const uint64_t* b, uint64_t* c, uint64_t n) {
 	for (uint64_t i = 0; i < n; ++i) set_difference(a[i], b[i], c[i]);
 }
