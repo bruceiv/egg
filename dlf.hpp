@@ -27,7 +27,8 @@
 #include <cassert>
 
 #include <memory>
-#include <vector>
+
+#include "utils/flagvector.hpp"
 
 /**
  * Implements dynamic left-factoring parsing for parsing expression grammars, according to the 
@@ -43,8 +44,79 @@ namespace dlf {
 	template <typename T>
 	using ptr = std::shared_ptr<T>;
 	
-	/// Bit vector for restriction set
-	using bitvec = std::vector<bool>;
+	/// Different restriction states
+	enum restriction {
+		unknown,   ///< Unresolved restrictions
+		allowed,   ///< No restrictions
+		forbidden  ///< Enforced restrictions
+	};
+	
+	/// Manages restrictions on expression matches
+	class restriction_mgr {
+	friend class restriction_ck;
+	public:
+		restriction_mgr() : restricted{}, allowed{}, update{0}, next{0} {}
+		
+		/// Reserve n consecutive restrictions; returns the first index
+		flags::index reserve(flags::index n) {
+			flags::index t = next;
+			next += n;
+			return t;
+		}
+		
+		/// Enforce a restriction
+		void forbid(flags::index i) {
+			forbidden |= i;
+			++update;
+		}
+		
+		/// Remove a restriction
+		void allow(flags::index i) {
+			allowed |= i;
+			++update;
+		}
+	private:
+		flags::vector forbidden;  ///< set of conditions blocking matches
+		flags::vector allowed;    ///< set of conditions which are safe
+		unsigned long update;     ///< index of last update
+		flags::index next;        ///< next available restriction
+	};  // class restriction_mgr
+	
+	/// Determines whether a node is prevented from matching
+	class restriction_ck {
+	friend restriction_mgr;
+	public:
+		restriction_ck(restriction_mgr& mgr, flags::vector&& restricted = flags::vector{}) 
+			: mgr{mgr}, restricted{restricted}, update{mgr.update}, 
+			  state{restricted.empty() ? allowed : restricted} {}
+		
+		/// Check if a restriction is enforced
+		restriction check() {
+			// Shortcuts for known state or no change
+			if ( state != unknown || update == mgr.update ) return state;
+			
+			// Remove restrictions that have been lifted
+			restricted -= mgr.allowed;
+			// Check for lack of restrictions
+			if ( restricted.empty() ) { state = allowed; }
+			// Check for newly enforced restrictions
+			else if ( restricted.intersects(mgr.forbidden) ) { state = forbidden; }
+			
+			update = mgr.update;
+			return state;
+		}
+		
+		/// Add a new set of restrictions
+		void join(const restriction_ck& o) {
+			// TODO write me
+		}
+		
+	private:
+		restriction_mgr& mgr;      ///< restriction manager
+		flags::vector restricted;  ///< set of restrictions on matches
+		unsigned long update;      ///< last update seen
+		restriction state;         ///< saved restriction state
+	};  // class restriction_ck
 	
 	/// Forward declarations of expression node types
 	class match_node;
@@ -57,6 +129,7 @@ namespace dlf {
 	class rule_node;
 	class alt_node;
 	class cut_node;
+	class end_node;
 	
 	/// Type of expression node
 	enum node_type {
@@ -69,7 +142,8 @@ namespace dlf {
 		str_type,
 		rule_type,
 		alt_type,
-		cut_type
+		cut_type,
+		end_type
 	};
 	
 	std::ostream& operator<< (std::ostream& out, expr_type t);
@@ -87,6 +161,7 @@ namespace dlf {
 		virtual void visit(rule_node&)  = 0;
 		virtual void visit(alt_node&)   = 0;
 		virtual void visit(cut_node&)   = 0;
+		virtual void visit(end_node&)   = 0;
 	}; // class visitor
 	
 	/// Abstract base class for expression nodes

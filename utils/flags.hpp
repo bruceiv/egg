@@ -226,6 +226,13 @@ inline bool is_zero(const uint64_t* a, uint64_t n) {
 	return true;
 }
 
+/// checks if two sets of bitflags intersect
+inline bool intersects(uint64_t x, uint64_t y) { return (x & y) != 0; }
+inline bool intersects(const uint64_t* a, const uint64_t* b, uint64_t n) {
+	for (uint64_t i = 0; i < n; ++i) if ( intersects(a[i], b[i]) ) return true;
+	return false;
+}
+
 /// takes the union of two sets of bitflags a and b, writing it into c
 inline void set_union(uint64_t x, uint64_t y, uint64_t& z) { z = x | y; }
 inline void set_union(const uint64_t* a, const uint64_t* b, uint64_t* c, uint64_t n) {

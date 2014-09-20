@@ -21,6 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
+#include <cassert> // TODO implement left-shift
 
 #include <algorithm>
 #include <cstdint>
@@ -48,6 +49,13 @@ namespace flags {
 		vector& operator= (const vector& o) = default;
 		vector& operator= (vector&& o) = default;
 		
+		/// Creates a singleton vector, with the single index set
+		static vector of(index n) {
+			vector s{n};
+			s |= n;
+			return s;
+		}
+		
 		/// Gets the index of the first bit set (-1 for none such)
 		index first() const { return v.size() == 1 ? first(v.front()) : first(v.data(), v.size()); }
 		/// Gets the index of the next bit set after i (-1 for none such)
@@ -61,15 +69,24 @@ namespace flags {
 		/// Gets the index of the j'th bit
 		index select(index j) const { return v.size() == 1 ? select(v.front(), j) : select(v.data(), v.size(), j); }
 		/// Checks if all flags are zeroed
-		bool is_zero() const {
+		bool empty() const {
 			switch ( v.size() ) {
 			case 0:  return true;
 			case 1:  return is_zero(v.front());
 			default: return is_zero(v.data(), v.size());
 			}
 		}
+		/// Checks if this intersects another vector
+		bool intersects(const vector& o) const {
+			index n = min(v.size(), o.v.size());
+			switch ( n ) {
+			case 0:  return false;
+			case 1:  return intersects(v.front(), o.v.front());
+			default: return intersects(v.data(), o.v.data(), n);
+			}
+		}
 		/// Clears all bits
-		void clear() { clear(v.data(), v.size()); }
+		void clear() { v.clear(); }
 		
 		/// Gets the i'th bit
 		bool operator() (index i) const {
@@ -180,6 +197,12 @@ namespace flags {
 			}
 			for (index i = n; i < v.size(); ++i) { d[i] = v[i]; }
 			return vector{std::move(d)};
+		}
+		
+		/// Creates a new vector as a copy of this one shifted left by the specified number of bits
+		vector operator<< (index i) const {
+			assert(false && "not yet implemented; see ksimplex");
+			return vector{};
 		}
 		
 	private:
