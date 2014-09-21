@@ -65,88 +65,30 @@ namespace dlf {
 			flags::vector blocking;
 		};
 		
-		/// Mark a restriction as unenforceable (should be removed from `enforcing` first)
-		void allow(flags::index i) {
-			// mark restriction as allowed
-			allowed |= i;
-			++update;
-			
-			// check if it frees up other flags
-			auto it = enforcing.begin();
-			while ( it != enforcing.end() ) {
-				flags::index j = it->first;
-				blocker& j_blocker = it->second();
-				
-				if ( j_blocker.released && allowed.contains(j_blocker.blocking) ) {
-					// if j is safe now, allow it as well
-					auto jt = it;
-					++it;
-					enforcing.erase(jt);
-					allow(j);
-					continue;
-				}
-				
-				++it;
-			}
-		}
+		/// Check for newly enforced rules after unenforceable has been changed; returns if there 
+		/// are any newly enforced rules
+		bool check_enforced();
+		/// Check for newly unenforceable rules after enforced has changed; returns if there are 
+		/// any newly unenforceable rules
+		bool check_unenforceable();
 	public:
-		restriction_mgr() : restricted{}, allowed{}, update{0}, next{0} {}
+		restriction_mgr() : enforced{}, unenforceable{}, pending{}, update{0}, next{0} {}
 		
 		/// Reserve n consecutive restrictions; returns the first index
-		flags::index reserve(flags::index n) {
-			flags::index t = next;
-			next += n;
-			return t;
-		}
+		flags::index reserve(flags::index n);
 		
 		/// Enforce a restriction, unless one of the restrictions is fired
-		void enforce_unless(flags::index i, const flags::vector& blocking) {
-			// check if the restriction has already been enforced
-			if ( forbidden(i) ) return;
-			// check if there are already restrictions blocking enforcement
-			auto it = enforcing.find();
-			if ( it == enforcing.end() ) {
-				// new enforcement
-				if ( ! blocking.empty() ) {
-					enforcing.emplace_hint(it, blocking);
-				}
-			} else {
-			
-			}
-			
-			forbidden |= i;
-			++update;
-		}
-		
-		/// FIXME can't think at this hour...
+		void enforce_unless(flags::index i, const flags::vector& blocking);
 		
 		/// A restriction will not be enforced any more
-		void release(flags::index i) {
-			// check if the restriction has already been enforced
-			if ( enforced(i) ) return;
-			// check if restriction is potentially being enforced
-			auto it = enforcing.find(i);
-			if ( it != enforcing.end() ) {
-				blocker& i_blocker = it->second;
-				i_blocker.released = true;  // mark this restriction as released
-				// Check if all the blocking restrictions have been removed
-				if ( ! enforced.contains(i_blocker.blocking) ) return;  // TODO write contains
-				// since all the blocking restrictions have been handled, stop tracking this
-				enforcing.erase(it);
-			}
-			
-			// we know that this restriction will never be enforced
-			unenforceable |= i;
-			++update;
-			allow(i);
-		}
+		void release(flags::index i);
 		
 		flags::vector enforced;       ///< set of enforced restrictions
 		flags::vector unenforceable;  ///< set of unenforceable restrictions
 	private:
 		/// restrictions that we haven't decided about enforcing
 		std::unordered_map<flags::index, 
-		                   blocker> enforcing;
+		                   blocker> pending;
 		unsigned long update;     ///< index of last update
 		flags::index next;        ///< next available restriction
 	};  // class restriction_mgr
@@ -160,25 +102,10 @@ namespace dlf {
 			  state{restricted.empty() ? allowed : restricted} {}
 		
 		/// Check if a restriction is enforced
-		restriction check() {
-			// Shortcuts for known state or no change
-			if ( state != unknown || update == mgr.update ) return state;
-			
-			// Remove restrictions that have been lifted
-			restricted -= mgr.allowed;
-			// Check for lack of restrictions
-			if ( restricted.empty() ) { state = allowed; }
-			// Check for newly enforced restrictions
-			else if ( restricted.intersects(mgr.forbidden) ) { state = forbidden; }
-			
-			update = mgr.update;
-			return state;
-		}
+		restriction check();
 		
 		/// Add a new set of restrictions
-		void join(const restriction_ck& o) {
-			// TODO write me
-		}
+		void join(const restriction_ck& o);
 		
 		flags::vector restricted;  ///< set of restrictions on matches
 	private:
