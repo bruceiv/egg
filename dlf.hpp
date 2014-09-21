@@ -27,6 +27,8 @@
 #include <cassert>
 
 #include <memory>
+#include <unordered_map>
+#include <utility>
 
 #include "utils/flagvector.hpp"
 
@@ -54,6 +56,39 @@ namespace dlf {
 	/// Manages restrictions on expression matches
 	class restriction_mgr {
 	friend class restriction_ck;
+		struct blocker {
+			blocker() = default;
+			blocker(flags::vector& blocking) : released{false}, blocking{blocking} {}
+			blocker(bool released, flags::vector& blocking) : released{released}, blocking{blocking} {}
+			
+			bool released;
+			flags::vector blocking;
+		};
+		
+		/// Mark a restriction as unenforceable (should be removed from `enforcing` first)
+		void allow(flags::index i) {
+			// mark restriction as allowed
+			allowed |= i;
+			++update;
+			
+			// check if it frees up other flags
+			auto it = enforcing.begin();
+			while ( it != enforcing.end() ) {
+				flags::index j = it->first;
+				blocker& j_blocker = it->second();
+				
+				if ( j_blocker.released && allowed.contains(j_blocker.blocking) ) {
+					// if j is safe now, allow it as well
+					auto jt = it;
+					++it;
+					enforcing.erase(jt);
+					allow(j);
+					continue;
+				}
+				
+				++it;
+			}
+		}
 	public:
 		restriction_mgr() : restricted{}, allowed{}, update{0}, next{0} {}
 		
@@ -64,20 +99,54 @@ namespace dlf {
 			return t;
 		}
 		
-		/// Enforce a restriction
-		void forbid(flags::index i) {
+		/// Enforce a restriction, unless one of the restrictions is fired
+		void enforce_unless(flags::index i, const flags::vector& blocking) {
+			// check if the restriction has already been enforced
+			if ( forbidden(i) ) return;
+			// check if there are already restrictions blocking enforcement
+			auto it = enforcing.find();
+			if ( it == enforcing.end() ) {
+				// new enforcement
+				if ( ! blocking.empty() ) {
+					enforcing.emplace_hint(it, blocking);
+				}
+			} else {
+			
+			}
+			
 			forbidden |= i;
 			++update;
 		}
 		
-		/// Remove a restriction
-		void allow(flags::index i) {
-			allowed |= i;
+		/// FIXME can't think at this hour...
+		
+		/// A restriction will not be enforced any more
+		void release(flags::index i) {
+			// check if the restriction has already been enforced
+			if ( enforced(i) ) return;
+			// check if restriction is potentially being enforced
+			auto it = enforcing.find(i);
+			if ( it != enforcing.end() ) {
+				blocker& i_blocker = it->second;
+				i_blocker.released = true;  // mark this restriction as released
+				// Check if all the blocking restrictions have been removed
+				if ( ! enforced.contains(i_blocker.blocking) ) return;  // TODO write contains
+				// since all the blocking restrictions have been handled, stop tracking this
+				enforcing.erase(it);
+			}
+			
+			// we know that this restriction will never be enforced
+			unenforceable |= i;
 			++update;
+			allow(i);
 		}
+		
+		flags::vector enforced;       ///< set of enforced restrictions
+		flags::vector unenforceable;  ///< set of unenforceable restrictions
 	private:
-		flags::vector forbidden;  ///< set of conditions blocking matches
-		flags::vector allowed;    ///< set of conditions which are safe
+		/// restrictions that we haven't decided about enforcing
+		std::unordered_map<flags::index, 
+		                   blocker> enforcing;
 		unsigned long update;     ///< index of last update
 		flags::index next;        ///< next available restriction
 	};  // class restriction_mgr
@@ -111,9 +180,9 @@ namespace dlf {
 			// TODO write me
 		}
 		
+		flags::vector restricted;  ///< set of restrictions on matches
 	private:
 		restriction_mgr& mgr;      ///< restriction manager
-		flags::vector restricted;  ///< set of restrictions on matches
 		unsigned long update;      ///< last update seen
 		restriction state;         ///< saved restriction state
 	};  // class restriction_ck
