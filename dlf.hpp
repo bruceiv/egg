@@ -189,6 +189,15 @@ namespace dlf {
 		virtual node_type type() const = 0;
 	};  // class node
 	
+	/// Directed arc linking two nodes
+	struct arc {
+		arc() = default;
+		arc(ptr<node> succ, restriction_ck blocking = restriction_ck{}) : succ{succ}, blocking{blocking} {}
+		
+		ptr<node> succ;           ///< sucessor pointer
+		restriction_ck blocking;  ///< restrictions blocking this arc
+	};  // struct arc
+	
 	/// Terminal node representing a match
 	class match_node : public node {
 	public:
