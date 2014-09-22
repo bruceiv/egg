@@ -207,4 +207,23 @@ namespace dlf {
 		update = min(update, o.update);
 		if ( state != forbidden && update < mgr.update ) { state = unknown; }
 	}
+	
+	// node_type ///////////////////////////////////////////////////////////////
+	
+	std::ostream& operator<< (std::ostream& out, node_type t) {
+		switch ( t ) {
+		case match_type: out << "MATCH"; break;
+		case fail_type:  out << "FAIL";  break;
+		case inf_type:   out << "INF";   break;
+		case char_type:  out << "CHAR";  break;
+		case range_type: out << "RANGE"; break;
+		case any_type:   out << "ANY";   break;
+		case str_type:   out << "STR";   break;
+		case rule_type:  out << "RULE";  break;
+		case alt_type:   out << "ALT";   break;
+		case cut_type:   out << "CUT";   break;
+		case end_type:   out << "END";   break;
+		}
+		return out;
+	}
 }

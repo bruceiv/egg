@@ -59,7 +59,8 @@ namespace dlf {
 		struct blocker {
 			blocker() = default;
 			blocker(flags::vector& blocking) : released{false}, blocking{blocking} {}
-			blocker(bool released, flags::vector& blocking) : released{released}, blocking{blocking} {}
+			blocker(bool released, flags::vector& blocking) 
+				: released{released}, blocking{blocking} {}
 			
 			bool released;
 			flags::vector blocking;
@@ -142,7 +143,7 @@ namespace dlf {
 		end_type
 	};
 	
-	std::ostream& operator<< (std::ostream& out, expr_type t);
+	std::ostream& operator<< (std::ostream& out, node_type t);
 	
 	/// Abstract base class of all expression visitors
 	class visitor {
