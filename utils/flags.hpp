@@ -251,5 +251,24 @@ inline void set_difference(const uint64_t* a, const uint64_t* b, uint64_t* c, ui
 	for (uint64_t i = 0; i < n; ++i) set_difference(a[i], b[i], c[i]);
 }
 
+/// shifts a (length n) left by s bits, writing the result into c
+void lsh(const uint64_t* a, const uint64_t s, uint64_t* c, uint64_t n) {
+	uint64_t s_l = s >> 6;   // s / 64, number of limbs to shift
+	uint64_t s_b = s & 0x3F; // s % 64, number of bits to shift
+	uint64_t u_s = 64 - s_b; // number of bits to unshift high-order bits
+	
+	// get high order bits of high limb
+	c[n+s_l] = a[n-1] >> u_s;
+	// shift remaining limbs
+	for (uint64_t i = n-1; i > 0; --i) {
+		// get low order bits of current limb, then high order bits of next back
+		c[i+s_l] = (a[i] << s_b) | (a[i-1] >> u_s);
+	}
+	// get low order bits of low limb
+	c[s_l] = a[0] << s_b;
+	// zero remaining low order limbs
+	clear(c, s_l);
+}
+
 } /* namespace flags */
 

@@ -199,10 +199,20 @@ namespace flags {
 			return vector{std::move(d)};
 		}
 		
+		/// Shifts the elements of this vector left by the specified number of bits
+		vector& operator<<= (index i) {
+			if ( i == 0 ) return *this;
+			v.resize(v.size() + el(i) + 1, 0);
+			lsh(v.data(), i, v.data(), v.size());
+			return *this;
+		}
+		
 		/// Creates a new vector as a copy of this one shifted left by the specified number of bits
 		vector operator<< (index i) const {
-			assert(false && "not yet implemented; see ksimplex");
-			return vector{};
+			if ( i == 0 || v.size() == 0 ) return vector{*this};
+			std::vector<uint64_t> d{v.size() + el(i) + 1};
+			lsh(v.data(), i, d.data(), v.size());
+			return vector{std::move(d)};
 		}
 		
 	private:
