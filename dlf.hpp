@@ -27,6 +27,7 @@
 #include <cassert>
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -48,6 +49,16 @@ namespace dlf {
 	/// Shorthand for shared_ptr
 	template <typename T>
 	using ptr = std::shared_ptr<T>;
+	
+	/// Abbreviates std::make_shared
+	template<typename T, typename... Args>
+	shared_ptr<T> make_ptr(Args&&... args) { 
+		return std::make_shared<T>(std::forward<Args>(args)...);
+	}
+	
+	/// Abreviates std::static_pointer_cast
+	template<typename T, typename U>
+	ptr<T> as_ptr(const ptr<U>& p) { return std::static_pointer_cast<T>(p); }
 	
 	/// Different restriction states
 	enum restriction {
@@ -111,6 +122,9 @@ namespace dlf {
 		/// Add a new set of restrictions
 		void join(const restriction_ck& o);
 		
+		/// Intersect a new set of restrictions
+		void refine(const restriction_ck& o);
+		
 		flags::vector restricted;  ///< set of restrictions on matches
 	private:
 		restriction_mgr& mgr;      ///< restriction manager
@@ -132,19 +146,29 @@ namespace dlf {
 	class cut_node;
 	
 	/// Type of expression node
-	enum node_type {
-		match_type,
-		fail_type,
-		inf_type,
-		end_type,
-		char_type,
-		range_type,
-		any_type,
-		str_type,
-		rule_type,
-		alt_type,
-		cut_type
+	enum node_type : std::size_t {
+		match_type = 0x0,
+		fail_type  = 0x1,
+		inf_type   = 0x2,
+		end_type   = 0x3,
+		char_type  = 0x4,
+		range_type = 0x5,
+		any_type   = 0x6,
+		str_type   = 0x7,
+		rule_type  = 0x8,
+		alt_type   = 0x9,
+		cut_type   = 0xA
 	};
+	
+	/// Tags `x` with the given node type; useful for hashing
+	inline constexpr std::size_t tag_with(node_type ty, std::size_t x = 0x0) {
+		return (x << 4) | static_cast<std::size_t>(ty);
+	}
+	
+	/// Gets the tag back from a hashed value (should only be used on result of tag_with)
+	inline constexpr node_type tag_of(std::size_t x) {
+		return reinterpret_cast<node_type>(x & 0xF);
+	}
 	
 	std::ostream& operator<< (std::ostream& out, node_type t);
 	
@@ -170,16 +194,14 @@ namespace dlf {
 	class node {
 	protected:
 		node() = default;
-	
+		
 	public:
 		virtual ~node() = default;
 		
 		/// Abreviates std::make_shared for expression nodes
 		template<typename T, typename... Args>
-		static ptr<node> make_ptr(Args&&... args) {
-			return std::static_pointer_cast<expr>(
-					std::make_shared<T>(
-						std::forward<Args>(args)...));
+		static ptr<node> make(Args&&... args) {
+			return as_ptr<expr>(make_ptr<T>(std::forward<Args>(args)...));
 		}
 		
 		/// Accept visitor
@@ -187,7 +209,7 @@ namespace dlf {
 		
 		/// Derivative of this expression (pointed to by arc `in`) with respect to x.
 		/// Returns true for unrestricted match
-		virtual bool d(char x, arc& in) const = 0;
+		virtual bool d(char x, arc& in) = 0;
 		
 		/// Expression node type
 		virtual node_type type() const = 0;
@@ -205,6 +227,16 @@ namespace dlf {
 		arc(ptr<node> succ, restriction_ck blocking = restriction_ck{}) 
 			: succ{succ}, blocking{blocking} {}
 		
+		/// Returns true and repoints this arc to a fail_node if one of the blocking restrictions 
+		/// is enforced
+		bool blocked();
+		
+		/// Joins to an outgoing arc. Returns true if now an unrestricted match (as in node::d()).
+		bool join(arc& out);
+		
+		/// Joins to a fail_node. Returns false.
+		bool fail();
+			
 		ptr<node> succ;           ///< sucessor pointer
 		restriction_ck blocking;  ///< restrictions blocking this arc
 	};  // struct arc
@@ -222,7 +254,7 @@ namespace dlf {
 		
 		static  ptr<node>   make(bool& reachable);
 		virtual void        accept(visitor* v) { v->visit(*this); }
-		virtual bool        d(char, arc&) const;
+		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return match_type; }
 		virtual std::size_t hash() const;
 		virtual bool        equiv(ptr<node>) const;
@@ -244,7 +276,7 @@ namespace dlf {
 		
 		static  ptr<node>   make();
 		virtual void        accept(visitor* v) { v->visit(*this); }
-		virtual bool        d(char, arc&) const;
+		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return fail_type; }
 		virtual std::size_t hash() const;
 		virtual bool        equiv(ptr<node>) const;
@@ -263,7 +295,7 @@ namespace dlf {
 		
 		static  ptr<node>   make();
 		virtual void        accept(visitor* v) { v->visit(*this); }
-		virtual bool        d(char, arc&) const;
+		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return inf_type; }
 		virtual std::size_t hash() const;
 		virtual bool        equiv(ptr<node>) const;
@@ -276,7 +308,7 @@ namespace dlf {
 		
 		static  ptr<node>   make();
 		virtual void        accept(visitor* v) { v->visit(*this); }
-		virtual bool        d(char, arc&) const;
+		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return end_type; }
 		virtual std::size_t hash() const;
 		virtual bool        equiv(ptr<node>) const;
@@ -289,7 +321,7 @@ namespace dlf {
 		
 		static  ptr<node>   make(const arc& out, char c);
 		virtual void        accept(visitor* v) { v->visit(*this); }
-		virtual bool        d(char, arc&) const;
+		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return char_type; }
 		virtual std::size_t hash() const;
 		virtual bool        equiv(ptr<node>) const;
@@ -305,7 +337,7 @@ namespace dlf {
 		
 		static  ptr<node>   make(const arc& out, char b, char c);
 		virtual void        accept(visitor* v) { v->visit(*this); }
-		virtual bool        d(char, arc&) const;
+		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return range_type; }
 		virtual std::size_t hash() const;
 		virtual bool        equiv(ptr<node>) const;
@@ -322,7 +354,7 @@ namespace dlf {
 		
 		static  ptr<node>   make(const arc& out);
 		virtual void        accept(visitor* v) { v->visit(*this); }
-		virtual bool        d(char, arc&) const;
+		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return any_type; }
 		virtual std::size_t hash() const;
 		virtual bool        equiv(ptr<node>) const;
@@ -336,13 +368,13 @@ namespace dlf {
 			: out{out}, sp{sp}, i{i} {}
 	public:
 		str_node(const arc& out, const std::string& s) 
-			: out{out}, sp{std::make_shared<std::string>(s)}, i{0} {}
+			: out{out}, sp{make_ptr<std::string>(s)}, i{0} {}
 		str_node(const arc& out, std::string&& s) 
-			: out{out}, sp{std::make_shared<std::string>(s)}, i{0} {}
+			: out{out}, sp{make_ptr<std::string>(s)}, i{0} {}
 		
 		static  ptr<node>   make(const arc& out, const std::string& s);
 		virtual void        accept(visitor* v) { v->visit(*this); }
-		virtual bool        d(char, arc&) const;
+		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return str_type; }
 		virtual std::size_t hash() const;
 		virtual bool        equiv(ptr<node>) const;
@@ -372,7 +404,7 @@ namespace dlf {
 		
 		static  ptr<node>   make(const arc& out, ptr<nonterminal> r);
 		virtual void        accept(visitor* v) { v->visit(*this); }
-		virtual bool        d(char, arc&) const;
+		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return rule_type; }
 		virtual std::size_t hash() const;
 		virtual bool        equiv(ptr<node>) const;
@@ -393,30 +425,40 @@ namespace dlf {
 			bool operator() (const arc& a, const arc& b) const { return a.succ->equiv(b.succ); }
 		};
 		
-		/// Merges an arc `a` into the set (flattening alternations and merging equivalent nodes)
-		void merge(arc& a);
+		/// Set of outgoing arcs
+		using arc_set = std::unordered_set<arc, succ_hash, succ_equiv>;
+		
+		/// Private default constructor
+		alt_node() = default;
+		
+		/// Merges an arc `a` into the set (flattening alternations and merging equivalent nodes).
+		/// Returns a pair containing the iterator to the merged item and a boolean value that will 
+		/// be true if the merged item is an unrestricted match
+		std::pair<arc_set::iterator, bool> merge(arc& a);
 	public:
 		/// `first` and `last` are a range of arcs to add to the set; they will be merged by 
 		/// `merge()`
 		template<typename It>
 		alt_node(It first, It last) : out{} {
+			// TODO make private in favour of make
 			while ( first != last ) {
 				merge(*first);
 				++first;
 			}
 		}
+		alt_node(alt_node&& o) = default;
 		virtual ~alt_node() = default;
 		
 		template<typename It>
 		static  ptr<node>   make(It first, It last);
 		virtual void        accept(visitor* v) { v->visit(*this); }
-		virtual bool        d(char, arc&) const;
+		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return alt_type; }
 		virtual std::size_t hash() const;
 		virtual bool        equiv(ptr<node>) const;
 		
 		/// Set of outward arcs, with a structural equivalence relation on their pointed-to nodes
-		std::unordered_set<arc, succ_hash, succ_equiv> out;
+		arc_set out;
 	}; // alt_node
 	
 	/// Node which inserts values into the restriction set
@@ -434,7 +476,7 @@ namespace dlf {
 		
 		static  ptr<node>   make(const arc& out, flags::index i, restriction_mgr& mgr);
 		virtual void        accept(visitor* v) { v->visit(*this); }
-		virtual bool        d(char, arc&) const;
+		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return cut_type; }
 		virtual std::size_t hash() const;
 		virtual bool        equiv(ptr<node>) const;
