@@ -25,6 +25,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "utils/strings.hpp"
@@ -36,7 +37,9 @@ namespace ast {
 	using std::shared_ptr;
 
 	template<typename T, typename... Args>
-	shared_ptr<T> make_ptr(Args... args) { return std::make_shared<T>(args...); }
+	shared_ptr<T> make_ptr(Args&&... args) { 
+		return std::make_shared<T>(std::forward<Args>(args)...);
+	}
 
 	template<typename T, typename U>
 	shared_ptr<T> as_ptr(const shared_ptr<U>& r) { return std::static_pointer_cast<T>(r); }
