@@ -355,7 +355,7 @@ namespace dlf {
 	
 	std::size_t any_node::hash() const { return tag_with(any_type); }
 	
-	bool char_node::equiv(ptr<node> o) const { return o->type() == any_type }
+	bool any_node::equiv(ptr<node> o) const { return o->type() == any_type }
 	
 	// str_node ///////////////////////////////////////////////////////////////
 	
@@ -384,6 +384,23 @@ namespace dlf {
 	}
 	
 	// rule_node //////////////////////////////////////////////////////////////
+	
+	ptr<node> rule_node::make(const arc& out, ptr<nonterminal> r, restriction_mgr& mgr) {
+		return node::make<rule_node>(out, r, mgr);
+	}
+	
+	bool rule_node::d(char x, arc& in) {
+		if ( in.blocked() ) return false;  // fail on blocked
+		in.succ = clone(r, out, mgr);      // expand nonterminal into input arc
+		return in.succ->d(x, in);          // take derivative of successor
+	}
+	
+	std::size_t rule_node::hash() const { return tag_with(rule_type, r.get()); }
+	
+	bool rule_node::equiv(ptr<node> o) const {
+		if ( o->type() != rule_type ) return false;
+		return as_ptr<rule_node>(o)->r == r;
+	}
 	
 	// alt_node ///////////////////////////////////////////////////////////////
 	

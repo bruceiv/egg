@@ -372,6 +372,7 @@ namespace dlf {
 			: out{out}, sp{make_ptr<std::string>(s)}, i{0} {}
 		str_node(const arc& out, std::string&& s) 
 			: out{out}, sp{make_ptr<std::string>(s)}, i{0} {}
+		str_node(const arc& out, const str_node& o) : out{out}, sp{o.sp}, i{o.i} {}
 		
 		static  ptr<node>   make(const arc& out, const std::string& s);
 		virtual void        accept(visitor* v) { v->visit(*this); }
@@ -393,14 +394,73 @@ namespace dlf {
 	struct nonterminal {
 		nonterminal(const std::string& name, ptr<node> begin) : name{name}, begin{begin} {}
 		
-		const std::string name;  ///< Name of the non-terminal
-		const ptr<node> begin;   ///< First subexpression in the non-terminal
+		const std::string name;        ///< Name of the non-terminal
+		const ptr<node> begin;         ///< First subexpression in the non-terminal
+		const flags::index nRestrict;  ///< Count of restrictions in this non-terminal
 	};
+	
+	/// Visitor with function-like interface for cloning a contained expression
+	class clone : public visitor {
+		/// Common code for visiting an arc
+		inline arc visit(arc& a) { return arc{visit(a.out.succ), a.out << nShift}; }
+		
+		/// Functional interface to visitor pattern
+		inline ptr<node> visit(ptr<node> np) {
+			pVal = np;
+			np->accept(this);
+			return rVal;
+			// TODO memoize by np.get() - important for maintaining DAG
+		}
+	public:
+		clone(nonterminal& nt, ptr<node> out, restriction_mgr& mgr) 
+		: rVal{}, out{out}, mgr{mgr} {
+			nShift = mgr.reserve(nt.nRestrict);
+			nt.begin->accept(this);
+		}
+		
+		operator ptr<node> () { return rVal; }
+		
+		// Unfollowed nodes just get copied over
+		virtual void visit(match_node&) { rVal = pVal; }
+		virtual void visit(fail_node&)  { rVal = pVal; }
+		virtual void visit(inf_node&)   { rVal = pVal; }
+		// End gets substituted for out-node
+		virtual void visit(end_node&)   { rVal = out; }
+		// Remaining nodes get cloned with their restriction sets shifted
+		virtual void visit(char_node& n) {
+			rVal = node::make<char_node>(visit(n.out), n.c);
+		}
+		virtual void visit(range_node& n) {
+			rVal = node::make<range_node>(visit(n.out), n.b, n.e);
+		}
+		virtual void visit(any_node& n) {
+			rVal = node::make<any_node>(visit(n.out));
+		}
+		virtual void visit(str_node& n) {
+			rVal = node::make<str_node>(visit(n.out), n);
+		}
+		virtual void visit(rule_node& n) {
+			rVal = node::make<rule_node>(visit(n.out), n.r, mgr);
+		}
+		virtual void visit(alt_node& n) {
+			// TODO fix me
+		}
+		virtual void visit(cut_node& n) {
+			rVal = node::make<cut_node>(visit(n.out), n.i + nShift, mgr);
+		}
+	private:
+		ptr<node> pVal;        ///< Parameter of last visit
+		ptr<node> rVal;        ///< Return value of last visit
+		ptr<node> out;         ///< Replacement for endNode
+		restriction_mgr& mgr;  ///< Restriction manager
+		flags::index nShift;   ///< Amount to shift restrictions by
+	}; // clone_visitor
 	
 	/// Node representing a non-terminal
 	class rule_node : public node {
 	public:	
-		rule_node(const arc& out, ptr<nonterminal> r) : out{out}, r{r} {}
+		rule_node(const arc& out, ptr<nonterminal> r, restriction_mgr& mgr) 
+			: out{out}, r{r}, mgr{mgr} {}
 		virtual ~rule_node() = default;
 		
 		static  ptr<node>   make(const arc& out, ptr<nonterminal> r);
@@ -410,8 +470,9 @@ namespace dlf {
 		virtual std::size_t hash() const;
 		virtual bool        equiv(ptr<node>) const;
 		
-		arc out;             ///< Successor node
-		ptr<nonterminal> r;  ///< Pointer to shared rule definition
+		arc out;               ///< Successor node
+		ptr<nonterminal> r;    ///< Pointer to shared rule definition
+		restriction_mgr& mgr;  ///< Restriction manager
 	}; // rule_node
 	
 	/// Node containing a number of subexpressions to parse concurrently
