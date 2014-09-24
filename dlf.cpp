@@ -208,6 +208,17 @@ namespace dlf {
 		if ( state == allowed && (o.state != allowed || update < mgr.update) ) { state = unknown; }
 	}
 	
+	void restriction_ck::refine(const restriction_ck& o) {
+		// intersect restriction set
+		restricted &= o.restricted;
+		
+		// update knowledge state of restriction set
+		update = min(update, o.update);
+		if ( state == forbidden && (o.state != forbidden || update < mgr.update) ) {
+			state = unknown;
+		}
+	}
+	
 	// node_type ///////////////////////////////////////////////////////////////
 	
 	std::ostream& operator<< (std::ostream& out, node_type t) {
@@ -380,59 +391,95 @@ namespace dlf {
 		node_type ty = add.succ->type();
 		
 		// don't bother inserting failing nodes
-		if ( ty == fail_type ) return std::make_pair(out.end(), false);
+		if ( ty == fail_type ) return {out.end(), false};
+		// don't bother inserting blocked nodes
+		if ( add.blocked() ) return {out.end(), false};
+		
+		// Flatten added alt nodes
+		if ( ty == alt_type ) {
+			alt_node& an = *as_ptr<alt_node>(add.succ);
+			
+			auto ins = std::make_pair(out.end(), false);
+			for (arc& a_add : an.out) {
+				arc add_new = add;
+				add_new.join(a_add);
+				ins = merge(add_new);
+				if ( ins.second ) break;
+			}
+			return ins;
+		}
+		
+		// Apply added cut nodes
+		if ( ty == cut_type ) {
+			cut_node& cn = *as_ptr<cut_node>(add.succ);
+			cn.mgr.enforce_unless(cn.i, add.blocking);
+			add.join(cn.out);
+			return merge(add);
+		}
 		
 		auto ins = out.emplace(add);
 		if ( ! ins->second ) { // element was not inserted
 			arc& ex = *(ins->first);  // existing arc
 			
 			switch ( ty ) {
-			case match_type: {
+			case match_type:
 				/// Match can only be prevented by restrictions that block both matches
 				ex.blocking.refine(add.blocking);
-				if ( ex.blocking.check() == allowed ) return std::make_pair(ins, true);
-			} case inf_type: {
-			
-			} case end_type: {
-			
-			} case char_type: {
-			
-			} case range_type: {
-			
-			} case any_type: {
-			
-			} case str_type: {
-			
-			} case rule_type: {
-			
-			} case alt_type: {
-			
-			} case cut_type: {
-			
-			} case fail_type: { assert(false && "shouldn't reach this branch"); } 
+				if ( ex.blocking.check() == allowed ) return true;
+				break;
+			case inf_type: case end_type:
+				/// Terminal node will only be blocked by restrictions that block both matches
+				ex.blocking.refine(add.blocking);
+				break;
+			case char_type:
+				merge<char_node>(ex, add);
+				break;
+			case range_type:
+				merge<range_node>(ex, add);
+				break;
+			case any_type
+				merge<any_node>(ex, add);
+				break;
+			case str_type:
+				merge<str_node>(ex, add);
+				break;
+			case rule_type:
+				merge<rule_node>(ex, add);
+				break;
+			case alt_type: case cut_type: case fail_type:
+				assert(false && "shouldn't reach this branch");
 			}
 		}
 		
-		return std::make_pair(ins, false);
+		return {ins, false};
 	}
 	
-	template<typename It>
-	ptr<node> alt_node::make(It first, It last) {
-		if ( first == last ) return fail_node::make();
-		// TODO account for empty/singleton alternations
-		// TODO also, lets make all the constructors private, and have make() be the only way to build nodes
-		return node::make<alt_node>(first, last);
+	ptr<node> alt_node::make(std::initializer_list<arc> out) {
+		if ( out.size() == 0 ) return fail_node::make();
+		
+		alt_node n;
+		for (arc& o : out ) {
+			/// Merge in object, short-circuiting on unrestricted match
+			auto ins = n.merge(o);
+			if ( ins.second ) return ins.first->succ;
+		}
+		
+		if ( n.out.size() == 0 ) return fail_node::make();
+		
+		return node::make<alt_node>(std::move(n));
 	}
+	
+	
 	
 	bool alt_node::d(char x, arc& in) {
 		if ( in.blocked() ) return false;
 		
 		alt_node n;
-		bool is_match = false;
 		for (arc& o : out) {
 			// Take derivative and merge in (short-circuiting for unrestricted match)
 			o.succ->d(x, o);
-			if ( n.merge(o) ) return in.join(*n.out.begin());
+			auto ins = n.merge(o);
+			if ( ins.second ) return in.join(*ins.first);
 		}
 		
 		switch ( n.out.size() ) {

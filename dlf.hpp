@@ -28,6 +28,7 @@
 
 #include <cstddef>
 #include <functional>
+#include <initializer_list>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -431,26 +432,25 @@ namespace dlf {
 		/// Private default constructor
 		alt_node() = default;
 		
+		/// Merges `add` into existing `ex`, pushing the alternation before the successors
+		template<typename NT>
+		void merge(arc& ex, arc& add) {
+			arc& ex_out  = as_ptr<NT>(ex.succ)->out;          // Get successor from common type
+			arc& add_out = as_ptr<NT>(add.succ)->out;         // Get successor from added node
+			ex_out.blocking.join(ex.blocking);                // add existing blockers to successor
+			add_out.blocking.join(add.blocking);              // add new blockers to new successor
+			ex.blocking.refine(add.blocking);                 // intersect blockers
+			ex_out = arc{alt_node::make({ex_out, add_out})};  // join new node
+		}
+		
 		/// Merges an arc `a` into the set (flattening alternations and merging equivalent nodes).
 		/// Returns a pair containing the iterator to the merged item and a boolean value that will 
 		/// be true if the merged item is an unrestricted match
 		std::pair<arc_set::iterator, bool> merge(arc& a);
 	public:
-		/// `first` and `last` are a range of arcs to add to the set; they will be merged by 
-		/// `merge()`
-		template<typename It>
-		alt_node(It first, It last) : out{} {
-			// TODO make private in favour of make
-			while ( first != last ) {
-				merge(*first);
-				++first;
-			}
-		}
-		alt_node(alt_node&& o) = default;
 		virtual ~alt_node() = default;
 		
-		template<typename It>
-		static  ptr<node>   make(It first, It last);
+		static  ptr<node>   make(std::initializer_list<arc> out);
 		virtual void        accept(visitor* v) { v->visit(*this); }
 		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return alt_type; }
@@ -483,7 +483,6 @@ namespace dlf {
 		
 		arc out;               ///< Successor node
 		flags::index i;        ///< Restriction to fire
-	private:
 		restriction_mgr& mgr;  ///< Restriction manager
 	}; // cut_node
 }
