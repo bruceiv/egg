@@ -29,7 +29,7 @@ namespace dlf {
 	
 	bool restriction_mgr::check_enforced() {
 		bool new_enforced = false;
-		it = pending.begin();
+		auto it = pending.begin();
 		while ( it != pending.end() ) {
 			flags::index j = it->first;
 			blocker& j_blocker = it->second;

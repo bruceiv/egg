@@ -22,18 +22,24 @@ CXX = clang++
 #CXX = g++
 
 # Development
-#CXXFLAGS = -O0 -ggdb --std=c++0x
+CXXFLAGS = -O0 -ggdb --std=c++0x
 
 # Profiling
 #CXXFLAGS = -O0 -ggdb --std=c++0x -DNDEBUG
-CXXFLAGS = -O2 -ggdb --std=c++0x -DNDEBUG
+#CXXFLAGS = -O2 -ggdb --std=c++0x -DNDEBUG
 
 # Release
 #CXXFLAGS = -O2 --std=c++0x -DNDEBUG
-CXXFLAGS = -O3 --std=c++0x -DNDEBUG
+#CXXFLAGS = -O3 --std=c++0x -DNDEBUG
 
-egg:  main.cpp egg.hpp parser.hpp visitors/printer.hpp visitors/compiler.hpp visitors/normalizer.hpp
+OBJS = dlf.o
+
+dlf.o:  dlf.cpp dlf.hpp utils/flagvector.hpp utils/flags.hpp
+	$(CXX) $(CXXFLAGS) -c dlf.cpp
+
+egg:  $(OBJS) main.cpp egg.hpp parser.hpp visitors/printer.hpp visitors/compiler.hpp visitors/normalizer.hpp
 	$(CXX) $(CXXFLAGS) -o egg main.cpp $(OBJS) $(LDFLAGS)
 
 clean:  
+	-rm dlf.o
 	-rm egg
