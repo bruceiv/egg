@@ -256,6 +256,86 @@ namespace dlf {
 		return false;
 	}
 	
+	// count_restrict /////////////////////////////////////////////////////////
+	
+	void count_restrict::visit(ptr<node> np) {
+		// check memo-table and visit if not found
+		if ( visited.count(np) == 0 ) {
+			np->accept(this);
+			visited.emplace(np);
+		}
+	}
+	
+	// Unfollowed nodes are no-ops
+	void count_restrict::visit(match_node&)   {}
+	void count_restrict::visit(fail_node&)    {}
+	void count_restrict::visit(inf_node&)     {}
+	void count_restrict::visit(end_node&)     {}
+	// Remaining nodes get their successors visited
+	void count_restrict::visit(char_node& n)  { visit(n.out.succ); }
+	void count_restrict::visit(range_node& n) { visit(n.out.succ); }
+	void count_restrict::visit(any_node& n)   { visit(n.out.succ); }
+	void count_restrict::visit(str_node& n)   { visit(n.out.succ); }
+	void count_restrict::visit(rule_node& n)  { visit(n.out.succ); }
+	void count_restrict::visit(alt_node& n)   { for (arc& out : n.out ) visit(out.succ); }
+	// Cut node increases count
+	void count_restrict::visit(cut_node& n)   { ++nRestrict; visit(n.out.succ); }
+	
+	// clone //////////////////////////////////////////////////////////////////
+	
+	arc clone::visit(arc& a) { return arc{visit(a.out.succ), a.out << nShift}; }
+	
+	ptr<node> clone::visit(ptr<node> np) {
+		// check memo-table
+		auto it = visited.find(np);
+		if ( it != visited.end() ) { rVal = it->second; return rVal; }
+		// visit
+		pVal = np;
+		np->accept(this);
+		// memoize and return
+		visited.emplace(np, rVal);
+		return rVal;
+	}
+	
+	// Unfollowed nodes just get copied over
+	void clone::visit(match_node&) { rVal = pVal; }
+	void clone::visit(fail_node&)  { rVal = pVal; }
+	void clone::visit(inf_node&)   { rVal = pVal; }
+	
+	// End gets substituted for out-node
+	void clone::visit(end_node&)   { rVal = out; }
+	
+	// Remaining nodes get cloned with their restriction sets shifted
+	void clone::visit(char_node& n) {
+		rVal = node::make<char_node>(visit(n.out), n.c);
+	}
+	
+	void clone::visit(range_node& n) {
+		rVal = node::make<range_node>(visit(n.out), n.b, n.e);
+	}
+	
+	void clone::visit(any_node& n) {
+		rVal = node::make<any_node>(visit(n.out));
+	}
+	
+	void clone::visit(str_node& n) {
+		rVal = node::make<str_node>(visit(n.out), n);
+	}
+	
+	void clone::visit(rule_node& n) {
+		rVal = node::make<rule_node>(visit(n.out), n.r, mgr);
+	}
+	
+	void clone::visit(alt_node& n) {
+		alt_node cn;
+		for (arc& out : n.out) { cn.out.emplace(visit(out)); }
+		rVal = node::make<alt_node>(std::move(cn));
+	}
+	
+	void clone::visit(cut_node& n) {
+		rVal = node::make<cut_node>(visit(n.out), n.i + nShift, mgr);
+	}
+	
 	// match_node //////////////////////////////////////////////////////////////
 	
 	ptr<node> match_node::make(bool& reachable) { return node::make<match_node>(reachable); }
@@ -391,8 +471,16 @@ namespace dlf {
 	
 	bool rule_node::d(char x, arc& in) {
 		if ( in.blocked() ) return false;  // fail on blocked
+		if ( r->inDeriv ) {
+			in.succ = inf_node::make();    // break infinite loop with terminator node
+			return false;
+		}
+		
 		in.succ = clone(r, out, mgr);      // expand nonterminal into input arc
-		return in.succ->d(x, in);          // take derivative of successor
+
+		r->inDeriv = true;
+		return in.succ->d(x, in);          // take derivative of successor, under loop flag
+		r->inDeriv = false;
 	}
 	
 	std::size_t rule_node::hash() const { return tag_with(rule_type, r.get()); }
