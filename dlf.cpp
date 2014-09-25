@@ -21,6 +21,7 @@
  */
 
 #include <algorithm>
+#include <ostream>
 
 #include "dlf.hpp"
 
@@ -51,12 +52,12 @@ namespace dlf {
 	
 	bool restriction_mgr::check_unenforceable() {
 		bool new_unenforceable = false;
-		it = pending.begin();
+		auto it = pending.begin();
 		while ( it != pending.end() ) {
 			flags::index j = it->first;
 			blocker& j_blocker = it->second;
 	
-			if ( j_blocker.released && j_blocker.intersects(enforced) ) {
+			if ( j_blocker.released && j_blocker.blocking.intersects(enforced) ) {
 				// this newly enforced restrictions mean that no j-restriction will ever fire
 				auto jt = it++;
 				unenforceable |= j;
@@ -70,7 +71,7 @@ namespace dlf {
 		return new_unenforceable;
 	}
 	
-	void restriction_mgr::reserve(flags::index n) {
+	flags::index restriction_mgr::reserve(flags::index n) {
 		flags::index t = next;
 		next += n;
 		return t;
@@ -78,7 +79,7 @@ namespace dlf {
 	
 	void restriction_mgr::enforce_unless(flags::index i, const flags::vector& blocking) {
 		// check if the restriction has already been enforced
-		if ( forbidden(i) ) return;
+		if ( enforced(i) ) return;
 		
 		// check if there are already restrictions blocking enforcement
 		auto it = pending.find(i);
@@ -135,7 +136,7 @@ namespace dlf {
 	
 	void restriction_mgr::release(flags::index i) {
 		// check if the restriction has already been enforced
-		if ( forbidden(i) ) return;
+		if ( enforced(i) ) return;
 		
 		// check if there is a pending enforcement decision for the restriction
 		auto it = pending.find(i);
@@ -143,7 +144,7 @@ namespace dlf {
 			blocker& i_blocker = it->second;
 			i_blocker.released = true;
 			// continue to wait on this decision if releasing the restriction doesn't block it
-			if ( ! i_blockier.blocking.intersects(enforced) ) return;
+			if ( ! i_blocker.blocking.intersects(enforced) ) return;
 			// otherwise remove restriction from pending list
 			pending.erase(it);
 		}
@@ -204,7 +205,7 @@ namespace dlf {
 		restricted |= o.restricted;
 		
 		// update knowledge state of restriction set
-		update = min(update, o.update);
+		update = std::min(update, o.update);
 		if ( state == allowed && (o.state != allowed || update < mgr.update) ) { state = unknown; }
 	}
 	
@@ -213,7 +214,7 @@ namespace dlf {
 		restricted &= o.restricted;
 		
 		// update knowledge state of restriction set
-		update = min(update, o.update);
+		update = std::min(update, o.update);
 		if ( state == forbidden && (o.state != forbidden || update < mgr.update) ) {
 			state = unknown;
 		}
@@ -241,7 +242,7 @@ namespace dlf {
 	// arc /////////////////////////////////////////////////////////////////////
 	
 	bool arc::blocked() {
-		if ( blocking.check() == forbidden ) { fail(); return true }
+		if ( blocking.check() == forbidden ) { fail(); return true; }
 		return false;
 	}
 	

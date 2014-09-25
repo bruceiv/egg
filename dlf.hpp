@@ -29,6 +29,7 @@
 #include <cstddef>
 #include <functional>
 #include <initializer_list>
+#include <iosfwd>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -53,7 +54,7 @@ namespace dlf {
 	
 	/// Abbreviates std::make_shared
 	template<typename T, typename... Args>
-	shared_ptr<T> make_ptr(Args&&... args) { 
+	ptr<T> make_ptr(Args&&... args) { 
 		return std::make_shared<T>(std::forward<Args>(args)...);
 	}
 	
@@ -114,8 +115,8 @@ namespace dlf {
 	friend restriction_mgr;
 	public:
 		restriction_ck(restriction_mgr& mgr, flags::vector&& restricted = flags::vector{}) 
-			: mgr{mgr}, restricted{restricted}, update{mgr.update}, 
-			  state{restricted.empty() ? allowed : restricted} {}
+			: mgr{mgr}, restricted{restricted}, update{mgr.update},  
+			  state{restricted.empty() ? allowed : unknown} {}
 		
 		/// Check if a restriction is enforced
 		restriction check();
@@ -166,11 +167,6 @@ namespace dlf {
 		return (x << 4) | static_cast<std::size_t>(ty);
 	}
 	
-	/// Gets the tag back from a hashed value (should only be used on result of tag_with)
-	inline constexpr node_type tag_of(std::size_t x) {
-		return reinterpret_cast<node_type>(x & 0xF);
-	}
-	
 	std::ostream& operator<< (std::ostream& out, node_type t);
 	
 	/// Abstract base class of all expression visitors
@@ -202,7 +198,7 @@ namespace dlf {
 		/// Abreviates std::make_shared for expression nodes
 		template<typename T, typename... Args>
 		static ptr<node> make(Args&&... args) {
-			return as_ptr<expr>(make_ptr<T>(std::forward<Args>(args)...));
+			return as_ptr<node>(make_ptr<T>(std::forward<Args>(args)...));
 		}
 		
 		/// Accept visitor
@@ -225,8 +221,7 @@ namespace dlf {
 	/// Directed arc linking two nodes
 	struct arc {
 		arc() = default;
-		arc(ptr<node> succ, restriction_ck blocking = restriction_ck{}) 
-			: succ{succ}, blocking{blocking} {}
+		arc(ptr<node> succ, restriction_ck blocking) : succ{succ}, blocking{blocking} {}
 		
 		/// Returns true and repoints this arc to a fail_node if one of the blocking restrictions 
 		/// is enforced
@@ -532,10 +527,10 @@ namespace dlf {
 	/// Node which inserts values into the restriction set
 	class cut_node : public node {
 		// disallow copying
-		match_node(const cut_node&) = delete;
-		match_node(cut_node&&) = delete;
-		match_node& operator= (const cut_node&) = delete;
-		match_node& operator= (cut_node&&) = delete;
+		cut_node(const cut_node&) = delete;
+		cut_node(cut_node&&) = delete;
+		cut_node& operator= (const cut_node&) = delete;
+		cut_node& operator= (cut_node&&) = delete;
 	public:
 		cut_node(const arc& out, flags::index i, restriction_mgr& mgr) 
 			: out{out}, i{i}, mgr{mgr} {}
