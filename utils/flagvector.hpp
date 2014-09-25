@@ -21,7 +21,10 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-#include <cassert> // TODO implement left-shift
+
+//uncomment to disable asserts
+//#define NDEBUG
+#include <cassert>
 
 #include <algorithm>
 #include <cstdint>
@@ -57,17 +60,47 @@ namespace flags {
 		}
 		
 		/// Gets the index of the first bit set (-1 for none such)
-		index first() const { return v.size() == 1 ? first(v.front()) : first(v.data(), v.size()); }
+		index first() const {
+			return v.size() == 1 ? 
+				flags::first(v.front())
+				: flags::first(v.data(), v.size());
+		}
+
 		/// Gets the index of the next bit set after i (-1 for none such)
-		index next(index i) const { return v.size() == 1 ? next(v.front(), i) : next(v.data(), v.size(), i); }
+		index next(index i) const {
+			return v.size() == 1 ? 
+				flags::next(v.front(), i) 
+				: flags::next(v.data(), v.size(), i);
+		}
+
 		/// Gets the index of the last bit set (-1 for none such)
-		index last() const { return v.size() == 1 ? last(v.front()) : last(v.data(), v.size()); }
+		index last() const {
+			return v.size() == 1 ? 
+				flags::last(v.front()) 
+				: flags::last(v.data(), v.size());
+		}
+		
 		/// Gets the count of bits set
-		index count() const { return v.size() == 1 ? count(v.front()) : count(v.data(), v.size()); }
+		index count() const {
+			return v.size() == 1 ? 
+				flags::count(v.front()) 
+				: flags::count(v.data(), v.size());
+		}
+		
 		/// Gets the number of bits set before i
-		index rank(index i) const { return v.size() == 1 ? rank(v.front(), i) : rank(v.data(), i); }
+		index rank(index i) const {
+			return v.size() == 1 ? 
+				flags::rank(v.front(), i) 
+				: flags::rank(v.data(), i);
+		}
+		
 		/// Gets the index of the j'th bit
-		index select(index j) const { return v.size() == 1 ? select(v.front(), j) : select(v.data(), v.size(), j); }
+		index select(index j) const {
+			return v.size() == 1 ? 
+				flags::select(v.front(), j) 
+				: flags::select(v.data(), v.size(), j);
+		}
+		
 		/// Checks if all flags are zeroed
 		bool empty() const {
 			switch ( v.size() ) {
@@ -76,15 +109,17 @@ namespace flags {
 			default: return is_zero(v.data(), v.size());
 			}
 		}
+		
 		/// Checks if this intersects another vector
 		bool intersects(const vector& o) const {
-			index n = min(v.size(), o.v.size());
+			index n = std::min(v.size(), o.v.size());
 			switch ( n ) {
 			case 0:  return false;
-			case 1:  return intersects(v.front(), o.v.front());
-			default: return intersects(v.data(), o.v.data(), n);
+			case 1:  return flags::intersects(v.front(), o.v.front());
+			default: return flags::intersects(v.data(), o.v.data(), n);
 			}
 		}
+		
 		/// Clears all bits
 		void clear() { v.clear(); }
 		
@@ -119,7 +154,7 @@ namespace flags {
 		
 		/// Unions another vector with this one
 		vector& operator|= (const vector& o) {
-			index n = min(v.size(), o.v.size());
+			index n = std::min(v.size(), o.v.size());
 			switch ( n ) {
 			case 0:  break;
 			case 1:  set_union(v.front(), o.v.front(), v.front()); break;
@@ -147,25 +182,25 @@ namespace flags {
 			case 1:  set_union(v.front(), o.v.front(), d.front()); break;
 			default: set_union(v.data(), o.v.data(), d.data(), n); break;
 			}
-			for (index i = n; i < m; ++i) { d[i] = (*big)[i]; }
+			for (index i = n; i < m; ++i) { d[i] = big->v[i]; }
 			return vector{std::move(d)};
 		}
 		
 		/// Intersects another vector with this one
 		vector& operator&= (const vector& o) {
-			index n = min(v.size(), o.v.size());
+			index n = std::min(v.size(), o.v.size());
 			switch ( n ) {
 			case 0:  clear(); return *this;
 			case 1:  set_intersection(v.front(), o.v.front(), v.front()); break;
 			default: set_intersection(v.data(), o.v.data(), v.data(), n); break;
 			}
-			if ( n < v.size() ) { clear(v.data()+n, v.size()-n); }
+			if ( n < v.size() ) { flags::clear(v.data()+n, v.size()-n); }
 			return *this;
 		}
 		
 		/// Creates a new vector with the intersection of the the two vectors
 		vector operator& (const vector& o) const {
-			index n = min(v.size(), o.v.size());
+			index n = std::min(v.size(), o.v.size());
 			std::vector<uint64_t> d{n};
 			switch ( n ) {
 			case 0:  break;
@@ -177,7 +212,7 @@ namespace flags {
 		
 		/// Removes all the elements of another vector from this one
 		vector& operator-= (const vector& o) {
-			index n = min(v.size(), o.v.size());
+			index n = std::min(v.size(), o.v.size());
 			switch ( n ) {
 			case 0:  break;
 			case 1:  set_difference(v.front(), o.v.front(), v.front()); break;
@@ -188,7 +223,7 @@ namespace flags {
 		
 		/// Creates a new vector with the set difference of this vector and another
 		vector operator- (const vector& o) const {
-			index n = min(v.size(), o.v.size());
+			index n = std::min(v.size(), o.v.size());
 			std::vector<uint64_t> d{v.size()};
 			switch ( n ) {
 			case 0:  break;
