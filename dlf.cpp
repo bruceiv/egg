@@ -21,6 +21,7 @@
  */
 
 #include <algorithm>
+#include <ostream>
 
 #include "dlf.hpp"
 
@@ -51,12 +52,12 @@ namespace dlf {
 	
 	bool restriction_mgr::check_unenforceable() {
 		bool new_unenforceable = false;
-		it = pending.begin();
+		auto it = pending.begin();
 		while ( it != pending.end() ) {
 			flags::index j = it->first;
 			blocker& j_blocker = it->second;
 	
-			if ( j_blocker.released && j_blocker.intersects(enforced) ) {
+			if ( j_blocker.released && j_blocker.blocking.intersects(enforced) ) {
 				// this newly enforced restrictions mean that no j-restriction will ever fire
 				auto jt = it++;
 				unenforceable |= j;
@@ -70,7 +71,7 @@ namespace dlf {
 		return new_unenforceable;
 	}
 	
-	void restriction_mgr::reserve(flags::index n) {
+	flags::index restriction_mgr::reserve(flags::index n) {
 		flags::index t = next;
 		next += n;
 		return t;
@@ -78,7 +79,7 @@ namespace dlf {
 	
 	void restriction_mgr::enforce_unless(flags::index i, const flags::vector& blocking) {
 		// check if the restriction has already been enforced
-		if ( forbidden(i) ) return;
+		if ( enforced(i) ) return;
 		
 		// check if there are already restrictions blocking enforcement
 		auto it = pending.find(i);
@@ -86,7 +87,7 @@ namespace dlf {
 			// new restriction
 			if ( ! blocking.empty() ) {
 				// wait on enforcement decision if blocking restrictions
-				pending.emplace_hint(it, blocking);
+				pending.emplace(i, blocker{blocking});
 				return;
 			}
 		} else {
@@ -135,7 +136,7 @@ namespace dlf {
 	
 	void restriction_mgr::release(flags::index i) {
 		// check if the restriction has already been enforced
-		if ( forbidden(i) ) return;
+		if ( enforced(i) ) return;
 		
 		// check if there is a pending enforcement decision for the restriction
 		auto it = pending.find(i);
@@ -143,7 +144,7 @@ namespace dlf {
 			blocker& i_blocker = it->second;
 			i_blocker.released = true;
 			// continue to wait on this decision if releasing the restriction doesn't block it
-			if ( ! i_blockier.blocking.intersects(enforced) ) return;
+			if ( ! i_blocker.blocking.intersects(enforced) ) return;
 			// otherwise remove restriction from pending list
 			pending.erase(it);
 		}
@@ -204,7 +205,7 @@ namespace dlf {
 		restricted |= o.restricted;
 		
 		// update knowledge state of restriction set
-		update = min(update, o.update);
+		update = std::min(update, o.update);
 		if ( state == allowed && (o.state != allowed || update < mgr.update) ) { state = unknown; }
 	}
 	
@@ -213,7 +214,7 @@ namespace dlf {
 		restricted &= o.restricted;
 		
 		// update knowledge state of restriction set
-		update = min(update, o.update);
+		update = std::min(update, o.update);
 		if ( state == forbidden && (o.state != forbidden || update < mgr.update) ) {
 			state = unknown;
 		}
@@ -240,7 +241,7 @@ namespace dlf {
 	void iterator::visit(any_node& n)   { visit(n.out.succ); }
 	void iterator::visit(str_node& n)   { visit(n.out.succ); }
 	void iterator::visit(rule_node& n)  { visit(n.out.succ); }
-	void iterator::visit(alt_node& n)   { for (arc& out : n.out ) visit(out.succ); }
+	void iterator::visit(alt_node& n)   { for (auto& out : n.out) visit(out.succ); }
 	void iterator::visit(cut_node& n)   { visit(n.out.succ); }
 	
 	// node_type ///////////////////////////////////////////////////////////////
@@ -265,11 +266,11 @@ namespace dlf {
 	// arc /////////////////////////////////////////////////////////////////////
 	
 	bool arc::blocked() {
-		if ( blocking.check() == forbidden ) { fail(); return true }
+		if ( blocking.check() == forbidden ) { fail(); return true; }
 		return false;
 	}
 	
-	bool arc::join(arc& out) {
+	bool arc::join(const arc& out) {
 		succ = out.succ;
 		blocking.join(out.blocking);
 		return succ->type() == match_type && blocking.check() == allowed;
@@ -286,27 +287,44 @@ namespace dlf {
 	
 	// clone //////////////////////////////////////////////////////////////////
 	
-	arc clone::visit(arc& a) { return arc{visit(a.out.succ), a.out << nShift}; }
+	arc clone::visit(arc& a) {
+		if ( a.succ->type() == end_type ) {
+			// Need to merge the arcs for the end-node
+			arc r = a;
+			r.join(out);
+			rVal = out.succ;
+			return r;
+		}
+		return arc{visit(a.succ), visit(a.blocking)};
+	}
+
+	restriction_ck clone::visit(restriction_ck& rck) {
+		return restriction_ck{mgr, std::move(rck.restricted << nShift)};
+	}
 	
 	ptr<node> clone::visit(ptr<node> np) {
+		// short-circuit un-copyable nodes
+		switch ( np->type() ) {
+		case match_type: case fail_type: case inf_type:
+			rVal = np;
+		}
 		// check memo-table
 		auto it = visited.find(np);
 		if ( it != visited.end() ) { rVal = it->second; return rVal; }
 		// visit
-		pVal = np;
 		np->accept(this);
 		// memoize and return
 		visited.emplace(np, rVal);
 		return rVal;
 	}
 	
-	// Unfollowed nodes just get copied over
-	void clone::visit(match_node&) { rVal = pVal; }
-	void clone::visit(fail_node&)  { rVal = pVal; }
-	void clone::visit(inf_node&)   { rVal = pVal; }
+	// Unfollowed nodes just get copied over by visit(ptr<node>)
+	void clone::visit(match_node&) { assert(false && "should not reach here"); }
+	void clone::visit(fail_node&)  { assert(false && "should not reach here"); }
+	void clone::visit(inf_node&)   { assert(false && "should not reach here"); }
 	
 	// End gets substituted for out-node
-	void clone::visit(end_node&)   { rVal = out; }
+	void clone::visit(end_node&)   { rVal = out.succ; }
 	
 	// Remaining nodes get cloned with their restriction sets shifted
 	void clone::visit(char_node& n) {
@@ -331,7 +349,7 @@ namespace dlf {
 	
 	void clone::visit(alt_node& n) {
 		alt_node cn;
-		for (arc& out : n.out) { cn.out.emplace(visit(out)); }
+		for (arc out : n.out) { cn.out.emplace(visit(out)); }
 		rVal = node::make<alt_node>(std::move(cn));
 	}
 	
@@ -380,7 +398,7 @@ namespace dlf {
 		return false;
 	}
 	
-	std::size_t fail_node::hash() const { return tag_with(inf_type); }
+	std::size_t inf_node::hash() const { return tag_with(inf_type); }
 	
 	bool inf_node::equiv(ptr<node> o) const { return o->type() == inf_type; }
 	
@@ -438,7 +456,7 @@ namespace dlf {
 	
 	std::size_t any_node::hash() const { return tag_with(any_type); }
 	
-	bool any_node::equiv(ptr<node> o) const { return o->type() == any_type }
+	bool any_node::equiv(ptr<node> o) const { return o->type() == any_type; }
 	
 	// str_node ///////////////////////////////////////////////////////////////
 	
@@ -451,14 +469,15 @@ namespace dlf {
 	}
 	
 	bool str_node::d(char x, arc& in) {
-		if ( in.blocked() )      return false;                // fail on node blocked
-		if ( (*sp)[i] != x )     return in.fail();            // fail on non-match
-		if ( sp->size() == i+1 ) return in.join(out);         // join with successor if consumed
-		in.succ = as_ptr<node>(ptr<str_node>{out, sp, i+1});  // new node with incremented index
+		if ( in.blocked() )      return false;         // fail on node blocked
+		if ( (*sp)[i] != x )     return in.fail();     // fail on non-match
+		if ( sp->size() == i+1 ) return in.join(out);  // join with successor if consumed
+		in.succ = as_ptr<node>(                        // new node with incremented index
+				ptr<str_node>{new str_node{out, sp, i+1}});  
 		return false;
 	}
 	
-	std::size_t str_node::hash() const { return tag_with(str_type, sp.get() ^ i); }
+	std::size_t str_node::hash() const { return tag_with(str_type, std::size_t(sp.get()) ^ i); }
 	
 	bool str_node::equiv(ptr<node> o) const {
 		if ( o->type() != str_type ) return false;
@@ -479,14 +498,14 @@ namespace dlf {
 			return false;
 		}
 		
-		in.succ = clone(r, out, mgr);      // expand nonterminal into input arc
+		in.succ = clone(*r, out, mgr);     // expand nonterminal into input arc
 
 		r->inDeriv = true;
 		return in.succ->d(x, in);          // take derivative of successor, under loop flag
 		r->inDeriv = false;
 	}
 	
-	std::size_t rule_node::hash() const { return tag_with(rule_type, r.get()); }
+	std::size_t rule_node::hash() const { return tag_with(rule_type, std::size_t(r.get())); }
 	
 	bool rule_node::equiv(ptr<node> o) const {
 		if ( o->type() != rule_type ) return false;
@@ -495,7 +514,7 @@ namespace dlf {
 	
 	// alt_node ///////////////////////////////////////////////////////////////
 	
-	std::pair<arc_set::iterator, bool> alt_node::merge(arc& add) {
+	std::pair<alt_node::arc_set::iterator, bool> alt_node::merge(arc& add) {
 		node_type ty = add.succ->type();
 		
 		// don't bother inserting failing nodes
@@ -508,7 +527,7 @@ namespace dlf {
 			alt_node& an = *as_ptr<alt_node>(add.succ);
 			
 			auto ins = std::make_pair(out.end(), false);
-			for (arc& a_add : an.out) {
+			for (arc a_add : an.out) {
 				arc add_new = add;
 				add_new.join(a_add);
 				ins = merge(add_new);
@@ -520,20 +539,20 @@ namespace dlf {
 		// Apply added cut nodes
 		if ( ty == cut_type ) {
 			cut_node& cn = *as_ptr<cut_node>(add.succ);
-			cn.mgr.enforce_unless(cn.i, add.blocking);
+			cn.mgr.enforce_unless(cn.i, add.blocking.restricted);
 			add.join(cn.out);
 			return merge(add);
 		}
 		
 		auto ins = out.emplace(add);
-		if ( ! ins->second ) { // element was not inserted
-			arc& ex = *(ins->first);  // existing arc
+		if ( ! ins.second ) { // element was not inserted
+			arc ex = *(ins.first);  // existing arc
 			
 			switch ( ty ) {
 			case match_type:
 				/// Match can only be prevented by restrictions that block both matches
 				ex.blocking.refine(add.blocking);
-				if ( ex.blocking.check() == allowed ) return true;
+				if ( ex.blocking.check() == allowed ) return {ins.first, true};
 				break;
 			case inf_type: case end_type:
 				/// Terminal node will only be blocked by restrictions that block both matches
@@ -545,7 +564,7 @@ namespace dlf {
 			case range_type:
 				merge<range_node>(ex, add);
 				break;
-			case any_type
+			case any_type:
 				merge<any_node>(ex, add);
 				break;
 			case str_type:
@@ -559,14 +578,14 @@ namespace dlf {
 			}
 		}
 		
-		return {ins, false};
+		return {ins.first, false};
 	}
 	
 	ptr<node> alt_node::make(std::initializer_list<arc> out) {
 		if ( out.size() == 0 ) return fail_node::make();
 		
 		alt_node n;
-		for (arc& o : out ) {
+		for (arc o : out) {
 			/// Merge in object, short-circuiting on unrestricted match
 			auto ins = n.merge(o);
 			if ( ins.second ) return ins.first->succ;
@@ -583,7 +602,7 @@ namespace dlf {
 		if ( in.blocked() ) return false;
 		
 		alt_node n;
-		for (arc& o : out) {
+		for (arc o : out) {
 			// Take derivative and merge in (short-circuiting for unrestricted match)
 			o.succ->d(x, o);
 			auto ins = n.merge(o);
@@ -611,10 +630,10 @@ namespace dlf {
 		// Check blocked
 		if ( in.blocked() ) return false;
 		// Enforce restriction
-		mgr.enforce_unless(i, in.blocking);
+		mgr.enforce_unless(i, in.blocking.restricted);
 		// Pass derivative along
 		in.join(out);
-		return in.succ.d(x, in);
+		return in.succ->d(x, in);
 	}
 	
 	std::size_t cut_node::hash() const { return tag_with(cut_type, i); }

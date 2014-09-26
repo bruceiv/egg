@@ -29,6 +29,7 @@
 #include <cstddef>
 #include <functional>
 #include <initializer_list>
+#include <iosfwd>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -53,7 +54,7 @@ namespace dlf {
 	
 	/// Abbreviates std::make_shared
 	template<typename T, typename... Args>
-	shared_ptr<T> make_ptr(Args&&... args) { 
+	ptr<T> make_ptr(Args&&... args) { 
 		return std::make_shared<T>(std::forward<Args>(args)...);
 	}
 	
@@ -73,12 +74,13 @@ namespace dlf {
 	friend class restriction_ck;
 		struct blocker {
 			blocker() = default;
-			blocker(flags::vector& blocking) : released{false}, blocking{blocking} {}
-			blocker(bool released, flags::vector& blocking) 
-				: released{released}, blocking{blocking} {}
+			blocker(const flags::vector& blocking, bool released = false)
+				: blocking{blocking}, released{released} {}
+			blocker(flags::vector&& blocking, bool released = false)
+				: blocking{std::move(blocking)}, released{released} {}
 			
-			bool released;
 			flags::vector blocking;
+			bool released;
 		};
 		
 		/// Check for newly enforced rules after unenforceable has been changed; returns if there 
@@ -114,8 +116,23 @@ namespace dlf {
 	friend restriction_mgr;
 	public:
 		restriction_ck(restriction_mgr& mgr, flags::vector&& restricted = flags::vector{}) 
-			: mgr{mgr}, restricted{restricted}, update{mgr.update}, 
-			  state{restricted.empty() ? allowed : restricted} {}
+			: mgr{mgr}, restricted{restricted}, update{mgr.update},  
+			  state{restricted.empty() ? allowed : unknown} {}
+		restriction_ck(const restriction_ck&) = default;
+		restriction_ck(restriction_ck&&) = default;
+		// WARNING: Assignment operators don't rebind manager
+		restriction_ck& operator= (const restriction_ck& o) {
+			restricted = o.restricted;
+			update = o.update;
+			state = o.state;
+			return *this;
+		}
+		restriction_ck& operator= (restriction_ck&& o) {
+			restricted = std::move(o.restricted);
+			update = o.update;
+			state = o.state;
+			return *this;
+		}
 		
 		/// Check if a restriction is enforced
 		restriction check();
@@ -127,8 +144,8 @@ namespace dlf {
 		void refine(const restriction_ck& o);
 		
 		flags::vector restricted;  ///< set of restrictions on matches
-	private:
 		restriction_mgr& mgr;      ///< restriction manager
+	private:
 		unsigned long update;      ///< last update seen
 		restriction state;         ///< saved restriction state
 	};  // restriction_ck
@@ -166,11 +183,6 @@ namespace dlf {
 		return (x << 4) | static_cast<std::size_t>(ty);
 	}
 	
-	/// Gets the tag back from a hashed value (should only be used on result of tag_with)
-	inline constexpr node_type tag_of(std::size_t x) {
-		return reinterpret_cast<node_type>(x & 0xF);
-	}
-	
 	std::ostream& operator<< (std::ostream& out, node_type t);
 	
 	/// Abstract base class of all expression visitors
@@ -202,7 +214,7 @@ namespace dlf {
 		/// Abreviates std::make_shared for expression nodes
 		template<typename T, typename... Args>
 		static ptr<node> make(Args&&... args) {
-			return as_ptr<expr>(make_ptr<T>(std::forward<Args>(args)...));
+			return as_ptr<node>(make_ptr<T>(std::forward<Args>(args)...));
 		}
 		
 		/// Accept visitor
@@ -246,15 +258,15 @@ namespace dlf {
 	/// Directed arc linking two nodes
 	struct arc {
 		arc() = default;
-		arc(ptr<node> succ, restriction_ck blocking = restriction_ck{}) 
-			: succ{succ}, blocking{blocking} {}
+		arc(ptr<node> succ, restriction_ck blocking) : succ{succ}, blocking{blocking} {}
+		
 		
 		/// Returns true and repoints this arc to a fail_node if one of the blocking restrictions 
 		/// is enforced
 		bool blocked();
 		
 		/// Joins to an outgoing arc. Returns true if now an unrestricted match (as in node::d()).
-		bool join(arc& out);
+		bool join(const arc& out);
 		
 		/// Joins to a fail_node. Returns false.
 		bool fail();
@@ -290,10 +302,13 @@ namespace dlf {
 		/// Common code for visiting an arc
 		arc visit(arc& a);
 		
+		/// Common code for visiting a restriction check
+		restriction_ck visit(restriction_ck& rck);
+		
 		/// Functional interface to visitor pattern
 		ptr<node> visit(ptr<node> np);
 	public:
-		clone(nonterminal& nt, ptr<node> out, restriction_mgr& mgr) 
+		clone(nonterminal& nt, arc& out, restriction_mgr& mgr) 
 		: rVal{}, out{out}, mgr{mgr}, visited{} {
 			nShift = mgr.reserve(nt.nRestrict);
 			visit(nt.begin);
@@ -314,9 +329,8 @@ namespace dlf {
 		virtual void visit(cut_node& n);
 		
 	private:
-		ptr<node> pVal;        ///< Parameter of last visit
 		ptr<node> rVal;        ///< Return value of last visit
-		ptr<node> out;         ///< Replacement for endNode
+		arc out;               ///< Replacement for endNode
 		restriction_mgr& mgr;  ///< Restriction manager
 		flags::index nShift;   ///< Amount to shift restrictions by
 		
@@ -386,6 +400,7 @@ namespace dlf {
 	
 	/// Placeholder node for the end of a subexpression
 	class end_node : public node {
+	public:
 		end_node() = default;
 		virtual ~end_node() = default;
 		
@@ -399,6 +414,7 @@ namespace dlf {
 	
 	/// Node representing a character literal
 	class char_node : public node {
+	public:
 		char_node(const arc& out, char c) : out{out}, c{c} {}
 		virtual ~char_node() = default;
 		
@@ -415,6 +431,7 @@ namespace dlf {
 	
 	/// Node representing a character range literal
 	class range_node : public node {
+	public:
 		range_node(const arc& out, char b, char e) : out{out}, b{b}, e{e} {}
 		virtual ~range_node() = default;
 		
@@ -432,6 +449,7 @@ namespace dlf {
 	
 	/// Node representing an "any character" literal
 	class any_node : public node {
+	public:
 		any_node(const arc& out) : out{out} {}
 		virtual ~any_node() = default;
 		
@@ -479,7 +497,7 @@ namespace dlf {
 			: out{out}, r{r}, mgr{mgr} {}
 		virtual ~rule_node() = default;
 		
-		static  ptr<node>   make(const arc& out, ptr<nonterminal> r);
+		static  ptr<node>   make(const arc& out, ptr<nonterminal> r, restriction_mgr& mgr);
 		virtual void        accept(visitor* v) { v->visit(*this); }
 		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return rule_type; }
@@ -509,12 +527,13 @@ namespace dlf {
 		/// Merges `add` into existing `ex`, pushing the alternation before the successors
 		template<typename NT>
 		void merge(arc& ex, arc& add) {
-			arc& ex_out  = as_ptr<NT>(ex.succ)->out;          // Get successor from common type
-			arc& add_out = as_ptr<NT>(add.succ)->out;         // Get successor from added node
-			ex_out.blocking.join(ex.blocking);                // add existing blockers to successor
-			add_out.blocking.join(add.blocking);              // add new blockers to new successor
-			ex.blocking.refine(add.blocking);                 // intersect blockers
-			ex_out = arc{alt_node::make({ex_out, add_out})};  // join new node
+			arc& ex_out  = as_ptr<NT>(ex.succ)->out;         // Get successor from common type
+			arc& add_out = as_ptr<NT>(add.succ)->out;        // Get successor from added node
+			ex_out.blocking.join(ex.blocking);               // add existing blockers to successor
+			add_out.blocking.join(add.blocking);             // add new blockers to new successor
+			ex.blocking.refine(add.blocking);                // intersect blockers
+			ex_out = arc{alt_node::make({ex_out, add_out}),
+                                     restriction_ck{ex.blocking.mgr}};   // join new node
 		}
 		
 		/// Merges an arc `a` into the set (flattening alternations and merging equivalent nodes).
@@ -539,10 +558,10 @@ namespace dlf {
 	/// Node which inserts values into the restriction set
 	class cut_node : public node {
 		// disallow copying
-		match_node(const cut_node&) = delete;
-		match_node(cut_node&&) = delete;
-		match_node& operator= (const cut_node&) = delete;
-		match_node& operator= (cut_node&&) = delete;
+		cut_node(const cut_node&) = delete;
+		cut_node(cut_node&&) = delete;
+		cut_node& operator= (const cut_node&) = delete;
+		cut_node& operator= (cut_node&&) = delete;
 	public:
 		cut_node(const arc& out, flags::index i, restriction_mgr& mgr) 
 			: out{out}, i{i}, mgr{mgr} {}
