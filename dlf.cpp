@@ -219,6 +219,30 @@ namespace dlf {
 		}
 	}
 	
+	// iterator ////////////////////////////////////////////////////////////////
+	
+	void iterator::visit(ptr<node> np) {
+		// check memo-table and visit if not found
+		if ( visited.count(np) == 0 ) {
+			visited.emplace(np);
+			np->accept(this);
+		}
+	}
+	
+	// Unfollowed nodes are no-ops
+	void iterator::visit(match_node&)   {}
+	void iterator::visit(fail_node&)    {}
+	void iterator::visit(inf_node&)     {}
+	void iterator::visit(end_node&)     {}
+	// Remaining nodes get their successors visited
+	void iterator::visit(char_node& n)  { visit(n.out.succ); }
+	void iterator::visit(range_node& n) { visit(n.out.succ); }
+	void iterator::visit(any_node& n)   { visit(n.out.succ); }
+	void iterator::visit(str_node& n)   { visit(n.out.succ); }
+	void iterator::visit(rule_node& n)  { visit(n.out.succ); }
+	void iterator::visit(alt_node& n)   { for (arc& out : n.out ) visit(out.succ); }
+	void iterator::visit(cut_node& n)   { visit(n.out.succ); }
+	
 	// node_type ///////////////////////////////////////////////////////////////
 	
 	std::ostream& operator<< (std::ostream& out, node_type t) {
@@ -258,28 +282,7 @@ namespace dlf {
 	
 	// count_restrict /////////////////////////////////////////////////////////
 	
-	void count_restrict::visit(ptr<node> np) {
-		// check memo-table and visit if not found
-		if ( visited.count(np) == 0 ) {
-			np->accept(this);
-			visited.emplace(np);
-		}
-	}
-	
-	// Unfollowed nodes are no-ops
-	void count_restrict::visit(match_node&)   {}
-	void count_restrict::visit(fail_node&)    {}
-	void count_restrict::visit(inf_node&)     {}
-	void count_restrict::visit(end_node&)     {}
-	// Remaining nodes get their successors visited
-	void count_restrict::visit(char_node& n)  { visit(n.out.succ); }
-	void count_restrict::visit(range_node& n) { visit(n.out.succ); }
-	void count_restrict::visit(any_node& n)   { visit(n.out.succ); }
-	void count_restrict::visit(str_node& n)   { visit(n.out.succ); }
-	void count_restrict::visit(rule_node& n)  { visit(n.out.succ); }
-	void count_restrict::visit(alt_node& n)   { for (arc& out : n.out ) visit(out.succ); }
-	// Cut node increases count
-	void count_restrict::visit(cut_node& n)   { ++nRestrict; visit(n.out.succ); }
+	void count_restrict::visit(cut_node& n)   { ++nRestrict; iterator::visit(n); }
 	
 	// clone //////////////////////////////////////////////////////////////////
 	

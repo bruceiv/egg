@@ -222,6 +222,27 @@ namespace dlf {
 		virtual bool equiv(ptr<node> o) const = 0;
 	};  // node
 	
+	/// Default visitor that just visits all the nodes; override individual methods to add 
+	/// functionality. Stores visited nodes so that they're not re-visited.
+	class iterator : public visitor {
+	protected:
+		void visit(ptr<node> np);
+	public:
+		virtual void visit(match_node&);
+		virtual void visit(fail_node&);
+		virtual void visit(inf_node&);
+		virtual void visit(end_node&);
+		virtual void visit(char_node&);
+		virtual void visit(range_node&);
+		virtual void visit(any_node&);
+		virtual void visit(str_node&);
+		virtual void visit(rule_node&);
+		virtual void visit(alt_node&);
+		virtual void visit(cut_node&);
+	protected:
+		std::unordered_set<ptr<node>> visited;  ///< Nodes already seen
+	};  // iterator
+	
 	/// Directed arc linking two nodes
 	struct arc {
 		arc() = default;
@@ -243,28 +264,14 @@ namespace dlf {
 	};  // arc
 	
 	/// Visitor with function-like interface for counting restrictions in an expression
-	class count_restrict : public visitor {
-		/// Common code for visitor pattern
-		void visit(ptr<node> np);
+	class count_restrict : public iterator {
 	public:
-		count_restrict(ptr<node> np) : nRestrict{0}, visited{} { visit(np); }
-		
+		count_restrict(ptr<node> np) : iterator{}, nRestrict{0} { visit(np); }
 		operator flags::index () { return nRestrict; }
 		
-		virtual void visit(match_node&);
-		virtual void visit(fail_node&);
-		virtual void visit(inf_node&);
-		virtual void visit(end_node&);
-		virtual void visit(char_node& n);
-		virtual void visit(range_node& n);
-		virtual void visit(any_node& n);
-		virtual void visit(str_node& n);
-		virtual void visit(rule_node& n);
-		virtual void visit(alt_node& n);
-		virtual void visit(cut_node& n);
+		virtual void visit(cut_node&);
 	private:
 		flags::index nRestrict;                 ///< restriction count
-		std::unordered_set<ptr<node>> visited;  ///< Nodes already seen
 	}; // count_restrict
 	
 	/// Nonterminal substitution
