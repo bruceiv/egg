@@ -281,10 +281,6 @@ namespace dlf {
 		return false;
 	}
 	
-	// count_restrict /////////////////////////////////////////////////////////
-	
-	void count_restrict::visit(cut_node& n)   { ++nRestrict; iterator::visit(n); }
-	
 	// clone //////////////////////////////////////////////////////////////////
 	
 	arc clone::visit(arc& a) {

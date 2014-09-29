@@ -281,7 +281,7 @@ namespace dlf {
 		count_restrict(ptr<node> np) : iterator{}, nRestrict{0} { visit(np); }
 		operator flags::index () { return nRestrict; }
 		
-		virtual void visit(cut_node&);
+		virtual void visit(cut_node&) { ++nRestrict; iterator::visit(n); }
 	private:
 		flags::index nRestrict;                 ///< restriction count
 	}; // count_restrict
@@ -544,7 +544,27 @@ namespace dlf {
 		alt_node() = default;
 		virtual ~alt_node() = default;
 		
-		static  ptr<node>   make(std::initializer_list<arc> out);
+		template<typename It>
+		static ptr<node> make(It begin, It end) {
+			if ( begin == end ) return fail_node::make();
+		
+			alt_node n;
+			while ( begin != end ) {
+				/// Merge in object, short-circuiting on unrestricted match
+				auto ins = n.merge(*begin);
+				if ( ins.second ) return ins.first->succ;
+				++begin;
+			}
+		
+			if ( n.out.size() == 0 ) return fail_node::make();
+		
+			return node::make<alt_node>(std::move(n));
+		}
+		
+		static ptr<node> make(std::initializer_list<arc> out) { 
+			return make(out.begin(), out.end());
+		}
+		
 		virtual void        accept(visitor* v) { v->visit(*this); }
 		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return alt_type; }
