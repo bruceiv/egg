@@ -515,8 +515,6 @@ namespace dlf {
 		
 		// don't bother inserting failing nodes
 		if ( ty == fail_type ) return {out.end(), false};
-		// don't bother inserting blocked nodes
-		if ( add.blocked() ) return {out.end(), false};
 		
 		// Flatten added alt nodes
 		if ( ty == alt_type ) {
@@ -530,14 +528,6 @@ namespace dlf {
 				if ( ins.second ) break;
 			}
 			return ins;
-		}
-		
-		// Apply added cut nodes
-		if ( ty == cut_type ) {
-			cut_node& cn = *as_ptr<cut_node>(add.succ);
-			cn.mgr.enforce_unless(cn.i, add.blocking.restricted);
-			add.join(cn.out);
-			return merge(add);
 		}
 		
 		auto ins = out.emplace(add);
@@ -569,7 +559,10 @@ namespace dlf {
 			case rule_type:
 				merge<rule_node>(ex, add);
 				break;
-			case alt_type: case cut_type: case fail_type:
+			case cut_type:
+				merge<cut_node>(ex, add);
+				break;
+			case alt_type: case fail_type:
 				assert(false && "shouldn't reach this branch");
 			}
 		}
@@ -601,6 +594,7 @@ namespace dlf {
 		for (arc o : out) {
 			// Take derivative and merge in (short-circuiting for unrestricted match)
 			o.succ->d(x, o);
+			if ( o.blocked() ) continue;  // skip blocked nodes
 			auto ins = n.merge(o);
 			if ( ins.second ) return in.join(*ins.first);
 		}
