@@ -270,6 +270,9 @@ namespace dlf {
 		
 		/// Joins to a fail_node. Returns false.
 		bool fail();
+		
+		/// Calls the derivative on the successor node; short for succ->d(x, *this).
+		bool d(char x) { return succ->d(x, *this); }
 			
 		ptr<node> succ;           ///< sucessor pointer
 		restriction_ck blocking;  ///< restrictions blocking this arc
@@ -278,7 +281,7 @@ namespace dlf {
 	/// Visitor with function-like interface for counting restrictions in an expression
 	class count_restrict : public iterator {
 	public:
-		count_restrict(ptr<node> np) : iterator{}, nRestrict{0} { visit(np); }
+		count_restrict(ptr<node> np) : iterator{}, nRestrict{0} { if ( np ) visit(np); }
 		operator flags::index () { return nRestrict; }
 		
 		virtual void visit(cut_node&) { ++nRestrict; iterator::visit(n); }
@@ -288,13 +291,27 @@ namespace dlf {
 	
 	/// Nonterminal substitution
 	struct nonterminal {
-		nonterminal(const std::string& name, ptr<node> begin)
-		: name{name}, begin{begin}, nRestrict{count_restrict(begin)}, inDeriv{false} {}
+		nonterminal(const std::string& name, ptr<node> sub = ptr<node>{})
+		: name{name}, inDeriv{false}, sub{}, nRestrict{0}, nbl{false} { reset(sub); }
 		
-		const std::string name;        ///< Name of the non-terminal
-		const ptr<node> begin;         ///< First subexpression in the non-terminal
-		const flags::index nRestrict;  ///< Count of restrictions in this non-terminal
-		bool inDeriv;                  ///< Flag for detecting infinite loops
+		/// Builds an arc that can be used to match this rule
+		arc matchable(bool& match_reachable, restriction_mgr& mgr);
+		
+		/// Gets first node in non-terminal substitution
+		const ptr<node> get() const;
+		/// Gets the count of restriction indexes used by this rule
+		flags::index num_restrictions() const;
+		/// Checks if the substitution is an unrestricted match
+		bool nullable() const;
+		/// Resets the first node in the nonterminal substitution
+		void reset(ptr<node> sub = ptr<node>{});
+		
+		const std::string name;  ///< Name of the non-terminal
+		bool inDeriv;            ///< Flag for detecting infinite loops
+	private:
+		ptr<node> sub;           ///< First subexpression in the non-terminal
+		flags::index nRestrict;  ///< Count of restrictions in this non-terminal
+		bool nbl;                ///< Is the expression nullable?
 	};  // nonterminal
 	
 	/// Visitor with function-like interface for cloning a contained expression
@@ -310,8 +327,8 @@ namespace dlf {
 	public:
 		clone(nonterminal& nt, arc& out, restriction_mgr& mgr) 
 		: rVal{}, out{out}, mgr{mgr}, visited{} {
-			nShift = mgr.reserve(nt.nRestrict);
-			visit(nt.begin);
+			nShift = mgr.reserve(nt.num_restrictions());
+			visit(nt.get());
 		}
 		
 		operator ptr<node> () { return rVal; }

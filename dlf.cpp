@@ -281,6 +281,36 @@ namespace dlf {
 		return false;
 	}
 	
+	bool arc::d(char x) { return succ->d(x, *this); }
+	
+	// nonterminal ////////////////////////////////////////////////////////////
+	
+	arc nonterminal::matchable(bool& match_reachable, restriction_mgr& mgr) {
+		return arc{rule_node::make(arc{match_node::make(match_reachable), 
+		                               restriction_ck{mgr}}),
+		           restriction_ck{mgr}};
+	}
+	
+	/// Gets first node in non-terminal substitution
+	const ptr<node> nonterminal::get() const { return sub; }
+	/// Gets the count of restriction indexes used by this rule
+	flags::index nonterminal::num_restrictions() const { return nRestrict; }
+	/// Checks if the substitution is an unrestricted match
+	bool nonterminal::nullable() const { return nbl; }
+	
+	/// Resets the first node
+	void nonterminal::reset(ptr<node> np) {
+		sub = np;
+		if ( sub ) {
+			nRestrict = count_restrict(begin);
+			bool btmp; restriction_mgr mtmp;
+			nbl = matchable(btmp, mtmp).d('\0');
+		} else {
+			nRestrict = 0;
+			nbl = false;
+		}
+	}
+	
 	// clone //////////////////////////////////////////////////////////////////
 	
 	arc clone::visit(arc& a) {
@@ -448,7 +478,10 @@ namespace dlf {
 	
 	ptr<node> any_node::make(const arc& out) { return node::make<any_node>(out); }
 	
-	bool any_node::d(char, arc& in) { return in.blocked() ? false : in.join(out); }
+	bool any_node::d(char x, arc& in) {
+		if ( in.blocked() ) return false;
+		return x != '\0' ? in.join(out) : in.fail();
+	}
 	
 	std::size_t any_node::hash() const { return tag_with(any_type); }
 	

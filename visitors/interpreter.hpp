@@ -25,6 +25,7 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -52,11 +53,7 @@ namespace dlf {
 		}
 		
 		/// Sets unique nonterminal for each name
-		void set_nonterminal(const std::string& s, ptr<node> n) {
-			ptr<nonterminal> nt = get_nonterminal(s);
-			nt->begin = n;
-			nt->nRestrict = count_restrict(n);
-		}
+		void set_nonterminal(const std::string& s, ptr<node> n) { get_nonterminal(s)->reset(n); }
 		
 		/// Produces a new restriction check from the current manager
 		restriction_ck ck(flags::vector&& blocking = flags::vector{}) {
@@ -74,7 +71,7 @@ namespace dlf {
 			
 			// set rule node for new anonymous non-terminal
 			ptr<nonterminal> R_i = 
-					make_ptr<nonterminal>("*" + std::to_string(mi++), inf_node::make());
+					make_ptr<nonterminal>("*" + std::to_string(mi++), ptr<node>{});
 			ptr<node> nt = rule_node::make(out(), R_i, mgr);
 			
 			// build anonymous rule
@@ -86,8 +83,7 @@ namespace dlf {
 			flags::index ri_bak = ri; ri = 0;             // save ri
 			mp->accept(this);                             // build many-expression
 			ri = ri_bak;                                  // restore ri
-			R_i->begin = alt_node::make({out(), skip});   // reset rule ...
-			R_i->nRestrict = count_restrict(R_i->begin);  // ... and count of restrictions
+			R_i->reset(alt_node::make({out(), skip}));    // reset rule
 			
 			// reset next to rule reference
 			next = nt;
@@ -232,6 +228,63 @@ namespace dlf {
 		flags::index ri;                              ///< Current restriction index
 		unsigned long mi;                             ///< Index to uniquely name many-nodes
 	}; // loader
+	
+	/// Recognizes the input
+	/// @param l		Loaded DLF DAG
+	/// @param in		Input stream
+	/// @param rule		Start rule
+	/// @param dbg		Print debug output? (default false)
+	/// @return true for match, false for failure
+	bool match(loader& l, std::istream& in, std::string rule, bool dbg = false) {
+		// find rule
+		auto& nts = l.get_nonterminals();
+		auto nt = nts.find(rule);
+		
+		// fail on no such rule
+		if ( nt = nts.end() ) return false;
+		
+		// set up printer
+		std::unordered_set<ptr<nonterminal>> names;
+		for (auto& nit : nts) { names.emplace(nit.second); }
+		derivs::printer p(std::cout, names);
+		
+		// establish initial expression
+		bool match_reachable = true;
+		restriction_mgr mgr;
+		arc e = (*nt)->matchable(match_reachable, mgr);
+		
+		// Check for initial success
+		if ( (*nt)->nullable() ) return true;
+		
+		// teke derivatives until failure, match, or end of input
+		char x = '\0';
+		do {
+			if ( dbg ) { p.print(e.succ); }
+			
+			if ( ! in.get(x) ) { x = '\0'; }  // read character, \0 for EOF
+			
+			if ( dbg ) {
+				std::cout << "d(\'" << (x == '\0' ? "\\0" : strings::escape(x)) << "\') =====>" 
+				          << std::endl;
+			}
+			
+			// take derivative; return true if unrestricted match
+			if ( e.d(x) ) return true;
+		} while ( match_reachable && x != '\0' );
+		
+		return false;
+	}
+	
+	/// Recognizes the input
+	/// @param g		Source grammar
+	/// @param in		Input stream
+	/// @param rule		Start rule
+	/// @param dbg		Print debug output? (default false)
+	/// @return true for match, false for failure
+	bool match(ast::grammar& g, std::istream& in, std::string rule, bool dbg = false) {
+		loader l(g, dbg);
+		return match(l, in, rule, dbg);
+	}
 
 }  // namespace dlf
 

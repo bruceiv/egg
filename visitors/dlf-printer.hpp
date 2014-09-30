@@ -41,8 +41,8 @@ namespace dlf {
 		
 		/// Prints the definition of a rule
 		void print(ptr<nonterminal> nt) {
-			out << nt->name ":= ";
-			nt->begin->accept(this);
+			out << nt->name " := ";
+			nt->get()->accept(this);
 			out << std::endl;
 		}
 		
