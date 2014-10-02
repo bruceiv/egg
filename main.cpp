@@ -30,11 +30,12 @@
 #include "egg.hpp"
 #include "parser.hpp"
 #include "visitors/compiler.hpp"
+#include "visitors/interpreter.hpp"
 #include "visitors/normalizer.hpp"
 #include "visitors/printer.hpp"
 
 /** Egg version */
-static const char* VERSION = "0.3.1";
+static const char* VERSION = "0.4.0-a";
 
 /** Egg usage string */
 static const char* USAGE = 
@@ -336,8 +337,7 @@ int main(int argc, char** argv) {
 			c.compile(*g);
 			break;
 		} case MATCH_MODE: {    // Interpret grammar
-			std::cerr << "NOT YET IMPLEMENTED" << std::endl;
-/*			if ( a.dbg() ) {
+			if ( a.dbg() ) {
 				visitor::printer p(std::cout);
 				p.print(*g); 
 				std::cout << std::endl;
@@ -346,10 +346,9 @@ int main(int argc, char** argv) {
 			bool b = dlf::match(*g, a.source(), a.rule(), a.dbg());
 			a.output() << "Rule `" << a.rule() << "` " 
 			           << ( b ? "matched" : "DID NOT match" ) << std::endl;
-*/			break;
+			break;
 		} case LINES_MODE: {   // Interpret grammar line-by-line
-			std::cerr << "NOT YET IMPLEMENTED" << std::endl;
-/*			if ( a.dbg() ) {
+			if ( a.dbg() ) {
 				visitor::printer p(std::cout);
 				p.print(*g); 
 				std::cout << std::endl;
@@ -364,7 +363,7 @@ int main(int argc, char** argv) {
 			               << ( b ? "matched" : "DID NOT match" ) 
 			               << " \"" << line << "\"" << std::endl;
 			}
-*/			break;
+			break;
 		} default: break;
 		}
 		

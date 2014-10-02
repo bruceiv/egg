@@ -220,6 +220,30 @@ namespace dlf {
 		}
 	}
 	
+	// iterator ////////////////////////////////////////////////////////////////
+	
+	void iterator::visit(ptr<node> np) {
+		// check memo-table and visit if not found
+		if ( visited.count(np) == 0 ) {
+			visited.emplace(np);
+			np->accept(this);
+		}
+	}
+	
+	// Unfollowed nodes are no-ops
+	void iterator::visit(match_node&)   {}
+	void iterator::visit(fail_node&)    {}
+	void iterator::visit(inf_node&)     {}
+	void iterator::visit(end_node&)     {}
+	// Remaining nodes get their successors visited
+	void iterator::visit(char_node& n)  { visit(n.out.succ); }
+	void iterator::visit(range_node& n) { visit(n.out.succ); }
+	void iterator::visit(any_node& n)   { visit(n.out.succ); }
+	void iterator::visit(str_node& n)   { visit(n.out.succ); }
+	void iterator::visit(rule_node& n)  { visit(n.out.succ); }
+	void iterator::visit(alt_node& n)   { for (auto& out : n.out) visit(out.succ); }
+	void iterator::visit(cut_node& n)   { visit(n.out.succ); }
+	
 	// node_type ///////////////////////////////////////////////////////////////
 	
 	std::ostream& operator<< (std::ostream& out, node_type t) {
@@ -257,30 +281,35 @@ namespace dlf {
 		return false;
 	}
 	
-	// count_restrict /////////////////////////////////////////////////////////
+	bool arc::d(char x) { return succ->d(x, *this); }
 	
-	void count_restrict::visit(ptr<node> np) {
-		// check memo-table and visit if not found
-		if ( visited.count(np) == 0 ) {
-			np->accept(this);
-			visited.emplace(np);
-		}
+	// nonterminal ////////////////////////////////////////////////////////////
+	
+	arc nonterminal::matchable(bool& match_reachable, restriction_mgr& mgr) {
+		return arc{rule_node::make(arc{match_node::make(match_reachable), 
+		                               restriction_ck{mgr}}),
+		           restriction_ck{mgr}};
 	}
 	
-	// Unfollowed nodes are no-ops
-	void count_restrict::visit(match_node&)   {}
-	void count_restrict::visit(fail_node&)    {}
-	void count_restrict::visit(inf_node&)     {}
-	void count_restrict::visit(end_node&)     {}
-	// Remaining nodes get their successors visited
-	void count_restrict::visit(char_node& n)  { visit(n.out.succ); }
-	void count_restrict::visit(range_node& n) { visit(n.out.succ); }
-	void count_restrict::visit(any_node& n)   { visit(n.out.succ); }
-	void count_restrict::visit(str_node& n)   { visit(n.out.succ); }
-	void count_restrict::visit(rule_node& n)  { visit(n.out.succ); }
-	void count_restrict::visit(alt_node& n)   { for (auto& out : n.out) visit(out.succ); }
-	// Cut node increases count
-	void count_restrict::visit(cut_node& n)   { ++nRestrict; visit(n.out.succ); }
+	/// Gets first node in non-terminal substitution
+	const ptr<node> nonterminal::get() const { return sub; }
+	/// Gets the count of restriction indexes used by this rule
+	flags::index nonterminal::num_restrictions() const { return nRestrict; }
+	/// Checks if the substitution is an unrestricted match
+	bool nonterminal::nullable() const { return nbl; }
+	
+	/// Resets the first node
+	void nonterminal::reset(ptr<node> np) {
+		sub = np;
+		if ( sub ) {
+			nRestrict = count_restrict(begin);
+			bool btmp; restriction_mgr mtmp;
+			nbl = matchable(btmp, mtmp).d('\0');
+		} else {
+			nRestrict = 0;
+			nbl = false;
+		}
+	}
 	
 	// clone //////////////////////////////////////////////////////////////////
 	
@@ -449,7 +478,10 @@ namespace dlf {
 	
 	ptr<node> any_node::make(const arc& out) { return node::make<any_node>(out); }
 	
-	bool any_node::d(char, arc& in) { return in.blocked() ? false : in.join(out); }
+	bool any_node::d(char x, arc& in) {
+		if ( in.blocked() ) return false;
+		return x != '\0' ? in.join(out) : in.fail();
+	}
 	
 	std::size_t any_node::hash() const { return tag_with(any_type); }
 	
@@ -516,8 +548,6 @@ namespace dlf {
 		
 		// don't bother inserting failing nodes
 		if ( ty == fail_type ) return {out.end(), false};
-		// don't bother inserting blocked nodes
-		if ( add.blocked() ) return {out.end(), false};
 		
 		// Flatten added alt nodes
 		if ( ty == alt_type ) {
@@ -531,14 +561,6 @@ namespace dlf {
 				if ( ins.second ) break;
 			}
 			return ins;
-		}
-		
-		// Apply added cut nodes
-		if ( ty == cut_type ) {
-			cut_node& cn = *as_ptr<cut_node>(add.succ);
-			cn.mgr.enforce_unless(cn.i, add.blocking.restricted);
-			add.join(cn.out);
-			return merge(add);
 		}
 		
 		auto ins = out.emplace(add);
@@ -570,7 +592,10 @@ namespace dlf {
 			case rule_type:
 				merge<rule_node>(ex, add);
 				break;
-			case alt_type: case cut_type: case fail_type:
+			case cut_type:
+				merge<cut_node>(ex, add);
+				break;
+			case alt_type: case fail_type:
 				assert(false && "shouldn't reach this branch");
 			}
 		}
@@ -602,6 +627,7 @@ namespace dlf {
 		for (arc o : out) {
 			// Take derivative and merge in (short-circuiting for unrestricted match)
 			o.succ->d(x, o);
+			if ( o.blocked() ) continue;  // skip blocked nodes
 			auto ins = n.merge(o);
 			if ( ins.second ) return in.join(*ins.first);
 		}

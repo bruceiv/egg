@@ -234,6 +234,27 @@ namespace dlf {
 		virtual bool equiv(ptr<node> o) const = 0;
 	};  // node
 	
+	/// Default visitor that just visits all the nodes; override individual methods to add 
+	/// functionality. Stores visited nodes so that they're not re-visited.
+	class iterator : public visitor {
+	protected:
+		void visit(ptr<node> np);
+	public:
+		virtual void visit(match_node&);
+		virtual void visit(fail_node&);
+		virtual void visit(inf_node&);
+		virtual void visit(end_node&);
+		virtual void visit(char_node&);
+		virtual void visit(range_node&);
+		virtual void visit(any_node&);
+		virtual void visit(str_node&);
+		virtual void visit(rule_node&);
+		virtual void visit(alt_node&);
+		virtual void visit(cut_node&);
+	protected:
+		std::unordered_set<ptr<node>> visited;  ///< Nodes already seen
+	};  // iterator
+	
 	/// Directed arc linking two nodes
 	struct arc {
 		arc() = default;
@@ -249,45 +270,48 @@ namespace dlf {
 		
 		/// Joins to a fail_node. Returns false.
 		bool fail();
+		
+		/// Calls the derivative on the successor node; short for succ->d(x, *this).
+		bool d(char x) { return succ->d(x, *this); }
 			
 		ptr<node> succ;           ///< sucessor pointer
 		restriction_ck blocking;  ///< restrictions blocking this arc
 	};  // arc
 	
 	/// Visitor with function-like interface for counting restrictions in an expression
-	class count_restrict : public visitor {
-		/// Common code for visitor pattern
-		void visit(ptr<node> np);
+	class count_restrict : public iterator {
 	public:
-		count_restrict(ptr<node> np) : nRestrict{0}, visited{} { visit(np); }
-		
+		count_restrict(ptr<node> np) : iterator{}, nRestrict{0} { if ( np ) visit(np); }
 		operator flags::index () { return nRestrict; }
 		
-		virtual void visit(match_node&);
-		virtual void visit(fail_node&);
-		virtual void visit(inf_node&);
-		virtual void visit(end_node&);
-		virtual void visit(char_node& n);
-		virtual void visit(range_node& n);
-		virtual void visit(any_node& n);
-		virtual void visit(str_node& n);
-		virtual void visit(rule_node& n);
-		virtual void visit(alt_node& n);
-		virtual void visit(cut_node& n);
+		virtual void visit(cut_node&) { ++nRestrict; iterator::visit(n); }
 	private:
 		flags::index nRestrict;                 ///< restriction count
-		std::unordered_set<ptr<node>> visited;  ///< Nodes already seen
 	}; // count_restrict
 	
 	/// Nonterminal substitution
 	struct nonterminal {
-		nonterminal(const std::string& name, ptr<node> begin)
-		: name{name}, begin{begin}, nRestrict{count_restrict(begin)}, inDeriv{false} {}
+		nonterminal(const std::string& name, ptr<node> sub = ptr<node>{})
+		: name{name}, inDeriv{false}, sub{}, nRestrict{0}, nbl{false} { reset(sub); }
 		
-		const std::string name;        ///< Name of the non-terminal
-		const ptr<node> begin;         ///< First subexpression in the non-terminal
-		const flags::index nRestrict;  ///< Count of restrictions in this non-terminal
-		bool inDeriv;                  ///< Flag for detecting infinite loops
+		/// Builds an arc that can be used to match this rule
+		arc matchable(bool& match_reachable, restriction_mgr& mgr);
+		
+		/// Gets first node in non-terminal substitution
+		const ptr<node> get() const;
+		/// Gets the count of restriction indexes used by this rule
+		flags::index num_restrictions() const;
+		/// Checks if the substitution is an unrestricted match
+		bool nullable() const;
+		/// Resets the first node in the nonterminal substitution
+		void reset(ptr<node> sub = ptr<node>{});
+		
+		const std::string name;  ///< Name of the non-terminal
+		bool inDeriv;            ///< Flag for detecting infinite loops
+	private:
+		ptr<node> sub;           ///< First subexpression in the non-terminal
+		flags::index nRestrict;  ///< Count of restrictions in this non-terminal
+		bool nbl;                ///< Is the expression nullable?
 	};  // nonterminal
 	
 	/// Visitor with function-like interface for cloning a contained expression
@@ -303,8 +327,8 @@ namespace dlf {
 	public:
 		clone(nonterminal& nt, arc& out, restriction_mgr& mgr) 
 		: rVal{}, out{out}, mgr{mgr}, visited{} {
-			nShift = mgr.reserve(nt.nRestrict);
-			visit(nt.begin);
+			nShift = mgr.reserve(nt.num_restrictions());
+			visit(nt.get());
 		}
 		
 		operator ptr<node> () { return rVal; }
@@ -537,7 +561,27 @@ namespace dlf {
 		alt_node() = default;
 		virtual ~alt_node() = default;
 		
-		static  ptr<node>   make(std::initializer_list<arc> out);
+		template<typename It>
+		static ptr<node> make(It begin, It end) {
+			if ( begin == end ) return fail_node::make();
+		
+			alt_node n;
+			while ( begin != end ) {
+				/// Merge in object, short-circuiting on unrestricted match
+				auto ins = n.merge(*begin);
+				if ( ins.second ) return ins.first->succ;
+				++begin;
+			}
+		
+			if ( n.out.size() == 0 ) return fail_node::make();
+		
+			return node::make<alt_node>(std::move(n));
+		}
+		
+		static ptr<node> make(std::initializer_list<arc> out) { 
+			return make(out.begin(), out.end());
+		}
+		
 		virtual void        accept(visitor* v) { v->visit(*this); }
 		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return alt_type; }

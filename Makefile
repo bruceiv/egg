@@ -38,7 +38,9 @@ OBJS = dlf.o
 dlf.o:  dlf.cpp dlf.hpp utils/flagvector.hpp utils/flags.hpp
 	$(CXX) $(CXXFLAGS) -c dlf.cpp
 
-egg:  $(OBJS) main.cpp egg.hpp parser.hpp visitors/printer.hpp visitors/compiler.hpp visitors/normalizer.hpp
+egg:  main.cpp $(OBJS) egg.hpp parser.hpp \
+      visitors/compiler.hpp visitors/normalizer.hpp visitors/interpreter.hpp \
+      visitors/printer.hpp visitors/dlf-printer.hpp
 	$(CXX) $(CXXFLAGS) -o egg main.cpp $(OBJS) $(LDFLAGS)
 
 clean:  
