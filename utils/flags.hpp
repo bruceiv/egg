@@ -110,19 +110,19 @@ static uint64_t first(uint64_t x) {
 }
 
 /// gets the index of the first bit of a (length n) set
-uint64_t first(const uint64_t* a, uint64_t n) {
+static uint64_t first(const uint64_t* a, uint64_t n) {
 	for (uint64_t i = 0; i < n; ++i) if ( a[i] != 0 ) return i*64 + first(a[i]);
 	return -1;
 }
 
 /// gets the index of the next bit set after i
-uint64_t next(uint64_t x, uint64_t i) {
+static uint64_t next(uint64_t x, uint64_t i) {
 	uint64_t t = x & (mask(i)-1);
 	return ( t == 0 ) ? -1 : first(t);
 }
 
 /// gets the index of the next bit set after i of a (length n)
-uint64_t next(const uint64_t* a, uint64_t n, uint64_t i) {
+static uint64_t next(const uint64_t* a, uint64_t n, uint64_t i) {
 	uint64_t j = el(i);
 	// mask off lower bits of this element
 	uint64_t t = a[j] & (mask(i)-1);
@@ -147,7 +147,7 @@ static uint64_t last(uint64_t x) {
 }
 
 /// gets the index of the last bit of a (length n) set
-uint64_t last(const uint64_t* a, uint64_t n) {
+static uint64_t last(const uint64_t* a, uint64_t n) {
 	do {
 		--n;
 		if ( a[n] != 0 ) return n*64 + last(a[n]);
@@ -168,7 +168,7 @@ static inline uint64_t count(uint64_t x) {
 }
 
 /// gets the count of set bits of a (length n)
-uint64_t count(const uint64_t* a, uint64_t n) {
+static uint64_t count(const uint64_t* a, uint64_t n) {
 	uint64_t c = 0;
 	for (uint64_t i = 0; i < n; ++i) {
 		c += count(a[i]);
@@ -177,17 +177,17 @@ uint64_t count(const uint64_t* a, uint64_t n) {
 }
 
 /// gets the number of set bits of a before i
-inline uint64_t rank(uint64_t x, uint64_t i) { return count(x & ~((mask(i) << 1)-1)); }
-inline uint64_t rank(const uint64_t* a, uint64_t i) { return count(a, el(i)) + rank(a[el(i)], i); }
+static inline uint64_t rank(uint64_t x, uint64_t i) { return count(x & ~((mask(i) << 1)-1)); }
+static inline uint64_t rank(const uint64_t* a, uint64_t i) { return count(a, el(i)) + rank(a[el(i)], i); }
 
 /// gets the index of the j'th bit
-uint64_t select(uint64_t x, uint64_t s) {
+static uint64_t select(uint64_t x, uint64_t s) {
 	uint64_t i = first(x);
 	for (uint64_t r = 1; i != -1 && r < s; ++r) i = next(x, i);
 	return i;
 }
 
-uint64_t select(const uint64_t* a, uint64_t n, uint64_t s) {
+static uint64_t select(const uint64_t* a, uint64_t n, uint64_t s) {
 	uint64_t c = 0;
 	uint64_t i;
 	for (i = 0; i < n-1; ++i) {
@@ -200,59 +200,59 @@ uint64_t select(const uint64_t* a, uint64_t n, uint64_t s) {
 }
 
 /// zero all flags
-inline void clear(uint64_t& x) { x = UINT64_C(0); }
-inline void clear(uint64_t* a, uint64_t n) { for (uint64_t i = 0; i < n; ++i) clear(a[i]); }
+static inline void clear(uint64_t& x) { x = UINT64_C(0); }
+static inline void clear(uint64_t* a, uint64_t n) { for (uint64_t i = 0; i < n; ++i) clear(a[i]); }
 
 /// true if the i'th bit of a is set
-inline bool get(uint64_t x, uint64_t i) { return (x & mask(i)) != 0; }
-inline bool get(const uint64_t* a, uint64_t i) { return get(a[el(i)], i); }
+static inline bool get(uint64_t x, uint64_t i) { return (x & mask(i)) != 0; }
+static inline bool get(const uint64_t* a, uint64_t i) { return get(a[el(i)], i); }
 
 /// sets the i'th bit of a
-inline void set(uint64_t& x, uint64_t i) { x |= mask(i); }
-inline void set(uint64_t* a, uint64_t i) { set(a[el(i)], i); }
+static inline void set(uint64_t& x, uint64_t i) { x |= mask(i); }
+static inline void set(uint64_t* a, uint64_t i) { set(a[el(i)], i); }
 
 /// unsets the i'th bit of a
-inline void unset(uint64_t& x, uint64_t i) { x &= ~mask(i); }
-inline void unset(uint64_t* a, uint64_t i) { unset(a[el(i)], i); }
+static inline void unset(uint64_t& x, uint64_t i) { x &= ~mask(i); }
+static inline void unset(uint64_t* a, uint64_t i) { unset(a[el(i)], i); }
 
 /// flips the i'th bit of a
-inline void flip(uint64_t& x, uint64_t i) { x ^= mask(i); }
-inline void flip(uint64_t* a, uint64_t i) { flip(a[el(i)], i); }
+static inline void flip(uint64_t& x, uint64_t i) { x ^= mask(i); }
+static inline void flip(uint64_t* a, uint64_t i) { flip(a[el(i)], i); }
 
 /// checks if the bitflags are zeroed
-inline bool is_zero(uint64_t x) { return x == 0; }
-inline bool is_zero(const uint64_t* a, uint64_t n) {
+static inline bool is_zero(uint64_t x) { return x == 0; }
+static inline bool is_zero(const uint64_t* a, uint64_t n) {
 	for (uint64_t i = 0; i < n; ++i) if ( a[i] != 0 ) return false;
 	return true;
 }
 
 /// checks if two sets of bitflags intersect
-inline bool intersects(uint64_t x, uint64_t y) { return (x & y) != 0; }
-inline bool intersects(const uint64_t* a, const uint64_t* b, uint64_t n) {
+static inline bool intersects(uint64_t x, uint64_t y) { return (x & y) != 0; }
+static inline bool intersects(const uint64_t* a, const uint64_t* b, uint64_t n) {
 	for (uint64_t i = 0; i < n; ++i) if ( intersects(a[i], b[i]) ) return true;
 	return false;
 }
 
 /// takes the union of two sets of bitflags a and b, writing it into c
-inline void set_union(uint64_t x, uint64_t y, uint64_t& z) { z = x | y; }
-inline void set_union(const uint64_t* a, const uint64_t* b, uint64_t* c, uint64_t n) {
+static inline void set_union(uint64_t x, uint64_t y, uint64_t& z) { z = x | y; }
+static inline void set_union(const uint64_t* a, const uint64_t* b, uint64_t* c, uint64_t n) {
 	for (uint64_t i = 0; i < n; ++i) set_union(a[i], b[i], c[i]);
 }
 
 /// takes the intersection of two sets of bitflags a and b, writing it into c
-inline void set_intersection(uint64_t x, uint64_t y, uint64_t& z) { z = x & y; }
-inline void set_intersection(const uint64_t* a, const uint64_t* b, uint64_t* c, uint64_t n) {
+static inline void set_intersection(uint64_t x, uint64_t y, uint64_t& z) { z = x & y; }
+static inline void set_intersection(const uint64_t* a, const uint64_t* b, uint64_t* c, uint64_t n) {
 	for (uint64_t i = 0; i < n; ++i) set_intersection(a[i], b[i], c[i]);
 }
 
 /// takes the set difference of two sets of bitflags a and b, writing it into c
-inline void set_difference(uint64_t x, uint64_t y, uint64_t& z) { z = x & ~y; }
-inline void set_difference(const uint64_t* a, const uint64_t* b, uint64_t* c, uint64_t n) {
+static inline void set_difference(uint64_t x, uint64_t y, uint64_t& z) { z = x & ~y; }
+static inline void set_difference(const uint64_t* a, const uint64_t* b, uint64_t* c, uint64_t n) {
 	for (uint64_t i = 0; i < n; ++i) set_difference(a[i], b[i], c[i]);
 }
 
 /// shifts a (length n) left by s bits, writing the result into c
-void lsh(const uint64_t* a, const uint64_t s, uint64_t* c, uint64_t n) {
+static void lsh(const uint64_t* a, const uint64_t s, uint64_t* c, uint64_t n) {
 	uint64_t s_l = s >> 6;   // s / 64, number of limbs to shift
 	uint64_t s_b = s & 0x3F; // s % 64, number of bits to shift
 	uint64_t u_s = 64 - s_b; // number of bits to unshift high-order bits
