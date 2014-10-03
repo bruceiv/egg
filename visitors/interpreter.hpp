@@ -117,7 +117,7 @@ namespace dlf {
 		
 		virtual void visit(ast::range_matcher& m) {
 			std::vector<arc> rs;
-			for (const char_range& r : m.rs) {
+			for (const ast::char_range& r : m.rs) {
 				rs.emplace_back(arc{range_node::make(out(), r.from, r.to), ck()});
 			}
 			next = alt_node::make(rs.begin(), rs.end());
@@ -241,20 +241,20 @@ namespace dlf {
 		auto nt = nts.find(rule);
 		
 		// fail on no such rule
-		if ( nt = nts.end() ) return false;
+		if ( nt == nts.end() ) return false;
 		
 		// set up printer
 		std::unordered_set<ptr<nonterminal>> names;
 		for (auto& nit : nts) { names.emplace(nit.second); }
-		derivs::printer p(std::cout, names);
+		dlf::printer p(std::cout, names);
 		
 		// establish initial expression
 		bool match_reachable = true;
 		restriction_mgr mgr;
-		arc e = (*nt)->matchable(match_reachable, mgr);
+		arc e = matchable(nt->second, match_reachable, mgr);
 		
 		// Check for initial success
-		if ( (*nt)->nullable() ) return true;
+		if ( nt->second->nullable() ) return true;
 		
 		// teke derivatives until failure, match, or end of input
 		char x = '\0';
