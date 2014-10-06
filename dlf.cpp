@@ -194,17 +194,17 @@ namespace dlf {
 	
 	// restriction_ck //////////////////////////////////////////////////////////
 	
-	restriction_ck(restriction_mgr& mgr, flags::vector&& restricted) 
+	restriction_ck::restriction_ck(restriction_mgr& mgr, flags::vector&& restricted) 
 	: mgr{mgr}, restricted{restricted}, update{mgr.update}, 
 	  state{restricted.empty() ? allowed : unknown} {}
 	
-	restriction_ck& operator= (const restriction_ck& o) {
+	restriction_ck& restriction_ck::operator= (const restriction_ck& o) {
 		restricted = o.restricted;
 		update = o.update;
 		state = o.state;
 		return *this;
 	}
-	restriction_ck& operator= (restriction_ck&& o) {
+	restriction_ck& restriction_ck::operator= (restriction_ck&& o) {
 		restricted = std::move(o.restricted);
 		update = o.update;
 		state = o.state;
@@ -316,7 +316,7 @@ namespace dlf {
 	count_restrict::count_restrict(ptr<node> np)
 	: iterator{}, nRestrict{0} { if ( np ) iterator::visit(np); }
 	
-	virtual void count_restrict::visit(cut_node& n) { ++nRestrict; iterator::visit(n); }
+	void count_restrict::visit(cut_node& n) { ++nRestrict; iterator::visit(n); }
 	
 	// nonterminal ////////////////////////////////////////////////////////////
 	

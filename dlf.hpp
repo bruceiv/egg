@@ -224,7 +224,6 @@ namespace dlf {
 	/// functionality. Stores visited nodes so that they're not re-visited.
 	class iterator : public visitor {
 	protected:
-		iterator() = default;
 		void visit(ptr<node> np);
 	public:
 		virtual void visit(match_node&);
