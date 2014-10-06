@@ -54,13 +54,13 @@ namespace dlf {
 	
 	/// Abbreviates std::make_shared
 	template<typename T, typename... Args>
-	ptr<T> make_ptr(Args&&... args) { 
+	inline ptr<T> make_ptr(Args&&... args) { 
 		return std::make_shared<T>(std::forward<Args>(args)...);
 	}
 	
 	/// Abreviates std::static_pointer_cast
 	template<typename T, typename U>
-	ptr<T> as_ptr(const ptr<U>& p) { return std::static_pointer_cast<T>(p); }
+	inline ptr<T> as_ptr(const ptr<U>& p) { return std::static_pointer_cast<T>(p); }
 	
 	/// Different restriction states
 	enum restriction {
@@ -74,10 +74,8 @@ namespace dlf {
 	friend class restriction_ck;
 		struct blocker {
 			blocker() = default;
-			blocker(const flags::vector& blocking, bool released = false)
-				: blocking{blocking}, released{released} {}
-			blocker(flags::vector&& blocking, bool released = false)
-				: blocking{std::move(blocking)}, released{released} {}
+			blocker(const flags::vector& blocking, bool released = false);
+			blocker(flags::vector&& blocking, bool released = false);
 			
 			flags::vector blocking;
 			bool released;
@@ -90,7 +88,7 @@ namespace dlf {
 		/// any newly unenforceable rules
 		bool check_unenforceable();
 	public:
-		restriction_mgr() : enforced{}, unenforceable{}, pending{}, update{0}, next{0} {}
+		restriction_mgr();
 		
 		/// Reserve n consecutive restrictions; returns the first index
 		flags::index reserve(flags::index n);
@@ -115,24 +113,12 @@ namespace dlf {
 	class restriction_ck {
 	friend restriction_mgr;
 	public:
-		restriction_ck(restriction_mgr& mgr, flags::vector&& restricted = flags::vector{}) 
-			: mgr{mgr}, restricted{restricted}, update{mgr.update},  
-			  state{restricted.empty() ? allowed : unknown} {}
+		restriction_ck(restriction_mgr& mgr, flags::vector&& restricted = flags::vector{});
 		restriction_ck(const restriction_ck&) = default;
 		restriction_ck(restriction_ck&&) = default;
 		// WARNING: Assignment operators don't rebind manager
-		restriction_ck& operator= (const restriction_ck& o) {
-			restricted = o.restricted;
-			update = o.update;
-			state = o.state;
-			return *this;
-		}
-		restriction_ck& operator= (restriction_ck&& o) {
-			restricted = std::move(o.restricted);
-			update = o.update;
-			state = o.state;
-			return *this;
-		}
+		restriction_ck& operator= (const restriction_ck& o);
+		restriction_ck& operator= (restriction_ck&& o);
 		
 		/// Check if a restriction is enforced
 		restriction check();
@@ -213,7 +199,7 @@ namespace dlf {
 		
 		/// Abreviates std::make_shared for expression nodes
 		template<typename T, typename... Args>
-		static ptr<node> make(Args&&... args) {
+		static inline ptr<node> make(Args&&... args) {
 			return as_ptr<node>(make_ptr<T>(std::forward<Args>(args)...));
 		}
 		
@@ -238,6 +224,7 @@ namespace dlf {
 	/// functionality. Stores visited nodes so that they're not re-visited.
 	class iterator : public visitor {
 	protected:
+		iterator() = default;
 		void visit(ptr<node> np);
 	public:
 		virtual void visit(match_node&);
@@ -258,8 +245,7 @@ namespace dlf {
 	/// Directed arc linking two nodes
 	struct arc {
 		arc() = default;
-		arc(ptr<node> succ, restriction_ck blocking) : succ{succ}, blocking{blocking} {}
-		
+		arc(ptr<node> succ, restriction_ck blocking);
 		
 		/// Returns true and repoints this arc to a fail_node if one of the blocking restrictions 
 		/// is enforced
@@ -281,20 +267,17 @@ namespace dlf {
 	/// Visitor with function-like interface for counting restrictions in an expression
 	class count_restrict : public iterator {
 	public:
-		count_restrict(ptr<node> np) : iterator{}, nRestrict{0} { if ( np ) iterator::visit(np); }
-		operator flags::index () { return nRestrict; }
-		
-		virtual void visit(cut_node& n) { ++nRestrict; iterator::visit(n); }
+		count_restrict(ptr<node> np);
+		inline operator flags::index () { return nRestrict; }
+		virtual void visit(cut_node& n);
 	private:
 		flags::index nRestrict;                 ///< restriction count
 	}; // count_restrict
 	
 	/// Nonterminal substitution
 	struct nonterminal {
-		nonterminal(const std::string& name)
-		: name{name}, inDeriv{false}, sub{fail_node::make()}, nRestrict{0}, nbl{false} {}
-		nonterminal(const std::string& name, ptr<node> sub)
-		: name{name}, inDeriv{false}, sub{sub}, nRestrict{0}, nbl{false} { reset(sub); }
+		nonterminal(const std::string& name);
+		nonterminal(const std::string& name, ptr<node> sub);
 		/// Gets first node in non-terminal substitution
 		const ptr<node> get() const;
 		/// Gets the count of restriction indexes used by this rule
@@ -326,12 +309,7 @@ namespace dlf {
 		/// Functional interface to visitor pattern
 		ptr<node> visit(ptr<node> np);
 	public:
-		clone(nonterminal& nt, arc& out, restriction_mgr& mgr) 
-		: rVal{fail_node::make()}, out{out}, mgr{mgr}, visited{} {
-			nShift = mgr.reserve(nt.num_restrictions());
-			visit(nt.get());
-		}
-		
+		clone(nonterminal& nt, arc& out, restriction_mgr& mgr);
 		operator ptr<node> () { return rVal; }
 		
 		virtual void visit(match_node&);

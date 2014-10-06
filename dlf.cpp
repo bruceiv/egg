@@ -28,6 +28,15 @@
 namespace dlf {
 	// restriction_mgr /////////////////////////////////////////////////////////
 	
+	restriction_mgr::blocker::blocker(const flags::vector& blocking, bool released)
+	: blocking{blocking}, released{released} {}
+	
+	restriction_mgr::blocker::blocker(flags::vector&& blocking, bool released)
+	: blocking{std::move(blocking)}, released{released} {}
+	
+	restriction_mgr::restriction_mgr() 
+	: enforced{}, unenforceable{}, pending{}, update{0}, next{0} {}
+	
 	bool restriction_mgr::check_enforced() {
 		bool new_enforced = false;
 		auto it = pending.begin();
@@ -185,6 +194,23 @@ namespace dlf {
 	
 	// restriction_ck //////////////////////////////////////////////////////////
 	
+	restriction_ck(restriction_mgr& mgr, flags::vector&& restricted) 
+	: mgr{mgr}, restricted{restricted}, update{mgr.update}, 
+	  state{restricted.empty() ? allowed : unknown} {}
+	
+	restriction_ck& operator= (const restriction_ck& o) {
+		restricted = o.restricted;
+		update = o.update;
+		state = o.state;
+		return *this;
+	}
+	restriction_ck& operator= (restriction_ck&& o) {
+		restricted = std::move(o.restricted);
+		update = o.update;
+		state = o.state;
+		return *this;
+	}
+	
 	restriction restriction_ck::check() {
 		// Shortcuts for known state or no change
 		if ( state != unknown || update == mgr.update ) return state;
@@ -265,6 +291,8 @@ namespace dlf {
 	
 	// arc /////////////////////////////////////////////////////////////////////
 	
+	arc::arc(ptr<node> succ, restriction_ck blocking) : succ{succ}, blocking{blocking} {}
+	
 	bool arc::blocked() {
 		if ( blocking.check() == forbidden ) { fail(); return true; }
 		return false;
@@ -283,7 +311,20 @@ namespace dlf {
 	
 	bool arc::d(char x) { return succ->d(x, *this); }
 	
+	// count_restrict /////////////////////////////////////////////////////////
+	
+	count_restrict::count_restrict(ptr<node> np)
+	: iterator{}, nRestrict{0} { if ( np ) iterator::visit(np); }
+	
+	virtual void count_restrict::visit(cut_node& n) { ++nRestrict; iterator::visit(n); }
+	
 	// nonterminal ////////////////////////////////////////////////////////////
+	
+	nonterminal::nonterminal(const std::string& name)
+	: name{name}, inDeriv{false}, sub{fail_node::make()}, nRestrict{0}, nbl{false} {}
+	
+	nonterminal::nonterminal(const std::string& name, ptr<node> sub)
+	: name{name}, inDeriv{false}, sub{sub}, nRestrict{0}, nbl{false} { reset(sub); }
 	
 	const ptr<node> nonterminal::get() const { return sub; }
 	
@@ -310,6 +351,12 @@ namespace dlf {
 	}
 	
 	// clone //////////////////////////////////////////////////////////////////
+	
+	clone::clone(nonterminal& nt, arc& out, restriction_mgr& mgr) 
+	: rVal{fail_node::make()}, out{out}, mgr{mgr}, visited{} {
+		nShift = mgr.reserve(nt.num_restrictions());
+		visit(nt.get());
+	}
 	
 	arc clone::visit(arc& a) {
 		if ( a.succ->type() == end_type ) {
