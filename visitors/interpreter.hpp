@@ -71,7 +71,7 @@ namespace dlf {
 			
 			// set rule node for new anonymous non-terminal
 			ptr<nonterminal> R_i = 
-					make_ptr<nonterminal>("*" + std::to_string(mi++), ptr<node>{});
+					make_ptr<nonterminal>("*" + std::to_string(mi++), fail_node::make());
 			ptr<node> nt = rule_node::make(out(), R_i, mgr);
 			
 			// build anonymous rule
