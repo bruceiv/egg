@@ -285,30 +285,28 @@ namespace dlf {
 	
 	// nonterminal ////////////////////////////////////////////////////////////
 	
-	arc nonterminal::matchable(bool& match_reachable, restriction_mgr& mgr) {
-		return arc{rule_node::make(arc{match_node::make(match_reachable), 
-		                               restriction_ck{mgr}}),
-		           restriction_ck{mgr}};
-	}
-	
-	/// Gets first node in non-terminal substitution
 	const ptr<node> nonterminal::get() const { return sub; }
-	/// Gets the count of restriction indexes used by this rule
+	
 	flags::index nonterminal::num_restrictions() const { return nRestrict; }
-	/// Checks if the substitution is an unrestricted match
+	
 	bool nonterminal::nullable() const { return nbl; }
 	
-	/// Resets the first node
 	void nonterminal::reset(ptr<node> np) {
 		sub = np;
 		if ( sub ) {
-			nRestrict = count_restrict(begin);
+			nRestrict = count_restrict(sub);
 			bool btmp; restriction_mgr mtmp;
-			nbl = matchable(btmp, mtmp).d('\0');
+			nbl = matchable(make_ptr<nonterminal>(*this), btmp, mtmp).d('\0');
 		} else {
 			nRestrict = 0;
 			nbl = false;
 		}
+	}
+
+	arc matchable(ptr<nonterminal> nt, bool& match_reachable, restriction_mgr& mgr) {
+		return arc{rule_node::make(arc{match_node::make(match_reachable), 
+		                               restriction_ck{mgr}}, nt, mgr),
+		           restriction_ck{mgr}};
 	}
 	
 	// clone //////////////////////////////////////////////////////////////////
@@ -332,11 +330,11 @@ namespace dlf {
 		// short-circuit un-copyable nodes
 		switch ( np->type() ) {
 		case match_type: case fail_type: case inf_type:
-			rVal = np;
+			return rVal = np;
 		}
 		// check memo-table
 		auto it = visited.find(np);
-		if ( it != visited.end() ) { rVal = it->second; return rVal; }
+		if ( it != visited.end() ) return rVal = it->second;
 		// visit
 		np->accept(this);
 		// memoize and return
@@ -602,23 +600,6 @@ namespace dlf {
 		
 		return {ins.first, false};
 	}
-	
-	ptr<node> alt_node::make(std::initializer_list<arc> out) {
-		if ( out.size() == 0 ) return fail_node::make();
-		
-		alt_node n;
-		for (arc o : out) {
-			/// Merge in object, short-circuiting on unrestricted match
-			auto ins = n.merge(o);
-			if ( ins.second ) return ins.first->succ;
-		}
-		
-		if ( n.out.size() == 0 ) return fail_node::make();
-		
-		return node::make<alt_node>(std::move(n));
-	}
-	
-	
 	
 	bool alt_node::d(char x, arc& in) {
 		if ( in.blocked() ) return false;

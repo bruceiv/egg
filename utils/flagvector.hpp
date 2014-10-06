@@ -28,6 +28,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <iterator>
 #include <vector>
 #include <utility>
 
@@ -42,6 +43,7 @@ namespace flags {
 		/// Data constructor; sets the storage vector directly
 		vector(std::vector<uint64_t>&& d) : v{std::move(d)} {}
 	public:
+
 		/// Default constructor; creates empty bitset
 		vector() = default;
 		/// Sized constructor; creates zeroed bitset with initial allocation for at least n bits
@@ -79,6 +81,45 @@ namespace flags {
 				flags::last(v.front()) 
 				: flags::last(v.data(), v.size());
 		}
+
+		/// Non-modifying iterator built on first() and next()
+		class const_iterator : public std::iterator<std::forward_iterator_tag, index> {
+		friend vector;
+			const_iterator(const vector& v) : v{v}, crnt{v.first()} {}
+			const_iterator(const vector& v, index crnt) : v{v}, crnt{crnt} {}
+		public:
+			const_iterator(const const_iterator&) = default;
+			const_iterator(const_iterator&&) = default;
+			
+			index operator* () { return crnt; }
+			
+			const_iterator& operator++ () {
+				if ( crnt != -1 ) { crnt = v.next(crnt); }
+				return *this;
+			}
+
+			const_iterator operator++ (int) {
+				const_iterator tmp = *this;
+				++(*this);
+				return tmp;
+			}
+
+			bool operator== (const const_iterator& o) {
+				return &v == &o.v && crnt == o.crnt;
+			}
+
+			bool operator!= (const const_iterator& o) { return ! (*this == o); }
+		private:
+			const vector& v;  ///< Vector iterated
+			index crnt;       ///< Current index
+		}; // const_iterator
+
+		using iterator = const_iterator;
+
+		const_iterator begin() const { return const_iterator(*this); }
+		const_iterator end() const { return const_iterator(*this, -1); }
+		const_iterator cbegin() const { return const_iterator(*this); }
+		const_iterator cend() const { return const_iterator(*this, -1); }
 		
 		/// Gets the count of bits set
 		index count() const {

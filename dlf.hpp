@@ -272,7 +272,7 @@ namespace dlf {
 		bool fail();
 		
 		/// Calls the derivative on the successor node; short for succ->d(x, *this).
-		bool d(char x) { return succ->d(x, *this); }
+		bool d(char x);
 			
 		ptr<node> succ;           ///< sucessor pointer
 		restriction_ck blocking;  ///< restrictions blocking this arc
@@ -281,22 +281,20 @@ namespace dlf {
 	/// Visitor with function-like interface for counting restrictions in an expression
 	class count_restrict : public iterator {
 	public:
-		count_restrict(ptr<node> np) : iterator{}, nRestrict{0} { if ( np ) visit(np); }
+		count_restrict(ptr<node> np) : iterator{}, nRestrict{0} { if ( np ) iterator::visit(np); }
 		operator flags::index () { return nRestrict; }
 		
-		virtual void visit(cut_node&) { ++nRestrict; iterator::visit(n); }
+		virtual void visit(cut_node& n) { ++nRestrict; iterator::visit(n); }
 	private:
 		flags::index nRestrict;                 ///< restriction count
 	}; // count_restrict
 	
 	/// Nonterminal substitution
 	struct nonterminal {
-		nonterminal(const std::string& name, ptr<node> sub = ptr<node>{})
-		: name{name}, inDeriv{false}, sub{}, nRestrict{0}, nbl{false} { reset(sub); }
-		
-		/// Builds an arc that can be used to match this rule
-		arc matchable(bool& match_reachable, restriction_mgr& mgr);
-		
+		nonterminal(const std::string& name)
+		: name{name}, inDeriv{false}, sub{fail_node::make()}, nRestrict{0}, nbl{false} {}
+		nonterminal(const std::string& name, ptr<node> sub)
+		: name{name}, inDeriv{false}, sub{sub}, nRestrict{0}, nbl{false} { reset(sub); }
 		/// Gets first node in non-terminal substitution
 		const ptr<node> get() const;
 		/// Gets the count of restriction indexes used by this rule
@@ -304,7 +302,7 @@ namespace dlf {
 		/// Checks if the substitution is an unrestricted match
 		bool nullable() const;
 		/// Resets the first node in the nonterminal substitution
-		void reset(ptr<node> sub = ptr<node>{});
+		void reset(ptr<node> sub);
 		
 		const std::string name;  ///< Name of the non-terminal
 		bool inDeriv;            ///< Flag for detecting infinite loops
@@ -313,6 +311,9 @@ namespace dlf {
 		flags::index nRestrict;  ///< Count of restrictions in this non-terminal
 		bool nbl;                ///< Is the expression nullable?
 	};  // nonterminal
+	
+	/// Builds an arc that can be used to match a rule
+	arc matchable(ptr<nonterminal> nt, bool& match_reachable, restriction_mgr& mgr);
 	
 	/// Visitor with function-like interface for cloning a contained expression
 	class clone : public visitor {
@@ -326,7 +327,7 @@ namespace dlf {
 		ptr<node> visit(ptr<node> np);
 	public:
 		clone(nonterminal& nt, arc& out, restriction_mgr& mgr) 
-		: rVal{}, out{out}, mgr{mgr}, visited{} {
+		: rVal{fail_node::make()}, out{out}, mgr{mgr}, visited{} {
 			nShift = mgr.reserve(nt.num_restrictions());
 			visit(nt.get());
 		}
@@ -578,8 +579,10 @@ namespace dlf {
 			return node::make<alt_node>(std::move(n));
 		}
 		
-		static ptr<node> make(std::initializer_list<arc> out) { 
-			return make(out.begin(), out.end());
+		static ptr<node> make(std::initializer_list<arc> out) {
+			// Can't actually use out iterators, because they're const
+			std::vector<arc> out_copy(out.begin(), out.end()); 
+			return make(out_copy.begin(), out_copy.end());
 		}
 		
 		virtual void        accept(visitor* v) { v->visit(*this); }

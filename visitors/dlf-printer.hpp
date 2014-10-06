@@ -41,7 +41,7 @@ namespace dlf {
 		
 		/// Prints the definition of a rule
 		void print(ptr<nonterminal> nt) {
-			out << nt->name " := ";
+			out << nt->name << " := ";
 			nt->get()->accept(this);
 			out << std::endl;
 		}
@@ -75,7 +75,7 @@ namespace dlf {
 		}
 		
 		/// Prints the expression; optionally provides output stream and pre-printed rules
-		static void print(ptr<node> n, std::ostream& out = std::cout, 
+		static void print(ptr<node> n, std::ostream& out, 
 		                  const std::unordered_set<ptr<nonterminal>>& rp 
 		                        = std::unordered_set<ptr<nonterminal>>{}) {
 			printer p(out, rp);
@@ -110,8 +110,8 @@ namespace dlf {
 		virtual void visit(rule_node& n) {
 			// Mark rule for printing if not yet printed
 			if ( rp.count(n.r) == 0 ) {
-				rp.emplace(r);
-				pl.emplace_back(r);
+				rp.emplace(n.r);
+				pl.emplace_back(n.r);
 			}
 			out << n.r->name << " ";
 			print(n.out);
