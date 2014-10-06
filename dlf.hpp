@@ -295,7 +295,7 @@ namespace dlf {
 	};  // nonterminal
 	
 	/// Builds an arc that can be used to match a rule
-	arc matchable(ptr<nonterminal> nt, bool& match_reachable, restriction_mgr& mgr);
+	arc matchable(ptr<nonterminal> nt, restriction_mgr& mgr, ptr<bool> match_reachable = ptr<bool>{});
 	
 	/// Visitor with function-like interface for cloning a contained expression
 	class clone : public visitor {
@@ -325,7 +325,7 @@ namespace dlf {
 		
 	private:
 		ptr<node> rVal;        ///< Return value of last visit
-		arc out;               ///< Replacement for endNode
+		arc& out;              ///< Replacement for endNode
 		restriction_mgr& mgr;  ///< Restriction manager
 		flags::index nShift;   ///< Amount to shift restrictions by
 		
@@ -337,14 +337,21 @@ namespace dlf {
 	class match_node : public node {
 		// disallow copying
 		match_node(const match_node&) = delete;
-		match_node(match_node&&) = delete;
 		match_node& operator= (const match_node&) = delete;
-		match_node& operator= (match_node&&) = delete;
 	public:
-		match_node(bool& reacheable) : reachable{reachable} {}
-		virtual ~match_node() { reachable = false; };
-		
-		static  ptr<node>   make(bool& reachable);
+		match_node(ptr<bool> reacheable = ptr<bool>{}) : reachable{reachable} {}
+		virtual ~match_node() {
+			ptr<bool> can_reach = reachable.lock();
+			if ( can_reach ) { *can_reach = false; }
+		}
+		// allow moving
+		match_node(match_node&& o) : reachable{o.reachable} { o.reachable.reset(); } 
+		match_node& operator= (match_node&& o) {
+			reachable = o.reachable;
+			o.reachable.reset();
+		}
+
+		static  ptr<node>   make(ptr<bool> reachable = ptr<bool>{});
 		virtual void        accept(visitor* v) { v->visit(*this); }
 		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return match_type; }
@@ -352,7 +359,7 @@ namespace dlf {
 		virtual bool        equiv(ptr<node>) const;
 	
 	private:
-		bool& reachable;  ///< Reachability flag, sets false in destructor
+		std::weak_ptr<bool> reachable;  ///< Reachability flag, sets false in destructor
 	}; // match_node
 	
 	/// Terminal node representing a failure

@@ -249,9 +249,9 @@ namespace dlf {
 		dlf::printer p(std::cout, names);
 		
 		// establish initial expression
-		bool match_reachable = true;
+		ptr<bool> match_reachable = make_ptr<bool>(true);
 		restriction_mgr mgr;
-		arc e = matchable(nt->second, match_reachable, mgr);
+		arc e = matchable(nt->second, mgr, match_reachable);
 		
 		// Check for initial success
 		if ( nt->second->nullable() ) return true;

@@ -336,15 +336,15 @@ namespace dlf {
 		sub = np;
 		if ( sub ) {
 			nRestrict = count_restrict(sub);
-			bool btmp; restriction_mgr mtmp;
-			nbl = matchable(make_ptr<nonterminal>(*this), btmp, mtmp).d('\0');
+			restriction_mgr mtmp;
+			nbl = matchable(make_ptr<nonterminal>(*this), mtmp).d('\0');
 		} else {
 			nRestrict = 0;
 			nbl = false;
 		}
 	}
 
-	arc matchable(ptr<nonterminal> nt, bool& match_reachable, restriction_mgr& mgr) {
+	arc matchable(ptr<nonterminal> nt, restriction_mgr& mgr, ptr<bool> match_reachable) {
 		return arc{rule_node::make(arc{match_node::make(match_reachable), 
 		                               restriction_ck{mgr}}, nt, mgr),
 		           restriction_ck{mgr}};
@@ -430,7 +430,7 @@ namespace dlf {
 	
 	// match_node //////////////////////////////////////////////////////////////
 	
-	ptr<node> match_node::make(bool& reachable) { return node::make<match_node>(reachable); }
+	ptr<node> match_node::make(ptr<bool> reachable) { return node::make<match_node>(reachable); }
 	
 	bool match_node::d(char, arc& in) {
 		switch ( in.blocking.check() ) {
