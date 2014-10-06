@@ -64,8 +64,12 @@ namespace dlf {
 		/// Based on Kleene's theorem, iterates upward from a bottom of false
 		bool fix_match(ptr<node> np);
 		
-		/// Set of expressions already fixed
+		/// Set of nonterminals already fixed
 		std::unordered_set<ptr<nonterminal>> fixed;
+		/// Set of in progress non-terminals
+		std::unordered_set<ptr<nonterminal>> running;
+		
+		/// Set of 
 		/// Map from nonterminals to the nonterminals they modify
 		std::unordered_map<ptr<nonterminal>,
 		                   std::unordered_set<ptr<nonterminal>> changes;
