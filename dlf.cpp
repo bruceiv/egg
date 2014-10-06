@@ -330,11 +330,11 @@ namespace dlf {
 		// short-circuit un-copyable nodes
 		switch ( np->type() ) {
 		case match_type: case fail_type: case inf_type:
-			rVal = np;
+			return rVal = np;
 		}
 		// check memo-table
 		auto it = visited.find(np);
-		if ( it != visited.end() ) { rVal = it->second; return rVal; }
+		if ( it != visited.end() ) return rVal = it->second;
 		// visit
 		np->accept(this);
 		// memoize and return
