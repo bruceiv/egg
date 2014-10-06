@@ -291,8 +291,10 @@ namespace dlf {
 	
 	/// Nonterminal substitution
 	struct nonterminal {
-		nonterminal(const std::string& name, ptr<node> sub = ptr<node>{})
-		: name{name}, inDeriv{false}, sub{}, nRestrict{0}, nbl{false} { reset(sub); }
+		nonterminal(const std::string& name)
+		: name{name}, inDeriv{false}, sub{fail_node::make()}, nRestrict{0}, nbl{false} {}
+		nonterminal(const std::string& name, ptr<node> sub)
+		: name{name}, inDeriv{false}, sub{sub}, nRestrict{0}, nbl{false} { reset(sub); }
 		/// Gets first node in non-terminal substitution
 		const ptr<node> get() const;
 		/// Gets the count of restriction indexes used by this rule
@@ -300,7 +302,7 @@ namespace dlf {
 		/// Checks if the substitution is an unrestricted match
 		bool nullable() const;
 		/// Resets the first node in the nonterminal substitution
-		void reset(ptr<node> sub = ptr<node>{});
+		void reset(ptr<node> sub);
 		
 		const std::string name;  ///< Name of the non-terminal
 		bool inDeriv;            ///< Flag for detecting infinite loops
@@ -325,7 +327,7 @@ namespace dlf {
 		ptr<node> visit(ptr<node> np);
 	public:
 		clone(nonterminal& nt, arc& out, restriction_mgr& mgr) 
-		: rVal{}, out{out}, mgr{mgr}, visited{} {
+		: rVal{fail_node::make()}, out{out}, mgr{mgr}, visited{} {
 			nShift = mgr.reserve(nt.num_restrictions());
 			visit(nt.get());
 		}
