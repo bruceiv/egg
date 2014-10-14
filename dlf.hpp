@@ -339,7 +339,7 @@ namespace dlf {
 		match_node(const match_node&) = delete;
 		match_node& operator= (const match_node&) = delete;
 	public:
-		match_node(ptr<bool> reacheable = ptr<bool>{}) : reachable{reachable} {}
+		match_node(ptr<bool> reachable = ptr<bool>{}) : reachable{reachable} {}
 		virtual ~match_node() {
 			ptr<bool> can_reach = reachable.lock();
 			if ( can_reach ) { *can_reach = false; }
