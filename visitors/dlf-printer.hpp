@@ -23,6 +23,7 @@
  */
 
 #include <iostream>
+#include <list>
 #include <unordered_set>
 
 #include "../dlf.hpp"
@@ -33,36 +34,6 @@ namespace dlf {
 	// Pretty-printer for DLF parse trees
 	class printer : public visitor {
 		//TODO investigate using ptr ref count to trim extra prints of repeated DAG branches
-	public:
-		printer(std::ostream& out = std::cout, 
-		        const std::unordered_set<ptr<nonterminal>>& rp 
-		              = std::unordered_set<ptr<nonterminal>>{}) 
-			: out{out}, rp{rp}, pl{} {}
-		
-		/// Prints the definition of a rule
-		void print(ptr<nonterminal> nt) {
-			out << nt->name << " := ";
-			nt->get()->accept(this);
-			out << std::endl;
-		}
-		
-		/// Prints an expression
-		void print(ptr<node> n) {
-			if ( n->type() == rule_type ) {
-				// Mark this rule as printed
-				ptr<nonterminal> r = as_ptr<rule_node>(n)->r;
-				if ( rp.count(r) == 0 ) { rp.emplace(r); }
-				pl.emplace_back(r);
-			} else {
-				// Just print the node
-				n->accept(this);
-				out << std::endl;
-			}
-			
-			// Print any rules we haven't printed yet
-			for (auto& nt : pl) { print(nt); }
-			pl.clear();
-		}
 		
 		/// Prints an arc, with its restrictions and successor
 		void print(const arc& a) {
@@ -72,6 +43,35 @@ namespace dlf {
 				out << " ] ";
 			}
 			a.succ->accept(this);
+		}
+		
+		void print_nts() {
+			for (auto it = pl.begin(); it != pl.end(); ++it) {
+				out << (*it)->name << " := ";
+				(*it)->get()->accept(this);
+				out << std::endl;
+			}
+			pl.clear();
+		}
+	public:
+		printer(std::ostream& out = std::cout, 
+		        const std::unordered_set<ptr<nonterminal>>& rp 
+		              = std::unordered_set<ptr<nonterminal>>{}) 
+			: out{out}, rp{rp}, pl{} {}
+			
+		/// Prints the definition of a rule
+		void print(ptr<nonterminal> nt) {
+			rp.emplace(nt);
+			pl.emplace_back(nt);
+			print_nts();
+		}
+		
+		/// Prints an expression
+		void print(ptr<node> n) {
+			// Print the node, followed by any unprinted rules
+			n->accept(this);
+			out << std::endl;
+			print_nts();
 		}
 		
 		/// Prints the expression; optionally provides output stream and pre-printed rules
@@ -136,7 +136,7 @@ namespace dlf {
 	private:
 		std::ostream& out;                        ///< output stream
 		std::unordered_set<ptr<nonterminal>> rp;  ///< Rules that have already been printed
-		std::vector<ptr<nonterminal>> pl;         ///< List of rules to print
+		std::list<ptr<nonterminal>> pl;           ///< List of rules to print
 	}; // printer
 
 } // namespace dlf
