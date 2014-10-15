@@ -67,7 +67,7 @@ namespace dlf {
 		
 		void make_many(ptr<ast::matcher> mp) {
 			// idea is to set up a new anonymous non-terminal R_i and set next to R_i
-			// R_i = m.m < ri > R_i | end
+			// R_i = m.m < ri > R_i | [ri] end
 			
 			// set rule node for new anonymous non-terminal
 			ptr<nonterminal> R_i = make_ptr<nonterminal>("*" + std::to_string(mi++));
