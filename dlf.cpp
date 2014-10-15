@@ -566,17 +566,18 @@ namespace dlf {
 	}
 	
 	bool rule_node::d(char x, arc& in) {
-		if ( in.blocked() ) return false;  // fail on blocked
+		if ( in.blocked() ) return false;    // fail on blocked
+
 		if ( r->inDeriv ) {
-			in.succ = inf_node::make();    // break infinite loop with terminator node
+			in.succ = inf_node::make();  // break infinite loop with terminator node
 			return false;
 		}
 		
-		in.succ = clone(*r, out, mgr);     // expand nonterminal into input arc
-
+		in.succ = clone(*r, out, mgr);       // expand nonterminal into input arc
 		r->inDeriv = true;
-		return in.succ->d(x, in);          // take derivative of successor, under loop flag
+		bool s = in.succ->d(x, in);          // take derivative of successor, under loop flag
 		r->inDeriv = false;
+		return s;
 	}
 	
 	std::size_t rule_node::hash() const { return tag_with(rule_type, std::size_t(r.get())); }
