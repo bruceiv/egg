@@ -156,17 +156,18 @@ namespace dlf {
 		}
 		
 		virtual void visit(ast::alt_matcher& m) {
+			// Idea: m0 < 0 > next | [0] m1 <1> next | ... | [0...n-1] mn next
 			ptr<node> alt_next = next; // save next value
 			flags::vector blocking;    // for greedy longest match
 			
 			std::vector<arc> rs;
 			for (auto& mi : m.ms) {
-				flags::index i = ri++;                 // get a restriction index to use
-				next = cut_node::make(out(), i, mgr);  // build cut for greedy longest match
-				mi->accept(this);                      // build subexpression
-				rs.emplace_back(out());                // add to list of arcs
-				next = alt_next;                       // restore next pointer for next iteration
-				blocking |= i;                         // add index to greedy longest match blocker
+				flags::index i = ri++;                          // get a restriction index to use
+				next = cut_node::make(out(), i, mgr);           // build cut for greedy longest match
+				mi->accept(this);                               // build subexpression
+				rs.emplace_back(out(flags::vector{blocking}));  // add to list of arcs
+				next = alt_next;                                // restore next pointer for next iteration
+				blocking |= i;                                  // add index to greedy longest match blocker
 			}
 			next = alt_node::make(rs.begin(), rs.end());
 		}
