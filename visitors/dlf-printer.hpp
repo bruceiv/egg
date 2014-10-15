@@ -24,6 +24,7 @@
 
 #include <iostream>
 #include <list>
+#include <unordered_map>
 #include <unordered_set>
 
 #include "../dlf.hpp"
@@ -33,8 +34,33 @@ namespace dlf {
 
 	// Pretty-printer for DLF parse trees
 	class printer : public visitor {
-		//TODO investigate using ptr ref count to trim extra prints of repeated DAG branches
-		
+		// np passed by reference to not throw off ref-count
+		void print_deduped(const ptr<node>& np) {
+			// look up node
+			const node* key = np.get();
+			auto it = dups.find(key);
+			
+			if ( it == dups.end() ) {
+				// not in duplicated set
+				
+				// just print non-duplicated nodes (and singleton terminals)
+				auto ty = np->type();
+				if ( np.unique() || ty == fail_type || ty == inf_type ) {
+					np->accept(this);
+					return;
+				}
+
+				// otherwise add to set and print
+				unsigned long ni = dups.size();
+				dups.emplace(key, ni);
+				out << ":" << ni << " ";
+				np->accept(this);
+			} else {
+				// already seen
+				out << "@" << it->second;
+			}
+		}
+
 		/// Prints an arc, with its restrictions and successor
 		void print(const arc& a) {
 			if ( ! a.blocking.restricted.empty() ) {
@@ -42,13 +68,13 @@ namespace dlf {
 				for (auto i : a.blocking.restricted) { out << " " << i; }
 				out << " ] ";
 			}
-			a.succ->accept(this);
+			print_deduped(a.succ);
 		}
 		
 		void print_nts() {
 			for (auto it = pl.begin(); it != pl.end(); ++it) {
 				out << (*it)->name << " := ";
-				(*it)->get()->accept(this);
+				print_deduped((*it)->get());
 				out << std::endl;
 			}
 			pl.clear();
@@ -57,10 +83,11 @@ namespace dlf {
 		printer(std::ostream& out = std::cout, 
 		        const std::unordered_set<ptr<nonterminal>>& rp 
 		              = std::unordered_set<ptr<nonterminal>>{}) 
-			: out{out}, rp{rp}, pl{} {}
+			: out{out}, rp{rp}, pl{}, dups{} {}
 			
 		/// Prints the definition of a rule
 		void print(ptr<nonterminal> nt) {
+			dups.clear();  // nodes could have been mutated since last print
 			rp.emplace(nt);
 			pl.emplace_back(nt);
 			print_nts();
@@ -68,8 +95,9 @@ namespace dlf {
 		
 		/// Prints an expression
 		void print(ptr<node> n) {
+			dups.clear(); // nodes could have been mutated since last print
 			// Print the node, followed by any unprinted rules
-			n->accept(this);
+			print_deduped(n);
 			out << std::endl;
 			print_nts();
 		}
@@ -137,6 +165,8 @@ namespace dlf {
 		std::ostream& out;                        ///< output stream
 		std::unordered_set<ptr<nonterminal>> rp;  ///< Rules that have already been printed
 		std::list<ptr<nonterminal>> pl;           ///< List of rules to print
+		std::unordered_map<const node*,
+                                   unsigned long> dups;   ///< IDs for duplicated nodes
 	}; // printer
 
 } // namespace dlf
