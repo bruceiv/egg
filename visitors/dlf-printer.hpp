@@ -146,7 +146,7 @@ namespace dlf {
 		}
 		
 		virtual void visit(alt_node& n) {
-			out << "( ";
+			out << "(";
 			auto it = n.out.begin();
 			if ( it != n.out.end() ) do {
 				print(*it);
