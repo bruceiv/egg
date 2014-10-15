@@ -268,8 +268,13 @@ namespace dlf {
 			}
 			
 			// take derivative; return true if unrestricted match
-			if ( e.d(x) ) return true;
+			if ( e.d(x) ) {
+				if ( dbg ) { p.print(e.succ); }
+				return true;
+			}
 		} while ( match_reachable && x != '\0' );
+		
+		if ( dbg ) { p.print(e.succ); }
 		
 		return false;
 	}
