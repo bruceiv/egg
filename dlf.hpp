@@ -110,6 +110,7 @@ namespace dlf {
 		
 		flags::vector enforced;          ///< set of enforced restrictions
 		flags::vector unenforceable;     ///< set of unenforceable restrictions
+		bool match_reachable;            ///< is the match-node reachable?
 	private:
 		std::unordered_map<std::string, 
                                    bool> dirty;  ///< set of dirty flags
@@ -305,7 +306,7 @@ namespace dlf {
 	};  // nonterminal
 	
 	/// Builds an arc that can be used to match a rule
-	arc matchable(ptr<nonterminal> nt, state_mgr& mgr, ptr<bool> match_reachable = ptr<bool>{});
+	arc matchable(ptr<nonterminal> nt, state_mgr& mgr);
 	
 	/// Visitor with function-like interface for cloning a contained expression
 	class clone : public visitor {
@@ -345,23 +346,16 @@ namespace dlf {
 	
 	/// Terminal node representing a match
 	class match_node : public node {
-		// disallow copying
+		// disallow copying and moving
 		match_node(const match_node&) = delete;
 		match_node& operator= (const match_node&) = delete;
+		match_node(match_node&&) = delete;
+		match_node& operator= (match_node&&) = delete;
 	public:
-		match_node(ptr<bool> reachable = ptr<bool>{}) : reachable{reachable} {}
-		virtual ~match_node() {
-			ptr<bool> can_reach = reachable.lock();
-			if ( can_reach ) { *can_reach = false; }
-		}
-		// allow moving
-		match_node(match_node&& o) : reachable{o.reachable} { o.reachable.reset(); } 
-		match_node& operator= (match_node&& o) {
-			reachable = o.reachable;
-			o.reachable.reset();
-		}
+		match_node(state_mgr& mgr) : mgr{mgr} {}
+		virtual ~match_node() { mgr.match_reachable = false; }
 
-		static  ptr<node>   make(ptr<bool> reachable = ptr<bool>{});
+		static  ptr<node>   make(state_mgr& mgr);
 		virtual void        accept(visitor* v) { v->visit(*this); }
 		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return match_type; }
@@ -369,7 +363,7 @@ namespace dlf {
 		virtual bool        equiv(ptr<node>) const;
 	
 	private:
-		std::weak_ptr<bool> reachable;  ///< Reachability flag, sets false in destructor
+		state_mgr& mgr;  ///< Sets reachability flag false in destructor
 	}; // match_node
 	
 	/// Terminal node representing a failure

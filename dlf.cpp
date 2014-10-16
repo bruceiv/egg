@@ -35,7 +35,8 @@ namespace dlf {
 	: blocking{std::move(blocking)}, released{released} {}
 	
 	state_mgr::state_mgr() 
-	: enforced{}, unenforceable{}, dirty{}, pending{}, update{0}, next{0} {}
+	: enforced{}, unenforceable{}, match_reachable{true}, 
+          dirty{}, pending{}, update{0}, next{0} {}
 	
 	bool state_mgr::check_enforced() {
 		bool new_enforced = false;
@@ -350,8 +351,8 @@ namespace dlf {
 		}
 	}
 
-	arc matchable(ptr<nonterminal> nt, state_mgr& mgr, ptr<bool> match_reachable) {
-		return arc{rule_node::make(arc{match_node::make(match_reachable), 
+	arc matchable(ptr<nonterminal> nt, state_mgr& mgr) {
+		return arc{rule_node::make(arc{match_node::make(mgr), 
 		                               restriction_ck{mgr}}, nt, mgr),
 		           restriction_ck{mgr}};
 	}
@@ -436,7 +437,7 @@ namespace dlf {
 	
 	// match_node //////////////////////////////////////////////////////////////
 	
-	ptr<node> match_node::make(ptr<bool> reachable) { return node::make<match_node>(reachable); }
+	ptr<node> match_node::make(state_mgr& mgr) { return node::make<match_node>(mgr); }
 	
 	bool match_node::d(char, arc& in) {
 		switch ( in.blocking.check() ) {

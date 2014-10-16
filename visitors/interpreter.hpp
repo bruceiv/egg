@@ -243,18 +243,17 @@ namespace dlf {
 		// fail on no such rule
 		if ( nt == nts.end() ) return false;
 		
+		// Check for initial success
+		if ( nt->second->nullable() ) return true;
+		
 		// set up printer
 		std::unordered_set<ptr<nonterminal>> names;
 		for (auto& nit : nts) { names.emplace(nit.second); }
 		dlf::printer p(std::cout, names);
 		
 		// establish initial expression
-		ptr<bool> match_reachable = make_ptr<bool>(true);
 		state_mgr mgr;
-		arc e = matchable(nt->second, mgr, match_reachable);
-		
-		// Check for initial success
-		if ( nt->second->nullable() ) return true;
+		arc e = matchable(nt->second, mgr);
 		
 		// teke derivatives until failure, match, or end of input
 		char x = '\0';
@@ -273,7 +272,7 @@ namespace dlf {
 				if ( dbg ) { p.print(e.succ); }
 				return true;
 			}
-		} while ( match_reachable && x != '\0' );
+		} while ( mgr.match_reachable && x != '\0' );
 		
 		if ( dbg ) { p.print(e.succ); }
 		
