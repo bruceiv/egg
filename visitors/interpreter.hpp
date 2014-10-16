@@ -55,45 +55,52 @@ namespace dlf {
 		/// Sets unique nonterminal for each name
 		void set_nonterminal(const std::string& s, ptr<node> n) { get_nonterminal(s)->reset(n); }
 		
-		/// Produces a new restriction check from the current manager
-		restriction_ck ck(flags::vector&& blocking = flags::vector{}) {
-			return restriction_ck{mgr, std::move(blocking)};
-		}
-		
 		/// Produces a new arc to the next node
 		arc out(flags::vector&& blocking = flags::vector{}) {
-			return arc{next, ck(std::move(blocking))};
+			return arc{next, mgr, std::move(blocking), flags::vector{next_cuts}};
+		}
+
+		/// Sets the next and next_cut values
+		inline void set_next(ptr<node> n) {
+			next = n;
+			next_cuts.clear();
+		}
+		
+		inline void set_next(ptr<node> n, flags::vector&& cuts) {
+			next = n;
+			next_cuts = std::move(cuts);
 		}
 		
 		void make_many(ptr<ast::matcher> mp) {
 			// idea is to set up a new anonymous non-terminal R_i and set next to R_i
-			// R_i = m.m < ri > R_i | [ri] end
+			// R_i = m.m [^ri] R_i end | [ri] end
 			
 			// set rule node for new anonymous non-terminal
 			ptr<nonterminal> R_i = make_ptr<nonterminal>("*" + std::to_string(mi++));
 			ptr<node> nt = rule_node::make(out(), R_i, mgr);
 			
 			// build anonymous rule
-			flags::index i = ri++;                        // get a restriction index to use
-			next = end_node::make();                      // make end node for rule
-			arc skip = out(flags::vector::of(i));         // save arc that skips match
-			next = rule_node::make(out(), R_i, mgr);      // build recursive invocation of rule
-			next = cut_node::make(out(), i, mgr);         // build cut node to succeed match
-			flags::index ri_bak = ri; ri = 0;             // save ri
-			mp->accept(this);                             // build many-expression
-			ri = ri_bak;                                  // restore ri
-			R_i->reset(alt_node::make({out(), skip}));    // reset rule
+			flags::index i = ri++;                      // get a restriction index to use
+			set_next(end_node::make());                 // make end node for rule
+			arc skip = out(flags::vector::of(i));       // save arc that skips match
+			set_next(rule_node::make(out(), R_i, mgr),  // build recursive invocation of rule
+			         flags::vector::of(i));             // set up cut on out-edges of many-expression
+			flags::index ri_bak = ri; ri = 0;           // save ri
+			mp->accept(this);                           // build many-expression
+			ri = ri_bak;                                // restore ri
+			R_i->reset(alt_node::make({out(), skip}));  // reset rule
 			
 			// reset next to rule reference
-			next = nt;
+			set_next(nt);
 		}
 
 	public:
 		/// Builds a DLF parse DAG from the given PEG grammar
-		loader(ast::grammar& g, bool dbg = false) : mgr{}, nts{}, next{}, ri{0}, mi{0} {
+		loader(ast::grammar& g, bool dbg = false) 
+		: mgr{}, nts{}, next{}, next_cuts{}, ri{0}, mi{0} {
 			// Read in rules
 			for (auto r : g.rs) {
-				next = end_node::make();
+				set_next(end_node::make());
 				r->m->accept(this);
 				set_nonterminal(r->name, next);
 				ri = 0;
@@ -110,35 +117,35 @@ namespace dlf {
 		
 		std::map<std::string, ptr<nonterminal>>& get_nonterminals() { return nts; }
 		
-		virtual void visit(ast::char_matcher& m) { next = char_node::make(out(), m.c); }
+		virtual void visit(ast::char_matcher& m) { set_next(char_node::make(out(), m.c)); }
 		
-		virtual void visit(ast::str_matcher& m) { next = str_node::make(out(), m.s); }
+		virtual void visit(ast::str_matcher& m) { set_next(str_node::make(out(), m.s)); }
 		
 		virtual void visit(ast::range_matcher& m) {
 			std::vector<arc> rs;
 			for (const ast::char_range& r : m.rs) {
-				rs.emplace_back(arc{range_node::make(out(), r.from, r.to), ck()});
+				rs.emplace_back(arc{range_node::make(out(), r.from, r.to), mgr});
 			}
-			next = alt_node::make(rs.begin(), rs.end());
+			set_next(alt_node::make(rs.begin(), rs.end()));
 		}
 		
 		virtual void visit(ast::rule_matcher& m) {
-			next = rule_node::make(out(), get_nonterminal(m.rule), mgr);
+			set_next(rule_node::make(out(), get_nonterminal(m.rule), mgr));
 		}
 		
-		virtual void visit(ast::any_matcher& m) { next = any_node::make(out()); }
+		virtual void visit(ast::any_matcher& m) { set_next(any_node::make(out())); }
 		
 		virtual void visit(ast::empty_matcher& m) { /* do nothing; next remains next */ }
 		
 		virtual void visit(ast::action_matcher& m) { /* TODO implement; for now no-op */ }
 		
 		virtual void visit(ast::opt_matcher& m) {
-			// Idea: m.m < i > next | [i] next
-			flags::index i = ri++;                 // get a restriction index to use
-			arc skip = out(flags::vector::of(i));  // save arc that skips the optional
-			next = cut_node::make(out(), i, mgr);  // build cut node to succeed match
-			m.m->accept(this);                     // build opt-expression
-			next = alt_node::make({out(), skip});  // make alternation of two paths
+			// Idea: m.m [^i] next | [i] next
+			flags::index i = ri++;                    // get a restriction index to use
+			arc skip = out(flags::vector::of(i));     // save arc that skips the optional
+			next_cuts |= i;                           // add restriction to cut-set
+			m.m->accept(this);                        // build opt-expression
+			set_next(alt_node::make({out(), skip}));  // make alternation of two paths
 		}
 		
 		virtual void visit(ast::many_matcher& m) {
@@ -156,54 +163,51 @@ namespace dlf {
 		}
 		
 		virtual void visit(ast::alt_matcher& m) {
-			// Idea: m0 < 0 > next | [0] m1 <1> next | ... | [0...n-1] mn next
-			ptr<node> alt_next = next; // save next value
-			flags::vector blocking;    // for greedy longest match
+			// Idea: m0 [^0] next | [0] m1 [^1] next | ... | [0...n-1] mn next
+			ptr<node> alt_next = next;           // save next value
+			flags::vector alt_cuts = next_cuts;  // ... and cuts
+			
+			flags::vector blocking;              // cuts for greedy longest match
 			
 			std::vector<arc> rs;
 			for (auto& mi : m.ms) {
 				flags::index i = ri++;                          // get a restriction index to use
-				next = cut_node::make(out(), i, mgr);           // build cut for greedy longest match
+				next_cuts |= i;                                 // flag cut for greedy longest match
 				mi->accept(this);                               // build subexpression
 				rs.emplace_back(out(flags::vector{blocking}));  // add to list of arcs
-				next = alt_next;                                // restore next pointer for next iteration
+				set_next(alt_next, flags::vector{alt_cuts});    // restore next values for next iteration
 				blocking |= i;                                  // add index to greedy longest match blocker
 			}
-			next = alt_node::make(rs.begin(), rs.end());
+			set_next(alt_node::make(rs.begin(), rs.end()));
 		}
 		
 		virtual void visit(ast::look_matcher& m) {
-			// Idea - !!m.m: m.m <j> fail | [j] <i> fail | [i] next
-			// If m.m matches, we cut out the <i> branch, freeing next to proceed safely
+			// Idea - !!m.m: m.m [^j] fail | [j ^i] fail | [i] next
+			// If m.m matches, we cut out the [j ^i] branch, freeing next to proceed safely
 			
-			// save restriction indices and next pointer
-			flags::index i = ri++;
+			// save restriction indices
 			flags::index j = ri++;
-			ptr<node> next_bak = next;
+			flags::index i = ri++;
+			// build continuing branch
+			arc cont = out(flags::vector::of(i));
 			// build cut branch
-			next = fail_node::make();
-			next = cut_node::make(out(), i, mgr);
+			set_next(fail_node::make(), flags::vector::of(i));
 			arc cut = out(flags::vector::of(j));
 			// build matching branch
-			next = fail_node::make();
-			next = cut_node::make(out(), j, mgr);
-			// alternate paths
-			next = alt_node::make({
-					arc{next_bak, ck(flags::vector::of(i))},
-					cut,
-					out()});
+			set_next(fail_node::make(), flags::vector::of(j));
+			m.m->accept(this);
+			// set alternate paths
+			next = alt_node::make({cont, cut, out()});
 		}
 		
 		virtual void visit(ast::not_matcher& m) {
-			// Idea - match both paths, failing if the not path matches: m.m <i> fail | [i] next
-			flags::index i = ri++;                 // get a restriction index to use
-			ptr<node> next_bak = next;             // save next pointer
-			next = fail_node::make();              // terminate blocking path
-			next = cut_node::make(out(), i, mgr);  // cut straight path on match
-			m.m->accept(this);                     // build blocking path
-			next = alt_node::make({                // alternate straight and blocking paths
-					arc{next_bak, ck(flags::vector::of(i))}, 
-					out()});
+			// Idea - match both paths, failing if the not path matches: m.m [^i] fail | [i] next
+			flags::index i = ri++;                    // get a restriction index to use
+			arc cont = out(flags::vector::of(i));     // build continuing branch
+			set_next(fail_node::make(),               // terminate blocking branch
+                                 flags::vector::of(i));              // with a cut on the match index
+			m.m->accept(this);                        // build blocking branch
+			set_next(alt_node::make({cont, out()}));  // alternate continuing and blocking branches
 		}
 		
 		virtual void visit(ast::capt_matcher& m) {
@@ -218,7 +222,7 @@ namespace dlf {
 		
 		virtual void visit(ast::fail_matcher& m) {
 			// TODO complete implementation; for now ignore the error message
-			next = fail_node::make();
+			set_next(fail_node::make());
 		}
 		
 	private:
@@ -228,6 +232,7 @@ namespace dlf {
 		// manager when the references in them expire
 		std::map<std::string, ptr<nonterminal>> nts;  ///< List of non-terminals
 		ptr<node> next;                               ///< Next node
+		flags::vector next_cuts;                      ///< Cuts to apply before next node
 		flags::index ri;                              ///< Current restriction index
 		unsigned long mi;                             ///< Index to uniquely name many-nodes
 	}; // loader

@@ -63,9 +63,13 @@ namespace dlf {
 
 		/// Prints an arc, with its restrictions and successor
 		void print(const arc& a) {
-			if ( ! a.blocking.restricted.empty() ) {
+			if ( ! (a.blocking.restricted.empty() && a.cuts.empty()) ) {
 				out << "[";
 				for (auto i : a.blocking.restricted) { out << " " << i; }
+				if ( ! a.cuts.empty() ) {
+					out << " ^";
+					for (auto i : a.cuts) { out << " " << i; }
+				}
 				out << " ] ";
 			}
 			print_deduped(a.succ);
@@ -154,11 +158,6 @@ namespace dlf {
 				out << " | ";
 			} while (true);
 			out << ")";
-		}
-		
-		virtual void visit(cut_node& n) {
-			out << "<" << n.i << "> ";
-			print(n.out);
 		}
 		
 	private:
