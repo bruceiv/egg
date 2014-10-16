@@ -47,12 +47,7 @@ namespace flags {
 		/// Default constructor; creates empty bitset
 		vector() = default;
 		/// Sized constructor; creates zeroed bitset with initial allocation for at least n bits
-		vector(index n) : v{(n+63) >> 6} {
-			// even with explicit casts I can't make this use the 2-arg (size, value) vector constructor
-			// and the size-only c'tor generates random data, so this needs to be cleared afterward
-			v.size() == 1 ? flags::clear(v.front()) 
-                                      : flags::clear(v.data(), v.size());
-		}
+		vector(index n) : v((n+63) >> 6, UINT64_C(0)) {}
 		
 		vector(const vector& o) = default;
 		vector(vector&& o) = default;
