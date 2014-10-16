@@ -98,15 +98,26 @@ namespace dlf {
 		
 		/// A restriction will not be enforced any more
 		void release(flags::index i);
+
+		/// Checks if the dirty flag is set for `s`
+		bool is_dirty(const std::string& s);
+
+		/// Raises the dirty flag for `s`
+		void set_dirty(const std::string& s);
+
+		/// Lowers the dirty flag for `s`
+		void unset_dirty(const std::string& s);
 		
-		flags::vector enforced;       ///< set of enforced restrictions
-		flags::vector unenforceable;  ///< set of unenforceable restrictions
+		flags::vector enforced;          ///< set of enforced restrictions
+		flags::vector unenforceable;     ///< set of unenforceable restrictions
 	private:
+		std::unordered_map<std::string, 
+                                   bool> dirty;  ///< set of dirty flags
 		/// restrictions that we haven't decided about enforcing
 		std::unordered_map<flags::index, 
 		                   blocker> pending;
-		unsigned long update;     ///< index of last update
-		flags::index next;        ///< next available restriction
+		unsigned long update;            ///< index of last update
+		flags::index next;               ///< next available restriction
 	};  // state_mgr
 	
 	/// Determines whether a node is prevented from matching
@@ -287,7 +298,6 @@ namespace dlf {
 		void reset(ptr<node> sub);
 		
 		const std::string name;  ///< Name of the non-terminal
-		bool inDeriv;            ///< Flag for detecting infinite loops
 	private:
 		ptr<node> sub;           ///< First subexpression in the non-terminal
 		flags::index nRestrict;  ///< Count of restrictions in this non-terminal

@@ -35,7 +35,7 @@ namespace dlf {
 	: blocking{std::move(blocking)}, released{released} {}
 	
 	state_mgr::state_mgr() 
-	: enforced{}, unenforceable{}, pending{}, update{0}, next{0} {}
+	: enforced{}, unenforceable{}, dirty{}, pending{}, update{0}, next{0} {}
 	
 	bool state_mgr::check_enforced() {
 		bool new_enforced = false;
@@ -191,6 +191,12 @@ namespace dlf {
 		
 		++update;
 	}
+
+	bool state_mgr::is_dirty(const std::string& s) { return dirty[s]; }
+
+	void state_mgr::set_dirty(const std::string& s) { dirty[s] = true; }
+
+	void state_mgr::unset_dirty(const std::string& s) { dirty[s] = false; }
 	
 	// restriction_ck //////////////////////////////////////////////////////////
 	
@@ -321,10 +327,10 @@ namespace dlf {
 	// nonterminal ////////////////////////////////////////////////////////////
 	
 	nonterminal::nonterminal(const std::string& name)
-	: name{name}, inDeriv{false}, sub{fail_node::make()}, nRestrict{0}, nbl{false} {}
+	: name{name}, sub{fail_node::make()}, nRestrict{0}, nbl{false} {}
 	
 	nonterminal::nonterminal(const std::string& name, ptr<node> sub)
-	: name{name}, inDeriv{false}, sub{sub}, nRestrict{0}, nbl{false} { reset(sub); }
+	: name{name}, sub{sub}, nRestrict{0}, nbl{false} { reset(sub); }
 	
 	const ptr<node> nonterminal::get() const { return sub; }
 	
@@ -568,15 +574,15 @@ namespace dlf {
 	bool rule_node::d(char x, arc& in) {
 		if ( in.blocked() ) return false;    // fail on blocked
 
-		if ( r->inDeriv ) {
+		if ( mgr.is_dirty(r->name) ) {
 			in.succ = inf_node::make();  // break infinite loop with terminator node
 			return false;
 		}
 		
 		in.succ = clone(*r, out, mgr);       // expand nonterminal into input arc
-		r->inDeriv = true;
+		mgr.set_dirty(r->name);
 		bool s = in.succ->d(x, in);          // take derivative of successor, under loop flag
-		r->inDeriv = false;
+		mgr.unset_dirty(r->name);
 		return s;
 	}
 	
