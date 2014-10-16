@@ -90,7 +90,7 @@ namespace dlf {
 
 	public:
 		/// Builds a DLF parse DAG from the given PEG grammar
-		loader(ast::grammar& g, bool dbg = false) : nts{}, next{}, mgr{}, ri{0}, mi{0} {
+		loader(ast::grammar& g, bool dbg = false) : mgr{}, nts{}, next{}, ri{0}, mi{0} {
 			// Read in rules
 			for (auto r : g.rs) {
 				next = end_node::make();
@@ -222,9 +222,12 @@ namespace dlf {
 		}
 		
 	private:
+		state_mgr mgr;                                ///< State manager
+		// NOTE it is *very* important that mgr be declared before nts; we also want to 
+		// deallocate nts first so that the nonterminals it's managing still have a 
+		// manager when the references in them expire
 		std::map<std::string, ptr<nonterminal>> nts;  ///< List of non-terminals
 		ptr<node> next;                               ///< Next node
-		state_mgr mgr;                                ///< Restriction manager to set up
 		flags::index ri;                              ///< Current restriction index
 		unsigned long mi;                             ///< Index to uniquely name many-nodes
 	}; // loader
