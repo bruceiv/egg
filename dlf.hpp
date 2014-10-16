@@ -81,11 +81,11 @@ namespace dlf {
 			bool released;
 		};
 		
-		/// Check for newly enforced rules after unenforceable has been changed; returns if there 
-		/// are any newly enforced rules
+		/// Check for newly enforced rules after unenforceable has been changed; returns 
+		/// true if there are any newly enforced rules
 		bool check_enforced();
-		/// Check for newly unenforceable rules after enforced has changed; returns if there are 
-		/// any newly unenforceable rules
+		/// Check for newly unenforceable rules after enforced has changed; returns true  
+		/// if there are any newly unenforceable rules
 		bool check_unenforceable();
 	public:
 		state_mgr();
@@ -159,7 +159,7 @@ namespace dlf {
 	class str_node;
 	class rule_node;
 	class alt_node;
-	class cut_node;
+//	class cut_node;
 	
 	/// Type of expression node
 	enum node_type : std::size_t {
@@ -173,7 +173,7 @@ namespace dlf {
 		str_type   = 0x7,
 		rule_type  = 0x8,
 		alt_type   = 0x9,
-		cut_type   = 0xA
+//		cut_type   = 0xA
 	};
 	
 	/// Tags `x` with the given node type; useful for hashing
@@ -196,7 +196,7 @@ namespace dlf {
 		virtual void visit(str_node&)   = 0;
 		virtual void visit(rule_node&)  = 0;
 		virtual void visit(alt_node&)   = 0;
-		virtual void visit(cut_node&)   = 0;
+//		virtual void visit(cut_node&)   = 0;
 	}; // visitor
 	
 	struct arc;
@@ -236,7 +236,8 @@ namespace dlf {
 	/// functionality. Stores visited nodes so that they're not re-visited.
 	class iterator : public visitor {
 	protected:
-		void visit(ptr<node> np);
+		virtual void visit(const arc& a);
+		virtual void visit(ptr<node> np);
 	public:
 		virtual void visit(match_node&);
 		virtual void visit(fail_node&);
@@ -248,39 +249,46 @@ namespace dlf {
 		virtual void visit(str_node&);
 		virtual void visit(rule_node&);
 		virtual void visit(alt_node&);
-		virtual void visit(cut_node&);
+//		virtual void visit(cut_node&);
 	protected:
 		std::unordered_set<ptr<node>> visited;  ///< Nodes already seen
 	};  // iterator
 	
 	/// Directed arc linking two nodes
 	struct arc {
-		arc() = default;
-		arc(ptr<node> succ, restriction_ck blocking);
+		arc(ptr<node> succ, state_mgr& mgr, flags::vector&& blocking = flags::vector{}, 
+                    flags::vector&& cuts = flags::vector{});
+		~arc();
 		
-		/// Returns true and repoints this arc to a fail_node if one of the blocking restrictions 
-		/// is enforced
-		bool blocked();
+		/// Attempts to traverse this arc, returning false and repointing this arc to a 
+		/// fail_node if one of the blocking restrictions is enforced
+		bool try_follow();
 		
 		/// Joins to an outgoing arc. Returns true if now an unrestricted match (as in node::d()).
-		bool join(const arc& out);
+		bool join(arc& out);
 		
 		/// Joins to a fail_node. Returns false.
 		bool fail();
 		
-		/// Calls the derivative on the successor node; short for succ->d(x, *this).
+		/// Attempts to follow this arc and calls the derivative on the successor node.
+		/// Returns true if this is not blocked and the successor derivative returns true.
 		bool d(char x);
 			
-		ptr<node> succ;           ///< sucessor pointer
-		restriction_ck blocking;  ///< restrictions blocking this arc
+		ptr<node> succ;           ///< Sucessor pointer
+		restriction_ck blocking;  ///< Restrictions blocking this arc
+		flags::vector cuts;       ///< Cuts to apply when traversing this arc
+		state_mgr& mgr;           ///< State manager
 	};  // arc
 	
 	/// Visitor with function-like interface for counting restrictions in an expression
 	class count_restrict : public iterator {
+		/// Common code for visiting an arc
+		void visit(const arc& a);
 	public:
 		count_restrict(ptr<node> np);
 		inline operator flags::index () { return nRestrict; }
-		virtual void visit(cut_node& n);
+		
+//		virtual void visit(cut_node& n);
 	private:
 		flags::index nRestrict;                 ///< restriction count
 	}; // count_restrict
@@ -313,9 +321,6 @@ namespace dlf {
 		/// Common code for visiting an arc
 		arc visit(arc& a);
 		
-		/// Common code for visiting a restriction check
-		restriction_ck visit(restriction_ck& rck);
-		
 		/// Functional interface to visitor pattern
 		ptr<node> visit(ptr<node> np);
 	public:
@@ -332,13 +337,13 @@ namespace dlf {
 		virtual void visit(str_node& n);
 		virtual void visit(rule_node& n);
 		virtual void visit(alt_node& n);
-		virtual void visit(cut_node& n);
+//		virtual void visit(cut_node& n);
 		
 	private:
-		ptr<node> rVal;  ///< Return value of last visit
-		arc& out;        ///< Replacement for endNode
-		state_mgr& mgr;  ///< State manager
-		flags::index nShift;   ///< Amount to shift restrictions by
+		ptr<node> rVal;       ///< Return value of last visit
+		arc& out;             ///< Replacement for endNode
+		state_mgr& mgr;       ///< State manager
+		flags::index nShift;  ///< Amount to shift restrictions by
 		
 		/// Memoizes visited nodes (to ensure singleton nodes remain singletons).
 		std::unordered_map<ptr<node>, ptr<node>> visited;
@@ -535,17 +540,23 @@ namespace dlf {
 		void merge(arc& ex, arc& add) {
 			arc& ex_out  = as_ptr<NT>(ex.succ)->out;         // Get successor from common type
 			arc& add_out = as_ptr<NT>(add.succ)->out;        // Get successor from added node
+
 			ex_out.blocking.join(ex.blocking);               // add existing blockers to successor
 			add_out.blocking.join(add.blocking);             // add new blockers to new successor
 			ex.blocking.refine(add.blocking);                // intersect blockers
-			ex_out = arc{alt_node::make({ex_out, add_out}),
-                                     restriction_ck{ex.blocking.mgr}};   // join new node
+
+			ex.cuts |= add.cuts;                             // add cuts to existing node
+			add.cuts.clear();                                // make sure they're only triggered once
+
+			ex_out.succ = alt_node::make({ex_out, add_out}); // join new node
 		}
 		
 		/// Merges an arc `a` into the set (flattening alternations and merging equivalent nodes).
-		/// Returns a pair containing the iterator to the merged item and a boolean value that will 
-		/// be true if the merged item is an unrestricted match
-		std::pair<arc_set::iterator, bool> merge(arc& a);
+		/// Returns a pair containing a pointer to the merged item and a boolean value that will 
+		/// be true if the merged item is an unrestricted match.
+		/// NOTE this is a little brittle; the successor pointer of the returned arc should not 
+		/// be changed.
+		std::pair<arc*, bool> merge(arc& a);
 	public:
 		alt_node() = default;
 		virtual ~alt_node() = default;
@@ -583,7 +594,7 @@ namespace dlf {
 		arc_set out;
 	}; // alt_node
 	
-	/// Node which inserts values into the restriction set
+/*	/// Node which inserts values into the restriction set
 	class cut_node : public node {
 		// disallow copying
 		cut_node(const cut_node&) = delete;
@@ -606,5 +617,5 @@ namespace dlf {
 		arc out;         ///< Successor node
 		flags::index i;  ///< Restriction to fire
 		state_mgr& mgr;  ///< State manager
-	}; // cut_node
+	}; */ // cut_node
 }

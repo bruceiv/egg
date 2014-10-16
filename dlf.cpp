@@ -255,6 +255,10 @@ namespace dlf {
 	
 	// iterator ////////////////////////////////////////////////////////////////
 	
+	void iterator::visit(const arc& a) {
+		visit(a.succ);
+	}
+		
 	void iterator::visit(ptr<node> np) {
 		// check memo-table and visit if not found
 		if ( visited.count(np) == 0 ) {
@@ -269,13 +273,13 @@ namespace dlf {
 	void iterator::visit(inf_node&)     {}
 	void iterator::visit(end_node&)     {}
 	// Remaining nodes get their successors visited
-	void iterator::visit(char_node& n)  { visit(n.out.succ); }
-	void iterator::visit(range_node& n) { visit(n.out.succ); }
-	void iterator::visit(any_node& n)   { visit(n.out.succ); }
-	void iterator::visit(str_node& n)   { visit(n.out.succ); }
-	void iterator::visit(rule_node& n)  { visit(n.out.succ); }
-	void iterator::visit(alt_node& n)   { for (auto& out : n.out) visit(out.succ); }
-	void iterator::visit(cut_node& n)   { visit(n.out.succ); }
+	void iterator::visit(char_node& n)  { visit(n.out); }
+	void iterator::visit(range_node& n) { visit(n.out); }
+	void iterator::visit(any_node& n)   { visit(n.out); }
+	void iterator::visit(str_node& n)   { visit(n.out); }
+	void iterator::visit(rule_node& n)  { visit(n.out); }
+	void iterator::visit(alt_node& n)   { for (auto& out : n.out) visit(out); }
+//	void iterator::visit(cut_node& n)   { visit(n.out.succ); }
 	
 	// node_type ///////////////////////////////////////////////////////////////
 	
@@ -290,7 +294,7 @@ namespace dlf {
 		case str_type:   out << "STR";   break;
 		case rule_type:  out << "RULE";  break;
 		case alt_type:   out << "ALT";   break;
-		case cut_type:   out << "CUT";   break;
+//		case cut_type:   out << "CUT";   break;
 		case end_type:   out << "END";   break;
 		}
 		return out;
@@ -298,21 +302,39 @@ namespace dlf {
 	
 	// arc /////////////////////////////////////////////////////////////////////
 	
-	arc::arc(ptr<node> succ, restriction_ck blocking) : succ{succ}, blocking{blocking} {}
+	arc::arc(ptr<node> succ, state_mgr& mgr, flags::vector&& blocking, flags::vector&& cuts) 
+	: succ{succ}, blocking{mgr, std::move(blocking)}, cuts{std::move(cuts)}, mgr{mgr} {}
+
+	arc::~arc() { for (flags::index i : cuts) mgr.release(i); }
 	
-	bool arc::blocked() {
-		if ( blocking.check() == forbidden ) { fail(); return true; }
-		return false;
+	bool arc::try_follow() {
+		// check if the node is blocked; fail if so
+		if ( blocking.check() == forbidden ) { fail(); return false; }
+		// apply any cuts
+		for (flags::index i : cuts) { mgr.enforce_unless(i, blocking.restricted); }
+		cuts.clear();
+		return true;
 	}
 	
-	bool arc::join(const arc& out) {
+	bool arc::join(arc& out) {
+		// set successor
 		succ = out.succ;
+		// join blocking sets
 		blocking.join(out.blocking);
+		// merge cut sets
+		cuts |= out.cuts;
+		out.cuts.clear();
+		// check if the arc is an unrestricted match
 		return succ->type() == match_type && blocking.check() == allowed;
 	}
 	
 	bool arc::fail() {
+		// cut off successors
 		succ = fail_node::make();
+		// release any cuts applied by this arc
+		for (flags::index i : cuts) { mgr.release(i); }
+		cuts.clear();
+
 		return false;
 	}
 	
@@ -320,10 +342,15 @@ namespace dlf {
 	
 	// count_restrict /////////////////////////////////////////////////////////
 	
+	void count_restrict::visit(const arc& a) {
+		nRestrict += a.cuts.count();
+		iterator::visit(a);
+	}
+		
 	count_restrict::count_restrict(ptr<node> np)
 	: iterator{}, nRestrict{0} { if ( np ) iterator::visit(np); }
 	
-	void count_restrict::visit(cut_node& n) { ++nRestrict; iterator::visit(n); }
+//	void count_restrict::visit(cut_node& n) { ++nRestrict; iterator::visit(n); }
 	
 	// nonterminal ////////////////////////////////////////////////////////////
 	
@@ -352,9 +379,7 @@ namespace dlf {
 	}
 
 	arc matchable(ptr<nonterminal> nt, state_mgr& mgr) {
-		return arc{rule_node::make(arc{match_node::make(mgr), 
-		                               restriction_ck{mgr}}, nt, mgr),
-		           restriction_ck{mgr}};
+		return arc{rule_node::make(arc{match_node::make(mgr), mgr}, nt, mgr), mgr};
 	}
 	
 	// clone //////////////////////////////////////////////////////////////////
@@ -368,18 +393,15 @@ namespace dlf {
 	arc clone::visit(arc& a) {
 		if ( a.succ->type() == end_type ) {
 			// Need to merge the arcs for the end-node
-			arc r = a;
+			arc r{a};
 			r.join(out);
 			rVal = out.succ;
 			return r;
 		}
-		return arc{visit(a.succ), visit(a.blocking)};
+		return arc{visit(a.succ), mgr, a.blocking.restricted << nShift,
+                           a.cuts << nShift};
 	}
 
-	restriction_ck clone::visit(restriction_ck& rck) {
-		return restriction_ck{mgr, std::move(rck.restricted << nShift)};
-	}
-	
 	ptr<node> clone::visit(ptr<node> np) {
 		// short-circuit un-copyable nodes
 		switch ( np->type() ) {
@@ -431,9 +453,9 @@ namespace dlf {
 		rVal = node::make<alt_node>(std::move(cn));
 	}
 	
-	void clone::visit(cut_node& n) {
-		rVal = node::make<cut_node>(visit(n.out), n.i + nShift, mgr);
-	}
+//	void clone::visit(cut_node& n) {
+//		rVal = node::make<cut_node>(visit(n.out), n.i + nShift, mgr);
+//	}
 	
 	// match_node //////////////////////////////////////////////////////////////
 	
@@ -495,7 +517,7 @@ namespace dlf {
 	ptr<node> char_node::make(const arc& out, char c) { return node::make<char_node>(out, c); }
 	
 	bool char_node::d(char x, arc& in) {
-		if ( in.blocked() ) return false;
+		if ( ! in.try_follow() ) return false;
 		return x == c ? in.join(out) : in.fail();
 	}
 	
@@ -514,7 +536,7 @@ namespace dlf {
 	}
 	
 	bool range_node::d(char x, arc& in) {
-		if ( in.blocked() ) return false;
+		if ( ! in.try_follow() ) return false;
 		return b <= x && x <= e ? in.join(out) : in.fail();
 	}
 	
@@ -531,7 +553,7 @@ namespace dlf {
 	ptr<node> any_node::make(const arc& out) { return node::make<any_node>(out); }
 	
 	bool any_node::d(char x, arc& in) {
-		if ( in.blocked() ) return false;
+		if ( ! in.try_follow() ) return false;
 		return x != '\0' ? in.join(out) : in.fail();
 	}
 	
@@ -550,7 +572,7 @@ namespace dlf {
 	}
 	
 	bool str_node::d(char x, arc& in) {
-		if ( in.blocked() )      return false;         // fail on node blocked
+		if ( ! in.try_follow() ) return false;         // fail on node blocked
 		if ( (*sp)[i] != x )     return in.fail();     // fail on non-match
 		if ( sp->size() == i+1 ) return in.join(out);  // join with successor if consumed
 		in.succ = as_ptr<node>(                        // new node with incremented index
@@ -573,16 +595,16 @@ namespace dlf {
 	}
 	
 	bool rule_node::d(char x, arc& in) {
-		if ( in.blocked() ) return false;    // fail on blocked
+		if ( ! in.try_follow() ) return false;  // fail on blocked
 
 		if ( mgr.is_dirty(r->name) ) {
-			in.succ = inf_node::make();  // break infinite loop with terminator node
+			in.succ = inf_node::make();     // break infinite loop with terminator node
 			return false;
 		}
 		
-		in.succ = clone(*r, out, mgr);       // expand nonterminal into input arc
+		in.succ = clone(*r, out, mgr);          // expand nonterminal into input arc
 		mgr.set_dirty(r->name);
-		bool s = in.succ->d(x, in);          // take derivative of successor, under loop flag
+		bool s = in.succ->d(x, in);             // take derivative of successor, under loop flag
 		mgr.unset_dirty(r->name);
 		return s;
 	}
@@ -596,24 +618,24 @@ namespace dlf {
 	
 	// alt_node ///////////////////////////////////////////////////////////////
 	
-	std::pair<alt_node::arc_set::iterator, bool> alt_node::merge(arc& add) {
+	std::pair<arc*, bool> alt_node::merge(arc& add) {
 		node_type ty = add.succ->type();
 		
 		// don't bother inserting failing nodes
-		if ( ty == fail_type ) return {out.end(), false};
+		if ( ty == fail_type ) return {nullptr, false};
 		
 		// Flatten added alt nodes
 		if ( ty == alt_type ) {
 			alt_node& an = *as_ptr<alt_node>(add.succ);
 			
-			auto ins = std::make_pair(out.end(), false);
+			std::pair<arc*, bool> ins_last{nullptr, false};
 			for (arc a_add : an.out) {
 				arc add_new = add;
 				add_new.join(a_add);
-				ins = merge(add_new);
-				if ( ins.second ) break;
+				ins_last = merge(add_new);
+				if ( ins_last.second ) break;
 			}
-			return ins;
+			return ins_last;
 		}
 		
 		auto ins = out.emplace(add);
@@ -624,7 +646,9 @@ namespace dlf {
 			case match_type:
 				/// Match can only be prevented by restrictions that block both matches
 				ex.blocking.refine(add.blocking);
-				if ( ex.blocking.check() == allowed ) return {ins.first, true};
+				if ( ex.blocking.check() == allowed ) {
+					return {&const_cast<arc&>(*ins.first), true};
+				}
 				break;
 			case inf_type: case end_type:
 				/// Terminal node will only be blocked by restrictions that block both matches
@@ -645,32 +669,32 @@ namespace dlf {
 			case rule_type:
 				merge<rule_node>(ex, add);
 				break;
-			case cut_type:
-				merge<cut_node>(ex, add);
-				break;
+//			case cut_type:
+//				merge<cut_node>(ex, add);
+//				break;
 			case alt_type: case fail_type:
 				assert(false && "shouldn't reach this branch");
 			}
 		}
 		
-		return {ins.first, false};
+		return {&const_cast<arc&>(*ins.first), false};
 	}
 	
 	bool alt_node::d(char x, arc& in) {
-		if ( in.blocked() ) return false;
+		if ( ! in.try_follow() ) return false;
 		
 		alt_node n;
 		for (arc o : out) {
 			// Take derivative and merge in (short-circuiting for unrestricted match)
 			o.succ->d(x, o);
-			if ( o.blocked() ) continue;  // skip blocked nodes
+			if ( ! o.try_follow() ) continue;  // skip blocked nodes
 			auto ins = n.merge(o);
 			if ( ins.second ) return in.join(*ins.first);
 		}
 		
 		switch ( n.out.size() ) {
 		case 0:  return in.fail();
-		case 1:  return in.join(*n.out.begin());
+		case 1:  return in.join(const_cast<arc&>(*n.out.begin()));
 		default: in.succ = node::make<alt_node>(std::move(n)); return false;
 		}
 	}
@@ -681,7 +705,7 @@ namespace dlf {
 	
 	// cut_node ///////////////////////////////////////////////////////////////
 	
-	ptr<node> cut_node::make(const arc& out, flags::index i, state_mgr& mgr) {
+/*	ptr<node> cut_node::make(const arc& out, flags::index i, state_mgr& mgr) {
 		return node::make<cut_node>(out, i, mgr);
 	}
 	
@@ -701,5 +725,5 @@ namespace dlf {
 		if ( o->type() != cut_type ) return false;
 		return as_ptr<cut_node>(o)->i == i;
 	}
-	
+*/	
 }
