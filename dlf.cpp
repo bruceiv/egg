@@ -26,18 +26,18 @@
 #include "dlf.hpp"
 
 namespace dlf {
-	// restriction_mgr /////////////////////////////////////////////////////////
+	// state_mgr //////////////////////////////////////////////////////////
 	
-	restriction_mgr::blocker::blocker(const flags::vector& blocking, bool released)
+	state_mgr::blocker::blocker(const flags::vector& blocking, bool released)
 	: blocking{blocking}, released{released} {}
 	
-	restriction_mgr::blocker::blocker(flags::vector&& blocking, bool released)
+	state_mgr::blocker::blocker(flags::vector&& blocking, bool released)
 	: blocking{std::move(blocking)}, released{released} {}
 	
-	restriction_mgr::restriction_mgr() 
+	state_mgr::state_mgr() 
 	: enforced{}, unenforceable{}, pending{}, update{0}, next{0} {}
 	
-	bool restriction_mgr::check_enforced() {
+	bool state_mgr::check_enforced() {
 		bool new_enforced = false;
 		auto it = pending.begin();
 		while ( it != pending.end() ) {
@@ -59,7 +59,7 @@ namespace dlf {
 		return new_enforced;
 	}
 	
-	bool restriction_mgr::check_unenforceable() {
+	bool state_mgr::check_unenforceable() {
 		bool new_unenforceable = false;
 		auto it = pending.begin();
 		while ( it != pending.end() ) {
@@ -80,13 +80,13 @@ namespace dlf {
 		return new_unenforceable;
 	}
 	
-	flags::index restriction_mgr::reserve(flags::index n) {
+	flags::index state_mgr::reserve(flags::index n) {
 		flags::index t = next;
 		next += n;
 		return t;
 	}
 	
-	void restriction_mgr::enforce_unless(flags::index i, const flags::vector& blocking) {
+	void state_mgr::enforce_unless(flags::index i, const flags::vector& blocking) {
 		// check if the restriction has already been enforced
 		if ( enforced(i) ) return;
 		
@@ -143,7 +143,7 @@ namespace dlf {
 		++update;
 	}
 	
-	void restriction_mgr::release(flags::index i) {
+	void state_mgr::release(flags::index i) {
 		// check if the restriction has already been enforced
 		if ( enforced(i) ) return;
 		
@@ -194,7 +194,7 @@ namespace dlf {
 	
 	// restriction_ck //////////////////////////////////////////////////////////
 	
-	restriction_ck::restriction_ck(restriction_mgr& mgr, flags::vector&& restricted) 
+	restriction_ck::restriction_ck(state_mgr& mgr, flags::vector&& restricted) 
 	: mgr{mgr}, restricted{restricted}, update{mgr.update}, 
 	  state{restricted.empty() ? allowed : unknown} {}
 	
@@ -336,7 +336,7 @@ namespace dlf {
 		sub = np;
 		if ( sub ) {
 			nRestrict = count_restrict(sub);
-			restriction_mgr mtmp;
+			state_mgr mtmp;
 			nbl = matchable(make_ptr<nonterminal>(*this), mtmp).d('\0');
 		} else {
 			nRestrict = 0;
@@ -344,7 +344,7 @@ namespace dlf {
 		}
 	}
 
-	arc matchable(ptr<nonterminal> nt, restriction_mgr& mgr, ptr<bool> match_reachable) {
+	arc matchable(ptr<nonterminal> nt, state_mgr& mgr, ptr<bool> match_reachable) {
 		return arc{rule_node::make(arc{match_node::make(match_reachable), 
 		                               restriction_ck{mgr}}, nt, mgr),
 		           restriction_ck{mgr}};
@@ -352,7 +352,7 @@ namespace dlf {
 	
 	// clone //////////////////////////////////////////////////////////////////
 	
-	clone::clone(nonterminal& nt, arc& out, restriction_mgr& mgr) 
+	clone::clone(nonterminal& nt, arc& out, state_mgr& mgr) 
 	: rVal{fail_node::make()}, out{out}, mgr{mgr}, visited{} {
 		nShift = mgr.reserve(nt.num_restrictions());
 		visit(nt.get());
@@ -561,7 +561,7 @@ namespace dlf {
 	
 	// rule_node //////////////////////////////////////////////////////////////
 	
-	ptr<node> rule_node::make(const arc& out, ptr<nonterminal> r, restriction_mgr& mgr) {
+	ptr<node> rule_node::make(const arc& out, ptr<nonterminal> r, state_mgr& mgr) {
 		return node::make<rule_node>(out, r, mgr);
 	}
 	
@@ -674,7 +674,7 @@ namespace dlf {
 	
 	// cut_node ///////////////////////////////////////////////////////////////
 	
-	ptr<node> cut_node::make(const arc& out, flags::index i, restriction_mgr& mgr) {
+	ptr<node> cut_node::make(const arc& out, flags::index i, state_mgr& mgr) {
 		return node::make<cut_node>(out, i, mgr);
 	}
 	

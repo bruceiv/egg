@@ -69,8 +69,8 @@ namespace dlf {
 		forbidden  ///< Enforced restrictions
 	};
 	
-	/// Manages restrictions on expression matches
-	class restriction_mgr {
+	/// Manages global state
+	class state_mgr {
 	friend class restriction_ck;
 		struct blocker {
 			blocker() = default;
@@ -88,7 +88,7 @@ namespace dlf {
 		/// any newly unenforceable rules
 		bool check_unenforceable();
 	public:
-		restriction_mgr();
+		state_mgr();
 		
 		/// Reserve n consecutive restrictions; returns the first index
 		flags::index reserve(flags::index n);
@@ -107,16 +107,16 @@ namespace dlf {
 		                   blocker> pending;
 		unsigned long update;     ///< index of last update
 		flags::index next;        ///< next available restriction
-	};  // restriction_mgr
+	};  // state_mgr
 	
 	/// Determines whether a node is prevented from matching
 	class restriction_ck {
-	friend restriction_mgr;
+	friend state_mgr;
 	public:
-		restriction_ck(restriction_mgr& mgr, flags::vector&& restricted = flags::vector{});
+		restriction_ck(state_mgr& mgr, flags::vector&& restricted = flags::vector{});
 		restriction_ck(const restriction_ck&) = default;
 		restriction_ck(restriction_ck&&) = default;
-		// WARNING: Assignment operators don't rebind manager
+		// WARNING: Assignment operators don't rebind state manager
 		restriction_ck& operator= (const restriction_ck& o);
 		restriction_ck& operator= (restriction_ck&& o);
 		
@@ -130,7 +130,7 @@ namespace dlf {
 		void refine(const restriction_ck& o);
 		
 		flags::vector restricted;  ///< set of restrictions on matches
-		restriction_mgr& mgr;      ///< restriction manager
+		state_mgr& mgr;            ///< restriction manager
 	private:
 		unsigned long update;      ///< last update seen
 		restriction state;         ///< saved restriction state
@@ -295,7 +295,7 @@ namespace dlf {
 	};  // nonterminal
 	
 	/// Builds an arc that can be used to match a rule
-	arc matchable(ptr<nonterminal> nt, restriction_mgr& mgr, ptr<bool> match_reachable = ptr<bool>{});
+	arc matchable(ptr<nonterminal> nt, state_mgr& mgr, ptr<bool> match_reachable = ptr<bool>{});
 	
 	/// Visitor with function-like interface for cloning a contained expression
 	class clone : public visitor {
@@ -308,7 +308,7 @@ namespace dlf {
 		/// Functional interface to visitor pattern
 		ptr<node> visit(ptr<node> np);
 	public:
-		clone(nonterminal& nt, arc& out, restriction_mgr& mgr);
+		clone(nonterminal& nt, arc& out, state_mgr& mgr);
 		operator ptr<node> () { return rVal; }
 		
 		virtual void visit(match_node&);
@@ -324,9 +324,9 @@ namespace dlf {
 		virtual void visit(cut_node& n);
 		
 	private:
-		ptr<node> rVal;        ///< Return value of last visit
-		arc& out;              ///< Replacement for endNode
-		restriction_mgr& mgr;  ///< Restriction manager
+		ptr<node> rVal;  ///< Return value of last visit
+		arc& out;        ///< Replacement for endNode
+		state_mgr& mgr;  ///< State manager
 		flags::index nShift;   ///< Amount to shift restrictions by
 		
 		/// Memoizes visited nodes (to ensure singleton nodes remain singletons).
@@ -495,20 +495,20 @@ namespace dlf {
 	/// Node representing a non-terminal
 	class rule_node : public node {
 	public:	
-		rule_node(const arc& out, ptr<nonterminal> r, restriction_mgr& mgr) 
+		rule_node(const arc& out, ptr<nonterminal> r, state_mgr& mgr) 
 			: out{out}, r{r}, mgr{mgr} {}
 		virtual ~rule_node() = default;
 		
-		static  ptr<node>   make(const arc& out, ptr<nonterminal> r, restriction_mgr& mgr);
+		static  ptr<node>   make(const arc& out, ptr<nonterminal> r, state_mgr& mgr);
 		virtual void        accept(visitor* v) { v->visit(*this); }
 		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return rule_type; }
 		virtual std::size_t hash() const;
 		virtual bool        equiv(ptr<node>) const;
 		
-		arc out;               ///< Successor node
-		ptr<nonterminal> r;    ///< Pointer to shared rule definition
-		restriction_mgr& mgr;  ///< Restriction manager
+		arc out;             ///< Successor node
+		ptr<nonterminal> r;  ///< Pointer to shared rule definition
+		state_mgr& mgr;      ///< State manager
 	}; // rule_node
 	
 	/// Node containing a number of subexpressions to parse concurrently
@@ -587,20 +587,20 @@ namespace dlf {
 		cut_node& operator= (const cut_node&) = delete;
 		cut_node& operator= (cut_node&&) = delete;
 	public:
-		cut_node(const arc& out, flags::index i, restriction_mgr& mgr) 
+		cut_node(const arc& out, flags::index i, state_mgr& mgr) 
 			: out{out}, i{i}, mgr{mgr} {}
 		/// Releases restriction upon no longer reachable
 		virtual ~cut_node() { mgr.release(i); };
 		
-		static  ptr<node>   make(const arc& out, flags::index i, restriction_mgr& mgr);
+		static  ptr<node>   make(const arc& out, flags::index i, state_mgr& mgr);
 		virtual void        accept(visitor* v) { v->visit(*this); }
 		virtual bool        d(char, arc&);
 		virtual node_type   type() const { return cut_type; }
 		virtual std::size_t hash() const;
 		virtual bool        equiv(ptr<node>) const;
 		
-		arc out;               ///< Successor node
-		flags::index i;        ///< Restriction to fire
-		restriction_mgr& mgr;  ///< Restriction manager
+		arc out;         ///< Successor node
+		flags::index i;  ///< Restriction to fire
+		state_mgr& mgr;  ///< State manager
 	}; // cut_node
 }

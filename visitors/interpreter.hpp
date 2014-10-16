@@ -224,7 +224,7 @@ namespace dlf {
 	private:
 		std::map<std::string, ptr<nonterminal>> nts;  ///< List of non-terminals
 		ptr<node> next;                               ///< Next node
-		restriction_mgr mgr;                          ///< Restriction manager to set up
+		state_mgr mgr;                                ///< Restriction manager to set up
 		flags::index ri;                              ///< Current restriction index
 		unsigned long mi;                             ///< Index to uniquely name many-nodes
 	}; // loader
@@ -250,7 +250,7 @@ namespace dlf {
 		
 		// establish initial expression
 		ptr<bool> match_reachable = make_ptr<bool>(true);
-		restriction_mgr mgr;
+		state_mgr mgr;
 		arc e = matchable(nt->second, mgr, match_reachable);
 		
 		// Check for initial success
