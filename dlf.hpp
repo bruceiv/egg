@@ -256,8 +256,11 @@ namespace dlf {
 	
 	/// Directed arc linking two nodes
 	struct arc {
+		/// Construct an arc by fields
 		arc(ptr<node> succ, state_mgr& mgr, flags::vector&& blocking = flags::vector{}, 
                     flags::vector&& cuts = flags::vector{});
+		/// Construct a copy of an arc with a different manager
+		arc(const arc& o, state_mgr& mgr);
 		~arc();
 		
 		/// Attempts to traverse this arc, returning false and repointing this arc to a 

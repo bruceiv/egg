@@ -305,6 +305,10 @@ namespace dlf {
 	arc::arc(ptr<node> succ, state_mgr& mgr, flags::vector&& blocking, flags::vector&& cuts) 
 	: succ{succ}, blocking{mgr, std::move(blocking)}, cuts{std::move(cuts)}, mgr{mgr} {}
 
+	arc::arc(const arc& o, state_mgr& mgr) 
+	: succ{o.succ}, blocking{mgr, flags::vector{o.blocking.restricted}}, 
+          cuts{flags::vector{o.cuts}}, mgr{mgr} {}
+
 	arc::~arc() { for (flags::index i : cuts) mgr.release(i); }
 	
 	bool arc::try_follow() {
@@ -393,7 +397,7 @@ namespace dlf {
 	arc clone::visit(arc& a) {
 		if ( a.succ->type() == end_type ) {
 			// Need to merge the arcs for the end-node
-			arc r{a};
+			arc r{a, mgr};
 			r.join(out);
 			rVal = out.succ;
 			return r;
