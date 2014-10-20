@@ -374,8 +374,12 @@ namespace dlf {
 		sub = np;
 		if ( sub ) {
 			nRestrict = count_restrict(sub);
-			state_mgr mtmp;
-			nbl = matchable(make_ptr<nonterminal>(*this), mtmp).d('\0');
+			// Check if this rule matches the empty string
+			state_mgr mgr;
+			arc out{match_node::make(mgr), mgr};
+			arc in{clone(*this, out, mgr), mgr};
+			nbl = in.d('\0');
+			//nbl = matchable(make_ptr<nonterminal>(*this), mtmp).d('\0');
 		} else {
 			nRestrict = 0;
 			nbl = false;
