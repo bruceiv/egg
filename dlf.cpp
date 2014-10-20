@@ -407,9 +407,9 @@ namespace dlf {
 	}
 
 	ptr<node> clone::visit(ptr<node> np) {
-		// short-circuit un-copyable nodes
+		// short-circuit singleton nodes
 		switch ( np->type() ) {
-		case match_type: case fail_type: case inf_type:
+		case fail_type: case inf_type:
 			return rVal = np;
 		}
 		// check memo-table
@@ -423,7 +423,7 @@ namespace dlf {
 	}
 	
 	// Unfollowed nodes just get copied over by visit(ptr<node>)
-	void clone::visit(match_node&) { assert(false && "should not reach here"); }
+	void clone::visit(match_node&) { rVal = node::make<match_node>(mgr); }
 	void clone::visit(fail_node&)  { assert(false && "should not reach here"); }
 	void clone::visit(inf_node&)   { assert(false && "should not reach here"); }
 	
