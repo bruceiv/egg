@@ -338,7 +338,7 @@ namespace dlf {
 		return false;
 	}
 	
-	bool arc::d(char x) { return succ->d(x, *this); }
+	bool arc::d(char x) { return try_follow() ? succ->d(x, *this) : false; }
 	
 	// count_restrict /////////////////////////////////////////////////////////
 	
