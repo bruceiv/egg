@@ -277,8 +277,8 @@ namespace flags {
 		
 		/// Shifts the elements of this vector left by the specified number of bits
 		vector& operator<<= (index i) {
-			if ( i == 0 ) return *this;
-			v.resize(v.size() + el(i) + 1, 0);
+			if ( i == 0 || v.size() == 0 ) return *this;
+			v.resize(v.size() + ((i + 63) >> 6), 0);
 			lsh(v.data(), i, v.data(), v.size());
 			return *this;
 		}
@@ -286,7 +286,7 @@ namespace flags {
 		/// Creates a new vector as a copy of this one shifted left by the specified number of bits
 		vector operator<< (index i) const {
 			if ( i == 0 || v.size() == 0 ) return vector{*this};
-			std::vector<uint64_t> d{v.size() + el(i) + 1};
+			std::vector<uint64_t> d(v.size() + ((i + 63) >> 6), 0);
 			lsh(v.data(), i, d.data(), v.size());
 			return vector{std::move(d)};
 		}
