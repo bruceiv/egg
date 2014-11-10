@@ -2,17 +2,17 @@
 
 /*
  * Copyright (c) 2014 Aaron Moss
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -22,11 +22,14 @@
  * THE SOFTWARE.
  */
 
+//uncomment to disable asserts
+//#define NDEBUG
+#include <cassert>
+
 #include <iostream>
-#include <map>
+#include <memory>
 #include <string>
-#include <unordered_set>
-#include <utility>
+#include <unordered_map>
 #include <vector>
 
 #include "../ast.hpp"
@@ -34,209 +37,292 @@
 
 #include "../utils/flagvector.hpp"
 
+#include "dlf-loader.hpp"
 #include "dlf-printer.hpp"
 
 namespace dlf {
 
-	/// Loads a set of derivatives from the grammar AST
-	class loader : public ast::visitor {
-		/// Gets unique nonterminal for each name
-		ptr<nonterminal> get_nonterminal(const std::string& s) {
-			auto it = nts.find(s);
-			if ( it == nts.end() ) {
-				ptr<nonterminal> nt = make_ptr<nonterminal>(s, fail_node::make());
-				nts.emplace(s, nt);
-				return nt;
-			} else {
-				return it->second;
-			}
+	/// Gets all the cuts in an expression
+	class cuts_in : public iterator {
+		void visit(const arc& a) { cuts |= a.cuts; iterator::visit(a); }
+	public:
+		cuts_in(ptr<node> np) : cuts{} { if ( np ) iterator::visit(np); }
+		operator flags::vector () { return cuts; }
+	private:
+		flags::vector cuts;  ///< Cuts included in this expression
+	};  // restrictions_of
+
+	/// Clones a nonterminal, repointing its out-arcs to the given node
+	class clone : public visitor {
+		/// Common code for visiting an arc
+		arc clone_of(const arc& a) {
+			return ( a.succ->type() == end_type ) ?
+				arc{out.succ, listener,
+					out.blocking | (a.blocking << nShift),
+					out.cuts | (a.cuts << nShift)} :
+			 	arc{clone_of(a.succ), listener, a.blocking << nShift, a.cuts << nShift};
+		}  // TODO set up register/unregister ref-counts for cut indices
+
+		/// Functional interface for visitor pattern
+		ptr<node> clone_of(const ptr<node> np) {
+			auto it = visited.find(np);
+			if ( it != visited.end() ) return rVal = it->second;
+			np->accept(this);
+			visited.emplace(np, rVal);
+			return rVal;
 		}
-		
-		/// Sets unique nonterminal for each name
-		void set_nonterminal(const std::string& s, ptr<node> n) { get_nonterminal(s)->reset(n); }
-		
-		/// Produces a new arc to the next node
-		arc out(flags::vector&& blocking = flags::vector{}) {
-			return arc{next, mgr, std::move(blocking), flags::vector{next_cuts}};
+	public:
+		clone(nonterminal& nt, arc& out,
+		      cut_listener* listener = nullptr, flags::index nShift = 0)
+		: rVal{out.succ}, out{out}, listener{listener}, nShift{nShift}, visited{} {
+			rVal = clone_of(nt->sub);
+		}
+		operator ptr<node> () { return rVal; }
+
+		void visit(const match_node&)   { rVal = match_node::make(); }
+		void visit(const fail_node&)    { rVal = fail_node::make(); }
+		void visit(const inf_node&)     { rVal = inf_node::make(); }
+		void visit(const end_node&)     { rVal = out.succ; }
+		void visit(const char_node& n)  { rVal = node::make<char_node>(clone_of(n.out), n.c); }
+		void visit(const range_node& n) { rVal = node::make<range_node>(clone_of(n.out), n.b, n.e); }
+		void visit(const any_node& n)   { rVal = node::make<any_node>(clone_of(n.out)); }
+		void visit(const str_node& n)   { rVal = node::make<str_node>(clone_of(n.out), n.sp, n.i); }
+		void visit(const rule_node& n)  { rVal = node::make<rule_node>(clone_of(n.out), n.r); }
+		void visit(const alt_node& n)   {
+			arc_set rs;
+			for (const arc& a : n.out) { rs.emplace(clone_of(a)); }
+			rVal = node::make<alt_node>(std::move(rs));
 		}
 
-		/// Sets the next and next_cut values
-		inline void set_next(ptr<node> n) {
-			next = n;
-			next_cuts.clear();
+	private:
+		ptr<node> rVal;          ///< Return value of last visit
+		arc out;                 ///< Replacement for end nodes
+		cut_listener* listener;  ///< Cut listener to release cloned cuts to
+		flags::index nShift;     ///< Amount to shift restrictions by
+
+		/// Memoizes visited nodes to maintain the structure of the DAG
+		std::unordered_map<ptr<node>, ptr<node>> visited;
+	};  // clone
+
+	/// Implements the derivative computation over a DLF DAG
+	class derivative : public visitor, public cut_listener {
+		/// Information about a nonterminal
+		struct nt_info {
+			nt_info(const flags::vector& cuts)
+			: cuts{cuts}, nCuts{cuts.count()}, inDeriv{false} {}
+
+			flags::vector cuts;  ///< Cuts used by non-terminal
+			flags::index nCuts;  ///< Number of cuts used by non-terminal
+			bool inDeriv;        ///< Flag used when currently in derivative
+		}; // nt_info
+
+		/// Cut that can be applied
+		struct block_info {
+			block_info(const flags::vector& cuts, const flags::vector& blocking)
+			: cuts{cuts}, blocking{blocking} {}
+
+			void swap(block_info& o) {
+				cuts.swap(o.cuts);
+				blocking.swap(o.blocking);
+			}
+
+			flags::vector cuts;      ///< Cuts that are applied unless blocked
+			flags::vector blocking;  ///< Restrictions that can block the cuts
+		};  // block_info
+
+		/// Expands a nonterminal
+		ptr<node> expand(ptr<nonterminal> nt, ptr<node> succ) {
+			flags::index nShift = next_restrict;
+
+			auto it = nt_state.find(nt);
+			if ( it == nt_state.end() ) {
+				nt_info info{cuts_in(nt.sub)};
+				next_restrict += info.nCuts;
+				nt_state.emplace(nt, std::move(info));
+			} else {
+				next_restrict += it.second.nCuts;
+			}
+
+			return clone(nt, succ, this, nShift);
 		}
-		
-		inline void set_next(ptr<node> n, flags::vector&& cuts) {
-			next = n;
-			next_cuts = std::move(cuts);
+
+		/// Called when a set of cuts is applied
+		void block(const flags::vector& cuts) {
+			blocked |= cuts;
+
+			flags::vector new_release;
+			unsigned long i = 0;
+			while ( i < pending.size() ) {
+				block_info& info = pending[i];
+				if ( info.blocking.intersects(cuts) ) {
+					new_release |= info.cuts;
+					unsigned long last = pending.size() - 1;
+					if ( i < last ) {
+						pending[i].swap(pending[last]);
+						pending.pop_back();
+						continue;
+					} else {
+						pending.pop_back();
+						break;
+					}
+				}
+				++i;
+			}
+
+			if ( ! new_release.empty() ) { release_block(new_release); }
 		}
-		
-		void make_many(ptr<ast::matcher> mp) {
-			// idea is to set up a new anonymous non-terminal R_i and set next to R_i
-			// R_i = m.m [^ri] R_i end | [ri] end
-			
-			// set rule node for new anonymous non-terminal
-			ptr<nonterminal> R_i = make_ptr<nonterminal>("*" + std::to_string(mi++));
-			ptr<node> nt = rule_node::make(out(), R_i, mgr);
-			
-			// build anonymous rule
-			flags::index i = ri++;                      // get a restriction index to use
-			set_next(end_node::make());                 // make end node for rule
-			arc skip = out(flags::vector::of(i));       // save arc that skips match
-			set_next(rule_node::make(out(), R_i, mgr),  // build recursive invocation of rule
-			         flags::vector::of(i));             // set up cut on out-edges of many-expression
-			flags::index ri_bak = ri; ri = 0;           // save ri
-			mp->accept(this);                           // build many-expression
-			ri = ri_bak;                                // restore ri
-			R_i->reset(alt_node::make({out(), skip}));  // reset rule
-			
-			// reset next to rule reference
-			set_next(nt);
+
+		/// Called when a set of cuts will be applied unless the blocking cuts are
+		void block_unless(const flags::vector& cuts, const flags::vector& blocking) {
+			pending.emplace_back(cuts, blocking);
+		}
+
+		/// Called when a set of cuts will never match
+		void release_block(const flags::vector& released) {
+			flags::vector new_cuts;
+
+			unsigned long i = 0;
+			while ( i < pending.size() ) {
+				block_info& info = pending[i];
+				info.blocking -= released;
+				if ( info.blocking.empty() ) {
+					new_cuts |= info.cuts;
+					unsigned long last = pending.size()-1;
+					if ( i < last ) {
+						pending[i].swap(pending[last]);
+						pending.pop_back();
+						continue;
+					} else {
+						pending.pop_back();
+						break;
+					}
+				}
+				++i;
+			}
+
+			if ( ! new_cuts.empty() ) { block(new_cuts); }
+		}
+
+		/// Follows an arc; returns successor node or failure if blocked
+		ptr<node> follow(const arc& a) {
+			if ( a.blocking.empty() ) {
+				// apply cuts and follow arc
+				if ( ! a.cuts.empty() ) { block(a.cuts); }
+				return a.succ;
+			} else {
+				// fail on blocked arc
+				if ( a.blocking.intersects(blocked) ) return fail_node::make();
+				// apply cuts and follow arc
+				block_unless(a.cuts, a.blocking);
+				return a.succ->block_succ_on(a.blocking);
+			}
 		}
 
 	public:
-		/// Builds a DLF parse DAG from the given PEG grammar
-		loader(ast::grammar& g, bool dbg = false) 
-		: mgr{}, nts{}, next{}, next_cuts{}, ri{0}, mi{0} {
-			// Read in rules
-			for (auto r : g.rs) {
-				set_next(end_node::make());
-				r->m->accept(this);
-				set_nonterminal(r->name, next);
-				ri = 0;
+		/// Sets up derivative computation for a nonterminal
+		derivative(ptr<nonterminal> nt)
+		: nt_state{}, blocked{}, outstanding{}, pending{}, cut_counts{},
+		  next_restrict{0}, rVal{}, x{'\0'} {
+			ptr<node> mp = match_node::make();
+			match_ptr = mp;
+			root = expand(nt, mp);
+		}
+
+		~derivative() {
+			root.reset();  // delete all the arcs before destroying their cut listener
+		}
+
+		/// Checks if the current expression is an unrestricted match
+		bool matched() const {
+			// Check for root match
+			if ( root->type() == match_type ) return true;
+
+			// Check for alt-match without blocking cut
+			if ( root->type() != alt_type ) return false;
+			for (arc& a : as_ptr<alt_node>(root)->out) {
+				// Can only be one level of alt-node, so only need to check matches here
+				if ( a.succ->type() == match_type
+					 && ! a.blocking.intersects(blocked) ) return true;
 			}
-			
-			if ( dbg ) {
-				dlf::printer p;
-				for (auto ntp : nts) {
-					p.print(ntp.second);
-				}
-				std::cout << "\n***** DONE LOADING RULES *****\n" << std::endl;
+
+			return false;
+		}
+
+		/// Checks if the current expression cannot match
+		bool failed() const { return match_ptr.expired() }
+
+		/// Called when new cuts are added
+		void acquire_cuts(const flags::vector& cuts) {
+			for (flags::index i : cuts) { ++cut_counts[i]; }
+		}
+
+		/// Called when cuts can no longer be applied
+		void release_cuts(const flags::vector& cuts) {
+			if ( cuts.empty() ) return;
+			flags::vector new_release;
+			for (flags::index i : cuts) {
+				if ( --cut_counts[i] == 0 ) { new_release |= i; }
 			}
+			if ( ! new_release.empty() ) { release_block(new_release); }
 		}
-		
-		std::map<std::string, ptr<nonterminal>>& get_nonterminals() { return nts; }
-		
-		virtual void visit(ast::char_matcher& m) { set_next(char_node::make(out(), m.c)); }
-		
-		virtual void visit(ast::str_matcher& m) { set_next(str_node::make(out(), m.s)); }
-		
-		virtual void visit(ast::range_matcher& m) {
-			std::vector<arc> rs;
-			for (const ast::char_range& r : m.rs) {
-				rs.emplace_back(arc{range_node::make(out(), r.from, r.to), mgr});
-			}
-			set_next(alt_node::make(rs.begin(), rs.end()));
+
+		/// Takes the derviative of the current root node
+		void operator(char x) {
+			this->x = x;
+			root->accept(this);
+			root = rVal;
+			rVal.reset();
 		}
-		
-		virtual void visit(ast::rule_matcher& m) {
-			set_next(rule_node::make(out(), get_nonterminal(m.rule), mgr));
+
+		void visit(const match_node& n) { rVal = n.clone(); }
+		void visit(const fail_node&)    { rVal = fail_node::make(); }
+		void visit(const inf_node&)     { rVal = inf_node::make(); }
+		void visit(const end_node&)     { assert(false && "Should never take derivative of end node"); }
+
+		void visit(const char_node& n)  {
+			rVal = ( x == n.c ) ? follow(n.out) : fail_node::make();
 		}
-		
-		virtual void visit(ast::any_matcher& m) { set_next(any_node::make(out())); }
-		
-		virtual void visit(ast::empty_matcher& m) { /* do nothing; next remains next */ }
-		
-		virtual void visit(ast::action_matcher& m) { /* TODO implement; for now no-op */ }
-		
-		virtual void visit(ast::opt_matcher& m) {
-			// Idea: m.m [^i] next | [i] next
-			flags::index i = ri++;                    // get a restriction index to use
-			arc skip = out(flags::vector::of(i));     // save arc that skips the optional
-			next_cuts |= i;                           // add restriction to cut-set
-			m.m->accept(this);                        // build opt-expression
-			set_next(alt_node::make({out(), skip}));  // make alternation of two paths
+
+		void visit(const range_node& n) {
+			rVal = ( n.b <= x && x <= n.e ) ? follow(n.out) : fail_node::make();
 		}
-		
-		virtual void visit(ast::many_matcher& m) {
-			make_many(m.m);  // generate new many-rule nonterminal
+
+		void visit(const any_node& n)   {
+			rVal = ( x != '\0' ) ? follow(n.out) : fail_node::make();
 		}
-		
-		virtual void visit(ast::some_matcher& m) {
-			make_many(m.m);     // generate new many-rule nonterminal
-			m.m->accept(this);  // sequence one copy of the rule before
+
+		void visit(const str_node& n)   {
+			if ( x == (*n.sp)[i] ) {
+				rVal = ( n.size() == 1 ) ?
+						follow(n.out) :
+						node::make<str_node>(n.out, n.sp, n.i+1);
+			} else { rVal = fail_node::make(); }
 		}
-		
-		virtual void visit(ast::seq_matcher& m) {
-			// build out sequence in reverse order
-			for (auto it = m.ms.rbegin(); it != m.ms.rend(); ++it) { (*it)->accept(this); }
-		}
-		
-		virtual void visit(ast::alt_matcher& m) {
-			// Idea: m0 [^0] next | [0] m1 [^1] next | ... | [0...n-1] mn next
-			ptr<node> alt_next = next;           // save next value
-			flags::vector alt_cuts = next_cuts;  // ... and cuts
-			
-			flags::vector blocking;              // cuts for greedy longest match
-			
-			std::vector<arc> rs;
-			for (auto& mi : m.ms) {
-				flags::index i = ri++;                          // get a restriction index to use
-				next_cuts |= i;                                 // flag cut for greedy longest match
-				mi->accept(this);                               // build subexpression
-				rs.emplace_back(out(flags::vector{blocking}));  // add to list of arcs
-				set_next(alt_next, flags::vector{alt_cuts});    // restore next values for next iteration
-				blocking |= i;                                  // add index to greedy longest match blocker
-			}
-			set_next(alt_node::make(rs.begin(), rs.end()));
-		}
-		
-		virtual void visit(ast::look_matcher& m) {
-			// Idea - !!m.m: m.m [^j] fail | [j ^i] fail | [i] next
-			// If m.m matches, we cut out the [j ^i] branch, freeing next to proceed safely
-			
-			// save restriction indices
-			flags::index j = ri++;
-			flags::index i = ri++;
-			// build continuing branch
-			arc cont = out(flags::vector::of(i));
-			// build cut branch
-			set_next(fail_node::make(), flags::vector::of(i));
-			arc cut = out(flags::vector::of(j));
-			// build matching branch
-			set_next(fail_node::make(), flags::vector::of(j));
-			m.m->accept(this);
-			// set alternate paths
-			next = alt_node::make({cont, cut, out()});
-		}
-		
-		virtual void visit(ast::not_matcher& m) {
-			// Idea - match both paths, failing if the not path matches: m.m [^i] fail | [i] next
-			flags::index i = ri++;                    // get a restriction index to use
-			arc cont = out(flags::vector::of(i));     // build continuing branch
-			set_next(fail_node::make(),               // terminate blocking branch
-                                 flags::vector::of(i));              // with a cut on the match index
-			m.m->accept(this);                        // build blocking branch
-			set_next(alt_node::make({cont, out()}));  // alternate continuing and blocking branches
-		}
-		
-		virtual void visit(ast::capt_matcher& m) {
-			// TODO implement; for now ignore the capture
-			m.m->accept(this);
-		}
-		
-		virtual void visit(ast::named_matcher& m) {
-			// TODO implement; for now ignore the error message
-			m.m->accept(this);
-		}
-		
-		virtual void visit(ast::fail_matcher& m) {
-			// TODO complete implementation; for now ignore the error message
-			set_next(fail_node::make());
-		}
-		
+
+		void visit(const rule_node& n)  {}  // TODO rewrite expand to use out-arcs
+
+		void visit(const alt_node& n)   {}  // TODO
+
 	private:
-		state_mgr mgr;                                ///< State manager
-		// NOTE it is *very* important that mgr be declared before nts; we also want to 
-		// deallocate nts first so that the nonterminals it's managing still have a 
-		// manager when the references in them expire
-		std::map<std::string, ptr<nonterminal>> nts;  ///< List of non-terminals
-		ptr<node> next;                               ///< Next node
-		flags::vector next_cuts;                      ///< Cuts to apply before next node
-		flags::index ri;                              ///< Current restriction index
-		unsigned long mi;                             ///< Index to uniquely name many-nodes
-	}; // loader
-	
+		/// Stored state for each nonterminal
+		std::unordered_map<ptr<nonterminal>, nt_info> nt_state;
+
+		flags::vector blocked;            ///< Blocked indices
+		flags::vector outstanding;        ///< Outstanding cut nodes
+		std::vector<block_info> pending;  ///< Cuts to be applied if they're not blocked
+		/// Ref-count for each cut
+		std::unordered_map<flags::index, unsigned long> cut_counts;
+
+		flags::index next_restrict;       ///< Index of next available restriction
+		std::weak_ptr<node> match_ptr;    ///< Pointer to match node
+	public:
+		ptr<node> root;                   ///< Current root node
+	private:
+		ptr<node> rVal;                   ///< Return value from derivative computation
+		char x;                           ///< Character to take derivative with respect to
+		bool new_blocks;                  ///< Flag for new blocked indices
+	};  // derivative
+
 	/// Recognizes the input
 	/// @param l		Loaded DLF DAG
 	/// @param in		Input stream
@@ -247,46 +333,46 @@ namespace dlf {
 		// find rule
 		auto& nts = l.get_nonterminals();
 		auto nt = nts.find(rule);
-		
+
 		// fail on no such rule
 		if ( nt == nts.end() ) return false;
-		
-		// Check for initial success
-		if ( nt->second->nullable() ) return true;
-		
+
 		// set up printer
 		std::unordered_set<ptr<nonterminal>> names;
 		for (auto& nit : nts) { names.emplace(nit.second); }
 		dlf::printer p(std::cout, names);
-		
-		// establish initial expression
-		state_mgr mgr;
-		arc e = matchable(nt->second, mgr);
-		
+
+		// set up derivative
+		derivative d(nt->second());
+		if ( dbg ) { p.print(d.root); }
+
+		// Check for initial match
+		if ( d.matched() ) {
+
+			return true;
+		}
+
 		// teke derivatives until failure, match, or end of input
-		char x = '\0';
+		char x = '\x7f';  // DEL character; never read
 		do {
-			if ( dbg ) { p.print(e.succ); }
-			
+			if ( dbg ) { p.print(d.root); }
+
+			if ( d.failed() ) return false;
+			else if ( d.matched() ) return true;
+			else if ( x == '\0' ) return false;
+
 			if ( ! in.get(x) ) { x = '\0'; }  // read character, \0 for EOF
-			
+
 			if ( dbg ) {
-				std::cout << "d(\'" << (x == '\0' ? "\\0" : strings::escape(x)) << "\') =====>" 
+				std::cout << "d(\'" << (x == '\0' ? "\\0" : strings::escape(x)) << "\') =====>"
 				          << std::endl;
 			}
-			
-			// take derivative; return true if unrestricted match
-			if ( e.d(x) ) {
-				if ( dbg ) { p.print(e.succ); }
-				return true;
-			}
-		} while ( mgr.match_reachable && x != '\0' );
-		
-		if ( dbg ) { p.print(e.succ); }
-		
-		return false;
+
+			// take derivative
+			d(x);
+		} while ( true );
 	}
-	
+
 	/// Recognizes the input
 	/// @param g		Source grammar
 	/// @param in		Input stream
@@ -299,4 +385,3 @@ namespace dlf {
 	}
 
 }  // namespace dlf
-
