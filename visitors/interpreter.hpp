@@ -72,7 +72,7 @@ namespace dlf {
 			return rVal;
 		}
 	public:
-		clone(nonterminal& nt, arc& out,
+		clone(nonterminal& nt, const arc& out,
 		      cut_listener* listener = nullptr, flags::index nShift = 0)
 		: rVal{out.succ}, out{out}, listener{listener}, nShift{nShift}, visited{} {
 			rVal = clone_of(nt->sub);
@@ -130,20 +130,24 @@ namespace dlf {
 			flags::vector blocking;  ///< Restrictions that can block the cuts
 		};  // block_info
 
-		/// Expands a nonterminal
-		ptr<node> expand(ptr<nonterminal> nt, ptr<node> succ) {
-			flags::index nShift = next_restrict;
-
+		/// Gets the info block for a nonterminal
+		nt_info& get_info(ptr<nonterminal> nt) {
 			auto it = nt_state.find(nt);
 			if ( it == nt_state.end() ) {
 				nt_info info{cuts_in(nt.sub)};
-				next_restrict += info.nCuts;
-				nt_state.emplace(nt, std::move(info));
-			} else {
-				next_restrict += it.second.nCuts;
-			}
+				return nt_state.emplace_hint(it, nt, std::move(info)).second;
+			} else return it.second;
+		}
 
-			return clone(nt, succ, this, nShift);
+		/// Expands a nonterminal
+		ptr<node> expand(ptr<nonterminal> nt, const arc& out, const nt_info& info) {
+			flags::index nShift = next_restrict;
+			next_restrict += info.nCuts;
+			return clone(nt, out, this, nShift);
+		}
+
+		inline ptr<node> expand(ptr<nonterminal> nt, const arc& out) {
+			return expand(nt, out, get_info(nt));
 		}
 
 		/// Called when a set of cuts is applied
@@ -213,7 +217,7 @@ namespace dlf {
 				// fail on blocked arc
 				if ( a.blocking.intersects(blocked) ) return fail_node::make();
 				// apply cuts and follow arc
-				block_unless(a.cuts, a.blocking);
+				if (! a.cuts.empty() ) block_unless(a.cuts, a.blocking);
 				return a.succ->block_succ_on(a.blocking);
 			}
 		}
@@ -225,7 +229,7 @@ namespace dlf {
 		  next_restrict{0}, rVal{}, x{'\0'} {
 			ptr<node> mp = match_node::make();
 			match_ptr = mp;
-			root = expand(nt, mp);
+			root = expand(nt, arc{mp});
 		}
 
 		~derivative() {
@@ -299,9 +303,38 @@ namespace dlf {
 			} else { rVal = fail_node::make(); }
 		}
 
-		void visit(const rule_node& n)  {}  // TODO rewrite expand to use out-arcs
+		void visit(const rule_node& n)  {
+			nt_info& info = get_info(n.sub);
+			// return infinite loop on left-recursion
+			if ( info.inDeriv ) { rVal = inf_node::make(); return; }
 
-		void visit(const alt_node& n)   {}  // TODO
+			// take derivative of expanded rule under left-recursion flag
+			info.inDeriv = true;
+			expand(n.sub, n.out, info)->accept(this);
+			info.inDeriv = false;
+		}
+
+		void visit(const alt_node& n)   {
+			arc_set as;
+			for (const arc& o : n.out) {
+				if ( o.blocking.empty() ) {
+					// apply cuts
+					if ( ! o.cuts.empty() ) { block(o.cuts); }
+					// take successor derivative
+					o.succ->accept(this);
+					as.emplace(arc{rVal, this});  // blocking empty, cuts already applied
+				} else {
+					// skip blocked arc
+					if ( o.blocking.intersects(blocked) ) continue;
+					// apply cuts
+					if ( ! o.cuts.empty() ) block_unless(o.cuts, o.blocking);
+					// take successor derivative
+					o.succ->accept(this);
+					as.emplace(arc{rVal, this, flags::vector{o.blocking}});  // cuts already applied
+				}
+			}
+			rVal = alt_node::make(as);
+		}
 
 	private:
 		/// Stored state for each nonterminal
