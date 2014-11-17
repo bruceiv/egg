@@ -68,6 +68,7 @@ namespace dlf {
 	class any_node;
 	class str_node;
 	class rule_node;
+	class cut_node;
 	class alt_node;
 
 	/// Type of expression node
@@ -81,7 +82,8 @@ namespace dlf {
 		any_type   = 0x6,
 		str_type   = 0x7,
 		rule_type  = 0x8,
-		alt_type   = 0x9,
+		cut_type   = 0x9,
+		alt_type   = 0xA,
 	};
 
 	/// Tags `x` with the given node type; useful for hashing
@@ -94,13 +96,14 @@ namespace dlf {
 		case match_type: out << "MATCH"; break;
 		case fail_type:  out << "FAIL";  break;
 		case inf_type:   out << "INF";   break;
+		case end_type:   out << "END";   break;
 		case char_type:  out << "CHAR";  break;
 		case range_type: out << "RANGE"; break;
 		case any_type:   out << "ANY";   break;
 		case str_type:   out << "STR";   break;
 		case rule_type:  out << "RULE";  break;
+		case cut_type:   out << "CUT";   break;
 		case alt_type:   out << "ALT";   break;
-		case end_type:   out << "END";   break;
 		}
 		return out;
 	}
@@ -117,6 +120,7 @@ namespace dlf {
 		virtual void visit(const any_node&)   = 0;
 		virtual void visit(const str_node&)   = 0;
 		virtual void visit(const rule_node&)  = 0;
+		virtual void visit(const cut_node&)   = 0;
 		virtual void visit(const alt_node&)   = 0;
 	}; // visitor
 
@@ -162,30 +166,19 @@ namespace dlf {
 		virtual ~cut_listener() = default;
 
 		/// State that these cuts can newly be acquired
-		virtual void acquire_cuts(const flags::vector& cuts) = 0;
+		virtual void acquire_cut(flags::index cut) = 0;
 
 		/// State that these cuts can no longer be acquired
-		virtual void release_cuts(const flags::vector& cuts) = 0;
+		virtual void release_cut(flags::index cut) = 0;
 	}; // cut listener
 
 	/// Directed arc linking two nodes
 	struct arc {
-		arc(ptr<node> succ, flags::vector&& blocking = flags::vector{},
-		    flags::vector&& cuts = flags::vector{})
-		: succ{succ}, blocking{std::move(blocking)}, cuts{std::move(cuts)}, listener{nullptr} {}
-
-		arc(ptr<node> succ, cut_listener* listener, flags::vector&& blocking = flags::vector{},
-			flags::vector&& cuts = flags::vector{})
-		: succ{succ}, blocking{std::move(blocking)}, cuts{std::move(cuts)}, listener{listener} {
-			listener->acquire_cuts(cuts);
-		}
-
-		~arc() { if ( listener ) listener->release_cuts(cuts); }
+		arc(ptr<node> succ, flags::vector&& blocking = flags::vector{})
+		: succ{succ}, blocking{std::move(blocking)} {}
 
 		ptr<node> succ;          ///< Successor pointer
 		flags::vector blocking;  ///< Restrictions blocking this arc
-		flags::vector cuts;      ///< Restrictions to apply when traversing this arc
-		cut_listener* listener;  ///< Listener used to release cuts
 	};
 
 	/// Returns a new arc pointing to the alternation of a and b.
@@ -411,7 +404,7 @@ namespace dlf {
 		rule_node(arc&& out, ptr<nonterminal> r) : out{std::move(out)}, r{r} {}
 		virtual ~rule_node() = default;
 
-		static  ptr<node>   make(arc&& out, ptr<nonterminal> r, state_mgr& mgr) {
+		static  ptr<node>   make(arc&& out, ptr<nonterminal> r) {
 			return node::make<rule_node>(std::move(out), r);
 		}
 
@@ -429,6 +422,74 @@ namespace dlf {
 		arc out;             ///< Successor node
 		ptr<nonterminal> r;  ///< Pointer to shared rule definition
 	}; // rule_node
+
+	/// Node representing a cut in the graph
+	class cut_node : public node {
+	public:
+		cut_node(arc&& out, flags::index cut) : out{std::move(out)}, cut{cut}, listener{nullptr} {}
+		cut_node(arc&& out, flags::index cut, cut_listener& _listener)
+		: out{std::move(out)}, cut{cut}, listener{&_listener} { _listener.acquire_cut(cut); }
+		cut_node(arc&& out, flags::index cut, cut_listener* listener)
+		: out{std::move(out)}, cut{cut}, listener{listener} {
+			if ( listener ) { listener->acquire_cut(cut); }
+		}
+		cut_node(const cut_node& o) : out{o.out}, cut{o.cut}, listener{o.listener} {
+			if ( listener ) { listener->acquire_cut(cut); }
+		}
+		cut_node(cut_node&& o) : out{std::move(o.out)}, cut{o.cut}, listener{o.listener} {
+			o.listener = nullptr;  // release responsibility moved to this node
+		}
+
+		cut_node& operator= (const cut_node& o) {
+			// Acquire new cut THEN release current one
+			if ( o.listener ) { o.listener->acquire_cut(o.cut); }
+			if ( listener ) { listener->release_cut(cut); }
+
+			out = o.out;
+			cut = o.cut;
+			listener = o.listener;
+
+			return *this;
+		}
+		cut_node& operator= (cut_node&& o) {
+			// Rely on o to have acquired new cut, just release old one
+			if ( listener ) { listener->release_cut(cut); }
+
+			out = std::move(o.out);
+			cut = o.cut;
+			listener = o.listener;
+
+			// make sure o doesn't release the cut
+			o.listener = nullptr;
+
+			return *this;
+		}
+
+		virtual ~cut_node() { if ( listener ) listener->release_cut(cut); }
+
+		static  ptr<node>   make(arc&& out, flags::index cut) {
+			return node::make<cut_node>(std::move(out), cut);
+		}
+		static  ptr<node>   make(arc&& out, flags::index cut, cut_listener& listener) {
+			return node::make<cut_node>(std::move(out), cut, listener);
+		}
+
+		virtual void        accept(visitor* v) const { v->visit(*this); }
+		virtual ptr<node>   merge_succ(arc&& a) const {
+			return node::make<cut_node>(alternate(std::move(as_ptr<cut_node>(a.succ)->out), out),
+			                            cut, listener);
+		}
+		virtual void        block_succ_on(const flags::vector& blocks) { out.blocking |= blocks; }
+		virtual node_type   type() const { return cut_type; }
+		virtual std::size_t hash() const { return tag_with(cut_type, cut); }
+		virtual bool        equiv(ptr<node>) const {
+			return o->type() == cut_type && as_ptr<cut_node>(o)->cut == cut;
+		}
+
+		arc out;                 ///< Successor node
+		flags::index cut;        ///< Index to block
+		cut_listener* listener;  ///< Listener to alert of changes in the cut state
+	};
 
 	/// Set of arcs which pushes alternation through its successor nodes.
 	class arc_set {
@@ -469,23 +530,24 @@ namespace dlf {
 				std::pair<iterator, bool> r{s.end(), false};
 				for (arc& aa : an.out) {
 					aa.blocking |= a.blocking;
-					aa.cuts |= a.cuts;
 					r = emplace_invar(std::move(aa));
 				}
 
 				return r
 			}
-
-			iterator ai = s.find(a);
-			if ( ai = s.end() ) {
-				// equivalent arc is not already present in set; emplace
-				return s.emplace(std::move(a));
-			}
-
-			// eqivalent arc already in set; remove, update, and re-emplace
-			arc e = *ai;
+			
+			arc e{*ai};
 			s.erase(ai);
-			e.succ = e.succ->merge_succ(std::move(a));
+			if ( e.succ == a.succ ) {
+				/// same node, merge blocking sets
+				e.blocking &= a.blocking;
+			} else {
+				/// distinct node, merge blocking sets and alternate successors
+				e.succ->block_succ_on(e.blocking - a.blocking);
+				a.succ->block_succ_on(a.blocking - e.blocking);
+				e.blocking &= a.blocking;
+				e.succ = e.succ->merge_succ(std::move(a));
+			}
 			return s.emplace(std::move(e));
 		}
 
