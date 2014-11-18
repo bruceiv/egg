@@ -489,7 +489,7 @@ namespace dlf {
 		arc out;                 ///< Successor node
 		flags::index cut;        ///< Index to block
 		cut_listener* listener;  ///< Listener to alert of changes in the cut state
-	};
+	};  // cut_node
 
 	/// Set of arcs which pushes alternation through its successor nodes.
 	class arc_set {
@@ -523,6 +523,9 @@ namespace dlf {
 		std::pair<iterator, bool> emplace_invar(arc&& a) {
 			node_type ty = a.succ->type();
 
+			// skip added fail nodes
+			if ( ty == fail_type ) return {s.end(), false};
+
 			// flatten added alt nodes
 			if ( ty == alt_type ) {
 				alt_node& an = *as_ptr<alt_node>(a.succ);
@@ -535,7 +538,7 @@ namespace dlf {
 
 				return r
 			}
-			
+
 			arc e{*ai};
 			s.erase(ai);
 			if ( e.succ == a.succ ) {
@@ -610,21 +613,21 @@ namespace dlf {
 		alt_node& operator= (alt_node&&) = default;
 		virtual ~alt_node() = default;
 
+		static  ptr<node>   make(arc_set&& as) {
+			return as.empty() ? fail_node::make() : node::make<alt_node>(std::move(as));
+		}
 		static  ptr<node>   make(arc&& a, arc&& b) {
 			arc_set as;
 			as.emplace(std::move(a));
 			as.emplace(std::move(b));
-			return node::make<alt_node>(std::move(as));
+			return make(std::move(as));
 		}
 		static  ptr<node>   make(arc&& a, arc&& b, arc&& c) {
 			arc_set as;
 			as.emplace(std::move(a));
 			as.emplace(std::move(b));
 			as.emplace(std::move(c));
-			return node::make<alt_node>(std::move(as));
-		}
-		static  ptr<node>   make(arc_set&& as) {
-			return as.empty() ? fail_node::make() : node::make<alt_node>(std::move(as));
+			return make(std::move(as));
 		}
 
 		virtual void        accept(visitor* v) const { v->visit(*this); }
@@ -633,7 +636,6 @@ namespace dlf {
 			alt_node& aa = *as_ptr<alt_node>(a.succ);
 			for (arc& ao : aa.out) {
 				ao.blocking |= a.blocking;
-				ao.cuts |= a.cuts;
 				as.insert(std::move(ao));
 			}
 			return node::make<alt_node>(std::move(as));
@@ -670,17 +672,18 @@ namespace dlf {
 
 	public:
 		// Unfollowed nodes are no-ops
-		void visit(const match_node&)   {}
-		void visit(const fail_node&)    {}
-		void visit(const inf_node&)     {}
-		void visit(const end_node&)     {}
+		virtual void visit(const match_node&)   {}
+		virtual void visit(const fail_node&)    {}
+		virtual void visit(const inf_node&)     {}
+		virtual void visit(const end_node&)     {}
 		// Remaining nodes get their successors visited
-		void visit(const char_node& n)  { visit(n.out); }
-		void visit(const range_node& n) { visit(n.out); }
-		void visit(const any_node& n)   { visit(n.out); }
-		void visit(const str_node& n)   { visit(n.out); }
-		void visit(const rule_node& n)  { visit(n.out); }
-		void visit(const alt_node& n)   { for (auto& out : n.out) visit(out); }
+		virtual void visit(const char_node& n)  { visit(n.out); }
+		virtual void visit(const range_node& n) { visit(n.out); }
+		virtual void visit(const any_node& n)   { visit(n.out); }
+		virtual void visit(const str_node& n)   { visit(n.out); }
+		virtual void visit(const rule_node& n)  { visit(n.out); }
+		virtual void visit(const cut_node& n)   { visit(n.out); }
+		virtual void visit(const alt_node& n)   { for (auto& out : n.out) visit(out); }
 	protected:
 		std::unordered_set<ptr<node>> visited;  ///< Nodes already seen
 	};  // iterator

@@ -44,10 +44,10 @@ namespace dlf {
 
 	/// Gets all the cuts in an expression
 	class cuts_in : public iterator {
-		void visit(const arc& a) { cuts |= a.cuts; iterator::visit(a); }
 	public:
 		cuts_in(ptr<node> np) : cuts{} { if ( np ) iterator::visit(np); }
 		operator flags::vector () { return cuts; }
+		void visit(const cut_node& n) { cuts |= n.cut; iterator::visit(n); }
 	private:
 		flags::vector cuts;  ///< Cuts included in this expression
 	};  // restrictions_of
@@ -57,10 +57,8 @@ namespace dlf {
 		/// Common code for visiting an arc
 		arc clone_of(const arc& a) {
 			return ( a.succ->type() == end_type ) ?
-				arc{out.succ, listener,
-					out.blocking | (a.blocking << nShift),
-					out.cuts | (a.cuts << nShift)} :
-			 	arc{clone_of(a.succ), listener, a.blocking << nShift, a.cuts << nShift};
+				arc{out.succ, listener, out.blocking | (a.blocking << nShift)} :
+			 	arc{clone_of(a.succ), listener, a.blocking << nShift};
 		}  // TODO set up register/unregister ref-counts for cut indices
 
 		/// Functional interface for visitor pattern
@@ -88,6 +86,9 @@ namespace dlf {
 		void visit(const any_node& n)   { rVal = node::make<any_node>(clone_of(n.out)); }
 		void visit(const str_node& n)   { rVal = node::make<str_node>(clone_of(n.out), n.sp, n.i); }
 		void visit(const rule_node& n)  { rVal = node::make<rule_node>(clone_of(n.out), n.r); }
+		void visit(const cut_node& n)   {
+			rVal = node::make<cut_node>(clone_of(n.out), n.cut + nShift, listener);
+		}
 		void visit(const alt_node& n)   {
 			arc_set rs;
 			for (const arc& a : n.out) { rs.emplace(clone_of(a)); }
@@ -109,7 +110,7 @@ namespace dlf {
 		/// Information about a nonterminal
 		struct nt_info {
 			nt_info(const flags::vector& cuts)
-			: cuts{cuts}, nCuts{cuts.count()}, inDeriv{false} {}
+			: cuts{cuts}, nCuts{cuts.empty() ? 0 : cuts.last()}, inDeriv{false} {}
 
 			flags::vector cuts;  ///< Cuts used by non-terminal
 			flags::index nCuts;  ///< Number of cuts used by non-terminal
@@ -117,17 +118,11 @@ namespace dlf {
 		}; // nt_info
 
 		/// Cut that can be applied
-		struct block_info {
-			block_info(const flags::vector& cuts, const flags::vector& blocking)
-			: cuts{cuts}, blocking{blocking} {}
+		struct cut_info {
+			cut_info() : blocking{}, fired{false} {}
 
-			void swap(block_info& o) {
-				cuts.swap(o.cuts);
-				blocking.swap(o.blocking);
-			}
-
-			flags::vector cuts;      ///< Cuts that are applied unless blocked
-			flags::vector blocking;  ///< Restrictions that can block the cuts
+			flags::vector blocking;  ///< Restrictions that can block the cut
+			bool fired;              ///< Has this cut been fired?
 		};  // block_info
 
 		/// Gets the info block for a nonterminal
@@ -151,89 +146,157 @@ namespace dlf {
 		}
 
 		/// Called when a set of cuts is applied
-		void block(const flags::vector& cuts) {
-			blocked |= cuts;
+		void block_new() {
+			// apply new blocks to pending list
+			auto it = pending.begin();
+			while ( it != pending.end() ) {
+				flags::index cut = it->first;
+				cut_info& info = it->second;
 
-			flags::vector new_release;
-			unsigned long i = 0;
-			while ( i < pending.size() ) {
-				block_info& info = pending[i];
-				if ( info.blocking.intersects(cuts) ) {
-					new_release |= info.cuts;
-					unsigned long last = pending.size() - 1;
-					if ( i < last ) {
-						pending[i].swap(pending[last]);
-						pending.pop_back();
-						continue;
-					} else {
-						pending.pop_back();
-						break;
-					}
+				// release any pending cuts that are now blocked
+				if ( info.blocking.intersects(new_blocked) ) {
+					new_released |= cut;
+					pending.erase(it++);
+					continue;
 				}
-				++i;
+
+				++it;
 			}
 
-			if ( ! new_release.empty() ) { release_block(new_release); }
-		}
+			// clear the new_blocked list
+			blocked |= new_blocked;
+			new_blocked.clear();
 
-		/// Called when a set of cuts will be applied unless the blocking cuts are
-		void block_unless(const flags::vector& cuts, const flags::vector& blocking) {
-			pending.emplace_back(cuts, blocking);
+			// recurse with newly released nodes
+			if ( ! new_released.empty() ) { release_new(); }
 		}
 
 		/// Called when a set of cuts will never match
-		void release_block(const flags::vector& released) {
-			flags::vector new_cuts;
+		void release_new() {
+			// apply new releases to pending list
+			auto it = pending.begin();
+			while ( it != pending.end() ) {
+				flags::index cut = it->first;
+				cut_info& info = it->second;
 
-			unsigned long i = 0;
-			while ( i < pending.size() ) {
-				block_info& info = pending[i];
-				info.blocking -= released;
+				// block any pending cuts that are no longer blocked
+				info.blocking -= new_released;
 				if ( info.blocking.empty() ) {
-					new_cuts |= info.cuts;
-					unsigned long last = pending.size()-1;
-					if ( i < last ) {
-						pending[i].swap(pending[last]);
-						pending.pop_back();
-						continue;
+					new_blocked |= cut;
+					pending.erase(it++);
+					continue;
+				}
+
+				++it;
+			}
+
+			// clear the new_released list
+			released |= new_released;
+			new_released.clear();
+
+			// recurse with newly blocked nodes
+			if ( ! new_blocked.empty() ) { block_new(); }
+		}
+
+		/// Applies a cut node pointed to by a, returning the successor arc
+		arc apply_cut(const arc& a) {
+			const cut_node& cn = *as_ptr<cut_node>(a.succ);
+			auto it = pending.find(cn.cut);
+
+			// If cut hasn't already been applied
+			if ( it != pending.end() ) {
+				// Apply blocking set to cut
+				if ( it->fired ) {
+					it->blocking &= a.blocking;
+				} else {
+					it->fired = true;
+					it->blocking = a.blocking;
+				}
+
+				// Block if necessary
+				if ( it->blocking.empty() ) {
+					new_blocked |= cn.cut;
+					pending.erase(it);
+				}
+			}
+
+			// Return cut node's successor, with blocking indices merged in
+			return a.blocking.empty() ? cn.out : arc{cn.out.succ, cn.out.blocking | a.blocking};
+		}
+
+		/// Returns a new arc merging in the block-set of another arc
+		inline arc merge(const arc& a, const flags::vector& blocking) {
+			return arc{a.succ, a.blocking | blocking};
+		}
+
+		/// Traverses an arc, modifying it in-place
+		arc traverse(arc&& a) {
+			// Clear released cuts
+			a.blocking -= released;
+
+			// Fail on blocked arc
+			if ( a.blocking.interesects(blocked) ) { a.succ = fail_node::make(); return a; }
+
+			// Conditionally apply cut node
+			if ( a.succ->type() == cut_type ) {
+				const cut_node& cn = *as_ptr<cut_node>(a.succ);
+				auto it = pending.find(cn.cut);
+
+				// If cut hasn't already been applied
+				if ( it != pending.end() ) {
+					// Apply blocking set to cut
+					if ( it->fired ) {
+						it->blocking &= a.blocking;
 					} else {
-						pending.pop_back();
-						break;
+						it->fired = true;
+						it->blocking = a.blocking;
+					}
+
+					// Block if necessary
+					if ( it->blocking.empty() ) {
+						new_blocked |= cn.cut;
+						pending.erase(it);
 					}
 				}
-				++i;
+
+				// Merge block-set into successor and traverse
+				a = merge(cn.out, a.blocking);
+				return traverse(std::move(a));
 			}
 
-			if ( ! new_cuts.empty() ) { block(new_cuts); }
+			return a;
 		}
+		inline arc traverse(const arc& a) { return traverse(arc{a}); }
 
-		/// Follows an arc; returns successor node or failure if blocked
-		ptr<node> follow(const arc& a) {
-			if ( a.blocking.empty() ) {
-				// apply cuts and follow arc
-				if ( ! a.cuts.empty() ) { block(a.cuts); }
-				return a.succ;
-			} else {
-				// fail on blocked arc
-				if ( a.blocking.intersects(blocked) ) return fail_node::make();
-				// apply cuts and follow arc
-				if (! a.cuts.empty() ) block_unless(a.cuts, a.blocking);
-				return a.succ->block_succ_on(a.blocking);
-			}
+		/// Takes the derivative of the node on the other side of an arc
+		arc&& deriv(arc&& a) {
+			rVal = traverse(std::move(a));
+			rVal.succ->accept(this);
+			return std::move(rVal);
 		}
+		inline arc deriv(const arc& a) { return deriv(arc{a}); }
+
+		/// Sets a failure arc into rVal
+		inline void fail() { rVal.succ = fail_node::make(); }
+
+		/// Merges the given arc into rVal
+		inline void follow(const arc& a) { rVal = merge(a, rVal.blocking); }
+
+		/// Resets rVal to the given node
+		inline void reset(ptr<node> np) { rVal.succ = np; }
 
 	public:
 		/// Sets up derivative computation for a nonterminal
 		derivative(ptr<nonterminal> nt)
-		: nt_state{}, blocked{}, outstanding{}, pending{}, cut_counts{},
-		  next_restrict{0}, rVal{}, x{'\0'} {
+		: nt_state{}, blocked{}, released{}, pending{}, new_blocked{}, new_released{},
+		  next_restrict{0}, match_ptr{}, root{ptr<node>{}}, rVal{ptr<node>{}}, x{'\0'} {
 			ptr<node> mp = match_node::make();
 			match_ptr = mp;
-			root = expand(nt, arc{mp});
+			root.succ = expand(nt, arc{mp});
 		}
 
 		~derivative() {
-			root.reset();  // delete all the arcs before destroying their cut listener
+			root.succ.reset();  // delete all the arcs before destroying their cut listener
 		}
 
 		/// Checks if the current expression is an unrestricted match
@@ -256,57 +319,48 @@ namespace dlf {
 		bool failed() const { return match_ptr.expired() }
 
 		/// Called when new cuts are added
-		void acquire_cuts(const flags::vector& cuts) {
-			for (flags::index i : cuts) { ++cut_counts[i]; }
-		}
+		void acquire_cut(flags::index cut) { pending.emplace(cut, cut_info{}); }
 
 		/// Called when cuts can no longer be applied
-		void release_cuts(const flags::vector& cuts) {
-			if ( cuts.empty() ) return;
-			flags::vector new_release;
-			for (flags::index i : cuts) {
-				if ( --cut_counts[i] == 0 ) { new_release |= i; }
+		void release_cut(flags::index cut) {
+			auto it = pending.find(cut);
+			if ( it != pending.end() && ! it->fired ) {
+				// Cut never fired, never will now
+				new_released |= cut;
+				pending.erase(it);
 			}
-			if ( ! new_release.empty() ) { release_block(new_release); }
 		}
 
 		/// Takes the derviative of the current root node
 		void operator(char x) {
 			this->x = x;
-			root->accept(this);
-			root = rVal;
-			rVal.reset();
+			root = deriv(std::move(root));
+
+			if ( ! new_blocked.empty() ) { block_new(); }
+			else if ( ! new_released.empty() ) { release_new(); }
 		}
 
-		void visit(const match_node& n) { rVal = n.clone(); }
-		void visit(const fail_node&)    { rVal = fail_node::make(); }
-		void visit(const inf_node&)     { rVal = inf_node::make(); }
+		void visit(const match_node& n) { /* do nothing */ }
+		void visit(const fail_node&)    { /* do nothing */ }
+		void visit(const inf_node&)     { /* do nothing */ }
 		void visit(const end_node&)     { assert(false && "Should never take derivative of end node"); }
 
-		void visit(const char_node& n)  {
-			rVal = ( x == n.c ) ? follow(n.out) : fail_node::make();
-		}
+		void visit(const char_node& n)  { x == n.c ? follow(n.out) : fail(); }
 
-		void visit(const range_node& n) {
-			rVal = ( n.b <= x && x <= n.e ) ? follow(n.out) : fail_node::make();
-		}
+		void visit(const range_node& n) { n.b <= x && x <= n.e ? follow(n.out) : fail(); }
 
-		void visit(const any_node& n)   {
-			rVal = ( x != '\0' ) ? follow(n.out) : fail_node::make();
-		}
+		void visit(const any_node& n)   { x != '\0' ? follow(n.out) : fail(); }
 
 		void visit(const str_node& n)   {
 			if ( x == (*n.sp)[i] ) {
-				rVal = ( n.size() == 1 ) ?
-						follow(n.out) :
-						node::make<str_node>(n.out, n.sp, n.i+1);
-			} else { rVal = fail_node::make(); }
+				n.size() == 1 ? follow(n.out) : reset(node::make<str_node>(n.out, n.sp, n.i+1));
+			} else fail();
 		}
 
 		void visit(const rule_node& n)  {
 			nt_info& info = get_info(n.sub);
 			// return infinite loop on left-recursion
-			if ( info.inDeriv ) { rVal = inf_node::make(); return; }
+			if ( info.inDeriv ) { reset(inf_node::make()); return; }
 
 			// take derivative of expanded rule under left-recursion flag
 			info.inDeriv = true;
@@ -314,46 +368,45 @@ namespace dlf {
 			info.inDeriv = false;
 		}
 
+		void visit(const cut_node& n)   {
+			auto it = pending.find(n.cut);
+			if ( it != pending.end() ) {
+				// Fire unconditionally
+				new_blocked |= n.cut;
+				pending.erase(it);
+			}
+
+			follow(n.out);
+		}
+
 		void visit(const alt_node& n)   {
 			arc_set as;
-			for (const arc& o : n.out) {
-				if ( o.blocking.empty() ) {
-					// apply cuts
-					if ( ! o.cuts.empty() ) { block(o.cuts); }
-					// take successor derivative
-					o.succ->accept(this);
-					as.emplace(arc{rVal, this});  // blocking empty, cuts already applied
-				} else {
-					// skip blocked arc
-					if ( o.blocking.intersects(blocked) ) continue;
-					// apply cuts
-					if ( ! o.cuts.empty() ) block_unless(o.cuts, o.blocking);
-					// take successor derivative
-					o.succ->accept(this);
-					as.emplace(arc{rVal, this, flags::vector{o.blocking}});  // cuts already applied
-				}
+			for (const arc& o : n.out) { as.emplace(deriv(o)); }
+			switch ( as.size() ) {
+			case 0:  fail();                                     return;  // no following node
+			case 1:  follow(as.front());                         return;  // merge single node
+			default: reset(node::make<alt_node>(std::move(as))); return;  // replace alt node
 			}
-			rVal = alt_node::make(as);
 		}
 
 	private:
 		/// Stored state for each nonterminal
 		std::unordered_map<ptr<nonterminal>, nt_info> nt_state;
 
-		flags::vector blocked;            ///< Blocked indices
-		flags::vector outstanding;        ///< Outstanding cut nodes
-		std::vector<block_info> pending;  ///< Cuts to be applied if they're not blocked
-		/// Ref-count for each cut
-		std::unordered_map<flags::index, unsigned long> cut_counts;
+		flags::vector blocked;                 ///< Blocked indices
+		flags::vector released;                ///< Safe indices
+		std::unordered_map<flags::index,
+		                   cut_info> pending;  ///< Information about outstanding cut indices
+		flags::vector new_blocked;             ///< Indices blocked this step
+		flags::vector new_released;            ///< Indices released this step
 
-		flags::index next_restrict;       ///< Index of next available restriction
-		std::weak_ptr<node> match_ptr;    ///< Pointer to match node
+		flags::index next_restrict;            ///< Index of next available restriction
+		std::weak_ptr<node> match_ptr;         ///< Pointer to match node
 	public:
-		ptr<node> root;                   ///< Current root node
+		arc root;                              ///< Current root arc
 	private:
-		ptr<node> rVal;                   ///< Return value from derivative computation
-		char x;                           ///< Character to take derivative with respect to
-		bool new_blocks;                  ///< Flag for new blocked indices
+		arc rVal;                              ///< Return value from derivative computation
+		char x;                                ///< Character to take derivative with respect to
 	};  // derivative
 
 	/// Recognizes the input
@@ -377,15 +430,8 @@ namespace dlf {
 
 		// set up derivative
 		derivative d(nt->second());
-		if ( dbg ) { p.print(d.root); }
 
-		// Check for initial match
-		if ( d.matched() ) {
-
-			return true;
-		}
-
-		// teke derivatives until failure, match, or end of input
+		// take derivatives until failure, match, or end of input
 		char x = '\x7f';  // DEL character; never read
 		do {
 			if ( dbg ) { p.print(d.root); }
