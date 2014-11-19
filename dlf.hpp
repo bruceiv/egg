@@ -206,7 +206,7 @@ namespace dlf {
 			return as_ptr<node>(mn);
 		}
 		/// Return clone of this node
-		static  ptr<node>   clone() { return self.lock(); }
+		        ptr<node>   clone() { return self.lock(); }
 
 		virtual void        accept(visitor* v) const { v->visit(*this); }
 		virtual ptr<node>   merge_succ(arc&& a) const { return self.lock(); }
@@ -419,7 +419,7 @@ namespace dlf {
 		virtual void        block_succ_on(const flags::vector& blocks) { out.blocking |= blocks; }
 		virtual node_type   type() const { return rule_type; }
 		virtual std::size_t hash() const { return tag_with(rule_type, std::size_t(r.get())); }
-		virtual bool        equiv(ptr<node>) const {
+		virtual bool        equiv(ptr<node> o) const {
 			return o->type() == rule_type && as_ptr<rule_node>(o)->r == r;
 		}
 
@@ -486,7 +486,7 @@ namespace dlf {
 		virtual void        block_succ_on(const flags::vector& blocks) { out.blocking |= blocks; }
 		virtual node_type   type() const { return cut_type; }
 		virtual std::size_t hash() const { return tag_with(cut_type, cut); }
-		virtual bool        equiv(ptr<node>) const {
+		virtual bool        equiv(ptr<node> o) const {
 			return o->type() == cut_type && as_ptr<cut_node>(o)->cut == cut;
 		}
 
@@ -524,39 +524,11 @@ namespace dlf {
 		using const_iterator = impl_set::const_iterator;
 
 	private:
-		std::pair<iterator, bool> emplace_invar(arc&& a) {
-			node_type ty = a.succ->type();
-
-			// skip added fail nodes
-			if ( ty == fail_type ) return {s.end(), false};
-
-			// flatten added alt nodes
-			if ( ty == alt_type ) {
-				alt_node& an = *as_ptr<alt_node>(a.succ);
-
-				std::pair<iterator, bool> r{s.end(), false};
-				for (arc& aa : an.out) {
-					aa.blocking |= a.blocking;
-					r = emplace_invar(std::move(aa));
-				}
-
-				return r
-			}
-
-			arc e{*ai};
-			s.erase(ai);
-			if ( e.succ == a.succ ) {
-				/// same node, merge blocking sets
-				e.blocking &= a.blocking;
-			} else {
-				/// distinct node, merge blocking sets and alternate successors
-				e.succ->block_succ_on(e.blocking - a.blocking);
-				a.succ->block_succ_on(a.blocking - e.blocking);
-				e.blocking &= a.blocking;
-				e.succ = e.succ->merge_succ(std::move(a));
-			}
-			return s.emplace(std::move(e));
-		}
+		/// Emplace a new arc into the set, maintaining the invariants that no fail nodes 
+		/// are allowed, all alt nodes are flattened, equal nodes are blocked by the 
+		/// intersection of their blocking sets, and equivalent nodes have the alternation 
+		/// factored past them
+		std::pair<iterator, bool> emplace_invar(arc&& a);
 
 	public:
 		arc_set() = default;
@@ -574,8 +546,8 @@ namespace dlf {
 		const_iterator begin() const { return s.cbegin(); }
 		const_iterator cbegin() const { return s.cbegin(); }
 		iterator end() { return s.end(); }
-		iterator end() const { return s.cend(); }
-		iterator cend() const { return s.cend(); }
+		const_iterator end() const { return s.cend(); }
+		const_iterator cend() const { return s.cend(); }
 
 		bool empty() const { return s.empty(); }
 		size_type size() const { return s.size(); }
@@ -587,7 +559,7 @@ namespace dlf {
 		template<typename It> void insert(It first, It last) {
 			while ( first != last ) { insert(*first); ++first; }
 		}
-		void insert(std::initializer_list<arc> sn) { for (arc&& a : sn) insert(a); }
+		void insert(std::initializer_list<arc> sn) { for (arc a : sn) insert(a); }
 		std::pair<iterator, bool> emplace(arc&& a) { return emplace_invar(std::move(a)); }
 		iterator erase(const_iterator pos) { return s.erase(pos); }
 		iterator erase(const_iterator first, const_iterator last) { return s.erase(first, last); }
@@ -595,7 +567,7 @@ namespace dlf {
 
 		size_type count(const arc& a) const { return s.count(a); }
 		iterator find(const arc& a) { return s.find(a); }
-		const_iterator find(const arc& a) { return s.find(a); }
+		const_iterator find(const arc& a) const { return s.find(a); }
 		std::pair<iterator, iterator> equal_range(const arc& a) { return s.equal_range(a); }
 		std::pair<const_iterator, const_iterator> equal_range(const arc& a) const {
 			return s.equal_range(a);
@@ -638,27 +610,64 @@ namespace dlf {
 		virtual ptr<node>   merge_succ(arc&& a) const {
 			arc_set as{out};
 			alt_node& aa = *as_ptr<alt_node>(a.succ);
-			for (arc& ao : aa.out) {
+			for (arc ao : aa.out) {
 				ao.blocking |= a.blocking;
 				as.insert(std::move(ao));
 			}
 			return node::make<alt_node>(std::move(as));
 		}
 		virtual void        block_succ_on(const flags::vector& blocks) {
-			for (arc& o : out) { o.blocking |= blocks; }
+			for (arc_set::iterator it = out.begin(); it != out.end(); ++it) {
+				const_cast<flags::vector&>(it->blocking) |= blocks;
+			}
 		}
 		virtual node_type   type() const { return alt_type; }
 		virtual std::size_t hash() const { return tag_with(alt_type); }
-		virtual bool        equiv(ptr<node>) const { return o->type() == alt_type; }
+		virtual bool        equiv(ptr<node> o) const { return o->type() == alt_type; }
 
 		arc_set out;
 	}; // alt_node
-
+	
 	inline arc alternate(arc&& a, const arc& b) {
-		arc bn{b.succ, b.blocking - a.blocking, flags::vector{b.cuts}};
-		arc an{std::move(a.succ), a.blocking - b.blocking, std::move(a.cuts)};
+		arc bn{b.succ, b.blocking - a.blocking};
+		arc an{std::move(a.succ), a.blocking - b.blocking};
 		return arc{alt_node::make(std::move(an), std::move(bn)),
 		           std::move(a.blocking &= b.blocking)};
+	}
+
+	std::pair<arc_set::iterator, bool> arc_set::emplace_invar(arc&& a) {
+		node_type ty = a.succ->type();
+
+		// skip added fail nodes
+		if ( ty == fail_type ) return {s.end(), false};
+
+		// flatten added alt nodes
+		if ( ty == alt_type ) {
+			alt_node& an = *as_ptr<alt_node>(a.succ);
+
+			std::pair<iterator, bool> r{s.end(), false};
+			for (arc aa : an.out) {
+				aa.blocking |= a.blocking;
+				r = emplace_invar(std::move(aa));
+			}
+
+			return r;
+		}
+
+		auto ai = s.find(a);
+		arc e{*ai};
+		s.erase(ai);
+		if ( e.succ == a.succ ) {
+			/// same node, merge blocking sets
+			e.blocking &= a.blocking;
+		} else {
+			/// distinct node, merge blocking sets and alternate successors
+			e.succ->block_succ_on(e.blocking - a.blocking);
+			a.succ->block_succ_on(a.blocking - e.blocking);
+			e.blocking &= a.blocking;
+			e.succ = e.succ->merge_succ(std::move(a));
+		}
+		return s.emplace(std::move(e));
 	}
 
 	/// Default visitor that just visits all the nodes; override individual methods to add

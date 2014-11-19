@@ -28,6 +28,8 @@
 #include "../ast.hpp"
 #include "../dlf.hpp"
 
+#include "dlf-printer.hpp"
+
 #include "../utils/flagvector.hpp"
 
 namespace dlf {
@@ -61,15 +63,16 @@ namespace dlf {
 			ptr<node> nt = rule_node::make(out(), R_i);
 
 			// build anonymous rule
-			flags::index i = ri++;                   // get a restriction index to use
-			next = end_node::make();                 // make end node for rule
-			arc skip = out(flags::vector::of(i));    // save arc that skips match
-			next = rule_node::make(out(), R_i);      // build recursive invocation of rule
-			next = cut_node::make(out(), i);         // set up cut on out-edges of many-expression
-			flags::index ri_bak = ri; ri = 0;        // save ri
-			mp->accept(this);                        // build many-expression
-			ri = ri_bak;                             // restore ri
-			R_i->sub = alt_node::make(out(), skip);  // reset rule
+			flags::index i = ri++;                 // get a restriction index to use
+			next = end_node::make();               // make end node for rule
+			arc skip = out(flags::vector::of(i));  // save arc that skips match
+			next = rule_node::make(out(), R_i);    // build recursive invocation of rule
+			next = cut_node::make(out(), i);       // set up cut on out-edges of many-expression
+			flags::index ri_bak = ri; ri = 0;      // save ri
+			mp->accept(this);                      // build many-expression
+			ri = ri_bak;                           // restore ri
+			R_i->sub = alt_node::make(out(),       // reset rule's substitution
+                                                  std::move(skip));
 
 			// reset next to rule reference
 			next = nt;
@@ -77,7 +80,7 @@ namespace dlf {
 
 	public:
 		/// Builds a DLF parse DAG from the given PEG grammar
-		loader(ast::grammar& g, bool dbg = false) : nts{}, str_ptrs{}, next{}, ri{0}, mi{0} {
+		loader(ast::grammar& g, bool dbg = false) : nts{}, next{}, ri{0}, mi{0} {
 			// Read in rules
 			for (auto r : g.rs) {
 				next = end_node::make();
@@ -106,7 +109,7 @@ namespace dlf {
 			for (const ast::char_range& r : m.rs) {
 				rs.emplace(arc{range_node::make(out(), r.from, r.to)});
 			}
-			next = alt_node::make(std::move(as));
+			next = alt_node::make(std::move(rs));
 		}
 
 		virtual void visit(ast::rule_matcher& m) {
@@ -125,7 +128,8 @@ namespace dlf {
 			arc skip = out(flags::vector::of(i));  // save arc that skips the optional
 			next = cut_node::make(out(), i);       // add blocker for skip branch
 			m.m->accept(this);                     // build opt-expression
-			next = alt_node::make(out(), skip);    // make alternation of two paths
+			next = alt_node::make(out(),           // make alternation of two paths
+			                      std::move(skip));
 		}
 
 		virtual void visit(ast::many_matcher& m) {
@@ -156,7 +160,7 @@ namespace dlf {
 				next = alt_next;                           // restore next values for next iteration
 				blocking |= i;                             // add index to greedy longest match blocker
 			}
-			set_next(alt_node::make(std::move(rs)));
+			next = alt_node::make(std::move(rs));
 		}
 
 		virtual void visit(ast::look_matcher& m) {
@@ -177,7 +181,7 @@ namespace dlf {
 			next = cut_node::make(out(), j);
 			m.m->accept(this);
 			// set alternate paths
-			set_next(alt_node::make(cont, cut, out()));
+			next = alt_node::make(out(), std::move(cont), std::move(cut));
 		}
 
 		virtual void visit(ast::not_matcher& m) {
@@ -187,7 +191,8 @@ namespace dlf {
 			next = fail_node::make();               // terminate blocking branch
 			next = cut_node::make(out(), i);        // with a cut on the match index
 			m.m->accept(this);                      // build blocking branch
-			set_next(alt_node::make(cont, out()));  // alternate continuing and blocking branches
+			next = alt_node::make(out(),            // alternate continuing and blocking branches
+			                      std::move(cont));
 		}
 
 		virtual void visit(ast::capt_matcher& m) {
@@ -202,7 +207,7 @@ namespace dlf {
 
 		virtual void visit(ast::fail_matcher& m) {
 			// TODO complete implementation; for now ignore the error message
-			set_next(fail_node::make());
+			next = fail_node::make();
 		}
 
 	private:

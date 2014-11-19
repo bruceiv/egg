@@ -63,7 +63,7 @@ namespace dlf {
 		}
 
 		/// Prints an arc, with its restrictions and successor
-		void print(const arc& a) {
+		void print_arc(const arc& a) {
 			if ( ! a.blocking.empty() ) {
 				out << "[";
 				for (auto i : a.blocking) { out << " " << i; }
@@ -76,7 +76,7 @@ namespace dlf {
 		void print_nts() {
 			for (auto it = pl.begin(); it != pl.end(); ++it) {
 				out << (*it)->name << " := ";
-				print_deduped((*it)->get());
+				print_deduped((*it)->sub);
 				out << std::endl;
 			}
 			pl.clear();
@@ -115,7 +115,7 @@ namespace dlf {
 		}
 
 		/// Prints the nonterminal; optionally provides output stream and pre-printed rules
-		static void print(ptr<nonterminal> nt, std::ostream& out = std::cout,
+		static void print(ptr<nonterminal> nt, std::ostream& out,
 		                  const std::unordered_set<ptr<nonterminal>>& rp
 		                        = std::unordered_set<ptr<nonterminal>>{}) {
 			printer p(out, rp);
@@ -123,47 +123,47 @@ namespace dlf {
 		}
 
 		/// Prints the expression; optionally provides output stream and pre-printed rules
-		static void print(ptr<node> n, std::ostream& out = std::cout,
-						const std::unordered_set<ptr<nonterminal>>& rp
-								= std::unordered_set<ptr<nonterminal>>{}) {
+		static void print(ptr<node> n, std::ostream& out,
+		                  const std::unordered_set<ptr<nonterminal>>& rp
+		                        = std::unordered_set<ptr<nonterminal>>{}) {
 			printer p(out, rp);
 			p.print(n);
 		}
 
 		/// Prints the arc; optionally provides output stream and pre-printed rules
-		static void print(const arc& a, std::ostream& out = std::cout,
-						const std::unordered_set<ptr<nonterminal>>& rp
-								= std::unordered_set<ptr<nonterminal>>{}) {
+		static void print(const arc& a, std::ostream& out,
+		                  const std::unordered_set<ptr<nonterminal>>& rp
+		                        = std::unordered_set<ptr<nonterminal>>{}) {
 			printer p(out, rp);
 			p.print(a);
 		}
 
-		virtual void visit(match_node&)  { out << "{MATCH}"; }
-		virtual void visit(fail_node&)   { out << "{FAIL}"; }
-		virtual void visit(inf_node&)    { out << "{INF}"; }
-		virtual void visit(end_node&)    { out << "{END}"; }
+		virtual void visit(const match_node&)  { out << "{MATCH}"; }
+		virtual void visit(const fail_node&)   { out << "{FAIL}"; }
+		virtual void visit(const inf_node&)    { out << "{INF}"; }
+		virtual void visit(const end_node&)    { out << "{END}"; }
 
-		virtual void visit(char_node& n) {
+		virtual void visit(const char_node& n) {
 			out << "\'" << strings::escape(n.c) << "\' ";
 			print_arc(n.out);
 		}
 
-		virtual void visit(range_node& n) {
+		virtual void visit(const range_node& n) {
 			out << "\'" << strings::escape(n.b) << "-" << strings::escape(n.e) << "\' ";
 			print_arc(n.out);
 		}
 
-		virtual void visit(any_node& n) {
+		virtual void visit(const any_node& n) {
 			out << ". ";
 			print_arc(n.out);
 		}
 
-		virtual void visit(str_node& n) {
+		virtual void visit(const str_node& n) {
 			out << "\"" << strings::escape(n.str()) << "\" ";
 			print_arc(n.out);
 		}
 
-		virtual void visit(rule_node& n) {
+		virtual void visit(const rule_node& n) {
 			// Mark rule for printing if not yet printed
 			if ( rp.count(n.r) == 0 ) {
 				rp.emplace(n.r);
@@ -173,12 +173,12 @@ namespace dlf {
 			print_arc(n.out);
 		}
 
-		virtual void visit(cut_node& n) {
+		virtual void visit(const cut_node& n) {
 			out << "<" << n.cut << "> ";
 			print_arc(n.out);
 		}
 
-		virtual void visit(alt_node& n) {
+		virtual void visit(const alt_node& n) {
 			out << "(";
 			auto it = n.out.begin();
 			if ( it != n.out.end() ) do {

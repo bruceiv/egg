@@ -23,7 +23,7 @@ CXX = g++
 
 # Development
 #CXXFLAGS = -O0 -ggdb --std=c++0x
-CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=10 -fdiagnostics-color=auto
+CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=10 -fdiagnostics-color=auto -ftemplate-backtrace-limit=0
 
 # Profiling
 #CXXFLAGS = -O0 -ggdb --std=c++0x -DNDEBUG
@@ -33,16 +33,17 @@ CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=10 -fdiagnostics-color=auto
 #CXXFLAGS = -O2 --std=c++0x -DNDEBUG
 #CXXFLAGS = -O3 --std=c++0x -DNDEBUG
 
-OBJS = dlf.o
+#OBJS = dlf.o
 
-dlf.o:  dlf.cpp dlf.hpp utils/flagvector.hpp utils/flags.hpp
-	$(CXX) $(CXXFLAGS) -c dlf.cpp
+#dlf.o:  dlf.cpp dlf.hpp utils/flagvector.hpp utils/flags.hpp
+#	$(CXX) $(CXXFLAGS) -c dlf.cpp
 
 egg:  main.cpp $(OBJS) egg.hpp parser.hpp \
+      dlf.hpp utils/flagvector.hpp utils/flags.hpp visitors/dlf-loader.hpp \
       visitors/compiler.hpp visitors/normalizer.hpp visitors/interpreter.hpp \
       visitors/printer.hpp visitors/dlf-printer.hpp
 	$(CXX) $(CXXFLAGS) -o egg main.cpp $(OBJS) $(LDFLAGS)
 
 clean:  
-	-rm dlf.o
+#	-rm dlf.o
 	-rm egg

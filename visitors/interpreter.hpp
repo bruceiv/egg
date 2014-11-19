@@ -57,9 +57,9 @@ namespace dlf {
 		/// Common code for visiting an arc
 		arc clone_of(const arc& a) {
 			return ( a.succ->type() == end_type ) ?
-				arc{out.succ, listener, out.blocking | (a.blocking << nShift)} :
-			 	arc{clone_of(a.succ), listener, a.blocking << nShift};
-		}  // TODO set up register/unregister ref-counts for cut indices
+				arc{out.succ, out.blocking | (a.blocking << nShift)} :
+			 	arc{clone_of(a.succ), a.blocking << nShift};
+		}  
 
 		/// Functional interface for visitor pattern
 		ptr<node> clone_of(const ptr<node> np) {
@@ -73,7 +73,7 @@ namespace dlf {
 		clone(nonterminal& nt, const arc& out,
 		      cut_listener* listener = nullptr, flags::index nShift = 0)
 		: rVal{out.succ}, out{out}, listener{listener}, nShift{nShift}, visited{} {
-			rVal = clone_of(nt->sub);
+			rVal = clone_of(nt.sub);
 		}
 		operator ptr<node> () { return rVal; }
 
@@ -130,16 +130,16 @@ namespace dlf {
 		nt_info& get_info(ptr<nonterminal> nt) {
 			auto it = nt_state.find(nt);
 			if ( it == nt_state.end() ) {
-				nt_info info{cuts_in(nt.sub)};
-				return nt_state.emplace_hint(it, nt, std::move(info)).second;
-			} else return it.second;
+				nt_info info(cuts_in(nt->sub));
+				return nt_state.emplace_hint(it, nt, std::move(info))->second;
+			} else return it->second;
 		}
 
 		/// Expands a nonterminal
 		ptr<node> expand(ptr<nonterminal> nt, const arc& out, const nt_info& info) {
 			flags::index nShift = next_restrict;
 			next_restrict += info.nCuts;
-			return clone(nt, out, this, nShift);
+			return clone(*nt, out, this, nShift);
 		}
 
 		inline ptr<node> expand(ptr<nonterminal> nt, const arc& out) {
@@ -206,16 +206,17 @@ namespace dlf {
 
 			// If cut hasn't already been applied
 			if ( it != pending.end() ) {
+				cut_info& info = it->second;
 				// Apply blocking set to cut
-				if ( it->fired ) {
-					it->blocking &= a.blocking;
+				if ( info.fired ) {
+					info.blocking &= a.blocking;
 				} else {
-					it->fired = true;
-					it->blocking = a.blocking;
+					info.fired = true;
+					info.blocking = a.blocking;
 				}
 
 				// Block if necessary
-				if ( it->blocking.empty() ) {
+				if ( info.blocking.empty() ) {
 					new_blocked |= cn.cut;
 					pending.erase(it);
 				}
@@ -236,7 +237,7 @@ namespace dlf {
 			a.blocking -= released;
 
 			// Fail on blocked arc
-			if ( a.blocking.interesects(blocked) ) { a.succ = fail_node::make(); return a; }
+			if ( a.blocking.intersects(blocked) ) { a.succ = fail_node::make(); return a; }
 
 			// Conditionally apply cut node
 			if ( a.succ->type() == cut_type ) {
@@ -245,16 +246,18 @@ namespace dlf {
 
 				// If cut hasn't already been applied
 				if ( it != pending.end() ) {
+					cut_info& info = it->second;
+
 					// Apply blocking set to cut
-					if ( it->fired ) {
-						it->blocking &= a.blocking;
+					if ( info.fired ) {
+						info.blocking &= a.blocking;
 					} else {
-						it->fired = true;
-						it->blocking = a.blocking;
+						info.fired = true;
+						info.blocking = a.blocking;
 					}
 
 					// Block if necessary
-					if ( it->blocking.empty() ) {
+					if ( info.blocking.empty() ) {
 						new_blocked |= cn.cut;
 						pending.erase(it);
 					}
@@ -303,11 +306,11 @@ namespace dlf {
 		/// Checks if the current expression is an unrestricted match
 		bool matched() const {
 			// Check for root match
-			if ( root->type() == match_type ) return true;
+			if ( root.succ->type() == match_type ) return true;
 
 			// Check for alt-match without blocking cut
-			if ( root->type() != alt_type ) return false;
-			for (arc& a : as_ptr<alt_node>(root)->out) {
+			if ( root.succ->type() != alt_type ) return false;
+			for (const arc& a : as_ptr<alt_node>(root.succ)->out) {
 				// Can only be one level of alt-node, so only need to check matches here
 				if ( a.succ->type() == match_type
 					 && ! a.blocking.intersects(blocked) ) return true;
@@ -317,7 +320,7 @@ namespace dlf {
 		}
 
 		/// Checks if the current expression cannot match
-		bool failed() const { return match_ptr.expired() }
+		bool failed() const { return match_ptr.expired(); }
 
 		/// Called when new cuts are added
 		void acquire_cut(flags::index cut) { pending[cut].refs++; }
@@ -325,7 +328,10 @@ namespace dlf {
 		/// Called when cuts can no longer be applied
 		void release_cut(flags::index cut) {
 			auto it = pending.find(cut);
-			if ( it != pending.end() && --(it->refs) == 0 && ! it->fired ) {
+			if ( it == pending.end() ) return;
+			cut_info& info = it->second;
+ 
+			if ( --info.refs == 0 && ! info.fired ) {
 				// Cut never fired, never will now
 				new_released |= cut;
 				pending.erase(it);
@@ -333,7 +339,7 @@ namespace dlf {
 		}
 
 		/// Takes the derviative of the current root node
-		void operator(char x) {
+		void operator() (char x) {
 			this->x = x;
 			root = deriv(std::move(root));
 
@@ -353,19 +359,21 @@ namespace dlf {
 		void visit(const any_node& n)   { x != '\0' ? follow(n.out) : fail(); }
 
 		void visit(const str_node& n)   {
-			if ( x == (*n.sp)[i] ) {
-				n.size() == 1 ? follow(n.out) : reset(node::make<str_node>(n.out, n.sp, n.i+1));
+			if ( x == (*n.sp)[n.i] ) {
+				n.size() == 1 ?
+					follow(n.out) : 
+					reset(node::make<str_node>(arc{n.out}, n.sp, n.i+1));
 			} else fail();
 		}
 
 		void visit(const rule_node& n)  {
-			nt_info& info = get_info(n.sub);
+			nt_info& info = get_info(n.r);
 			// return infinite loop on left-recursion
 			if ( info.inDeriv ) { reset(inf_node::make()); return; }
 
 			// take derivative of expanded rule under left-recursion flag
 			info.inDeriv = true;
-			expand(n.sub, n.out, info)->accept(this);
+			expand(n.r, n.out, info)->accept(this);
 			info.inDeriv = false;
 		}
 
@@ -385,7 +393,7 @@ namespace dlf {
 			for (const arc& o : n.out) { as.emplace(deriv(o)); }
 			switch ( as.size() ) {
 			case 0:  fail();                                     return;  // no following node
-			case 1:  follow(as.front());                         return;  // merge single node
+			case 1:  follow(*as.begin());                        return;  // merge single node
 			default: reset(node::make<alt_node>(std::move(as))); return;  // replace alt node
 			}
 		}
@@ -430,7 +438,7 @@ namespace dlf {
 		dlf::printer p(std::cout, names);
 
 		// set up derivative
-		derivative d(nt->second());
+		derivative d{nt->second};
 
 		// take derivatives until failure, match, or end of input
 		char x = '\x7f';  // DEL character; never read
