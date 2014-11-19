@@ -25,6 +25,39 @@
 #include "dlf.hpp"
 
 namespace dlf {
+
+	// node_type ///////////////////////////////////////////////////////////////
+
+	std::ostream& operator<< (std::ostream& out, node_type ty) {
+		switch ( ty ) {
+		case match_type: out << "MATCH"; break;
+		case fail_type:  out << "FAIL";  break;
+		case inf_type:   out << "INF";   break;
+		case end_type:   out << "END";   break;
+		case char_type:  out << "CHAR";  break;
+		case range_type: out << "RANGE"; break;
+		case any_type:   out << "ANY";   break;
+		case str_type:   out << "STR";   break;
+		case rule_type:  out << "RULE";  break;
+		case cut_type:   out << "CUT";   break;
+		case alt_type:   out << "ALT";   break;
+		}
+		return out;
+	}
+
+	// arc /////////////////////////////////////////////////////////////////////
+
+	arc::arc(ptr<node> succ, flags::vector&& blocking)
+	: succ{succ}, blocking{std::move(blocking)} {}
+
+	// nonterminal /////////////////////////////////////////////////////////////
+
+	nonterminal::nonterminal(const std::string& name) : name{name}, sub{fail_node::make()} {}
+
+	nonterminal::nonterminal(const std::string& name, ptr<node> sub) : name{name}, sub{sub} {}
+
+	
+
 	// state_mgr //////////////////////////////////////////////////////////
 
 	state_mgr::blocker::blocker(const flags::vector& blocking, bool released)

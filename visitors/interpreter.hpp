@@ -119,10 +119,11 @@ namespace dlf {
 
 		/// Cut that can be applied
 		struct cut_info {
-			cut_info() : blocking{}, fired{false} {}
+			cut_info() : blocking{}, fired{false}, refs{0} {}
 
 			flags::vector blocking;  ///< Restrictions that can block the cut
 			bool fired;              ///< Has this cut been fired?
+			unsigned long refs;      ///< Reference count
 		};  // block_info
 
 		/// Gets the info block for a nonterminal
@@ -319,12 +320,12 @@ namespace dlf {
 		bool failed() const { return match_ptr.expired() }
 
 		/// Called when new cuts are added
-		void acquire_cut(flags::index cut) { pending.emplace(cut, cut_info{}); }
+		void acquire_cut(flags::index cut) { pending[cut].refs++; }
 
 		/// Called when cuts can no longer be applied
 		void release_cut(flags::index cut) {
 			auto it = pending.find(cut);
-			if ( it != pending.end() && ! it->fired ) {
+			if ( it != pending.end() && --(it->refs) == 0 && ! it->fired ) {
 				// Cut never fired, never will now
 				new_released |= cut;
 				pending.erase(it);

@@ -71,6 +71,9 @@ namespace dlf {
 	class cut_node;
 	class alt_node;
 
+	/// Forward declaration of arc type
+	class arc;
+
 	/// Type of expression node
 	enum node_type : std::size_t {
 		match_type = 0x0,
@@ -91,7 +94,8 @@ namespace dlf {
 		return (x << 4) | static_cast<std::size_t>(ty);
 	}
 
-	inline std::ostream& operator<< (std::ostream& out, node_type ty) {
+	/// Prints node type
+	std::ostream& operator<< (std::ostream& out, node_type ty) {
 		switch ( ty ) {
 		case match_type: out << "MATCH"; break;
 		case fail_type:  out << "FAIL";  break;
@@ -183,15 +187,6 @@ namespace dlf {
 
 	/// Returns a new arc pointing to the alternation of a and b.
 	arc alternate(arc&& a, const arc& b);
-
-	/// Nonterminal substitution
-	struct nonterminal {
-		nonterminal(const std::string& name) : name{name}, sub{fail_node::make()} {}
-		nonterminal(const std::string& name, ptr<node> sub) : name{name}, sub{sub} {}
-
-		const std::string name;  ///< Name of the non-terminal
-		ptr<node> sub;           ///< First subexpression in the non-terminal
-	};  // nonterminal
 
 	/// Terminal node representing a match
 	class match_node : public node {
@@ -397,6 +392,15 @@ namespace dlf {
 		ptr<std::string> sp;       ///< Pointer to the interred string
 		std::string::size_type i;  ///< Index into the interred string
 	}; // str_node
+
+	/// Nonterminal substitution
+	struct nonterminal {
+		nonterminal(const std::string& name) : name{name}, sub{fail_node::make()} {}
+		nonterminal(const std::string& name, ptr<node> sub) : name{name}, sub{sub} {}
+
+		const std::string name;  ///< Name of the non-terminal
+		ptr<node> sub;           ///< First subexpression in the non-terminal
+	};  // nonterminal
 
 	/// Node representing a non-terminal
 	class rule_node : public node {
