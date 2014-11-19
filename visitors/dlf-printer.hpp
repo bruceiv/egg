@@ -89,28 +89,29 @@ namespace dlf {
 
 		/// Prints the definition of a rule
 		void print(ptr<nonterminal> nt) {
-			dups.clear();  // nodes could have been mutated since last print
+			// Add this nonterminal to the list of ones to print, then print all of them
 			rp.emplace(nt);
 			pl.emplace_back(nt);
 			print_nts();
+			dups.clear();  // shouldn't persist duplicates over top-level calls
 		}
 
 		/// Prints an expression
 		void print(ptr<node> n) {
-			dups.clear(); // nodes could have been mutated since last print
 			// Print the node, followed by any unprinted rules
 			print_deduped(n);
 			out << std::endl;
 			print_nts();
+			dups.clear();  // shouldn't persist duplicates over top-level calls
 		}
 
 		/// Prints an arc
 		void print(const arc& a) {
-			dups.clear(); // nodes could have been mutated since last print
 			// Print the arc, followed by any unprinted rules
 			print_arc(a);
 			out << std::endl;
 			print_nts();
+			dups.clear();  // shouldn't persist duplicates over top-level calls
 		}
 
 		/// Prints the nonterminal; optionally provides output stream and pre-printed rules
