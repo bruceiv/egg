@@ -305,15 +305,21 @@ namespace dlf {
 
 		/// Checks if the current expression is an unrestricted match
 		bool matched() const {
+			// Check root arc for possible blockages
+			if ( !( root.blocking.empty() 
+                                || (root.blocking - released).empty() ) ) return false;
+
 			// Check for root match
 			if ( root.succ->type() == match_type ) return true;
 
-			// Check for alt-match without blocking cut
+			// Check for alt-match without possibly blocking cut
 			if ( root.succ->type() != alt_type ) return false;
 			for (const arc& a : as_ptr<alt_node>(root.succ)->out) {
 				// Can only be one level of alt-node, so only need to check matches here
-				if ( a.succ->type() == match_type
-					 && ! a.blocking.intersects(blocked) ) return true;
+				if ( a.succ->type() == match_type ) {
+					// Can only be one match successor, check it and return
+					return a.blocking.empty() || (a.blocking - released).empty();
+				}
 			}
 
 			return false;
