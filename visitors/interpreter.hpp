@@ -199,33 +199,6 @@ namespace dlf {
 			if ( ! new_blocked.empty() ) { block_new(); }
 		}
 
-		/// Applies a cut node pointed to by a, returning the successor arc
-		arc apply_cut(const arc& a) {
-			const cut_node& cn = *as_ptr<cut_node>(a.succ);
-			auto it = pending.find(cn.cut);
-
-			// If cut hasn't already been applied
-			if ( it != pending.end() ) {
-				cut_info& info = it->second;
-				// Apply blocking set to cut
-				if ( info.fired ) {
-					info.blocking &= a.blocking;
-				} else {
-					info.fired = true;
-					info.blocking = a.blocking;
-				}
-
-				// Block if necessary
-				if ( info.blocking.empty() ) {
-					new_blocked |= cn.cut;
-					pending.erase(it);
-				}
-			}
-
-			// Return cut node's successor, with blocking indices merged in
-			return a.blocking.empty() ? cn.out : arc{cn.out.succ, cn.out.blocking | a.blocking};
-		}
-
 		/// Returns a new arc merging in the block-set of another arc
 		inline arc merge(const arc& a, const flags::vector& blocking) {
 			return arc{a.succ, a.blocking | blocking};
@@ -284,7 +257,7 @@ namespace dlf {
 		inline void fail() { rVal.succ = fail_node::make(); }
 
 		/// Merges the given arc into rVal
-		inline void follow(const arc& a) { rVal = merge(a, rVal.blocking); }
+		inline void follow(const arc& a) { rVal = traverse(merge(a, rVal.blocking)); }
 
 		/// Resets rVal to the given node
 		inline void reset(ptr<node> np) { rVal.succ = np; }
