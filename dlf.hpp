@@ -655,6 +655,10 @@ namespace dlf {
 		}
 
 		auto ai = s.find(a);
+		// add nodes that don't yet exist
+		if ( ai == s.end() ) return s.emplace(std::move(a));
+
+		// merge nodes that are already present
 		arc e{*ai};
 		s.erase(ai);
 		if ( e.succ == a.succ ) {
