@@ -56,19 +56,18 @@ namespace dlf {
 		/// Makes an anonymous nonterminal for the given matcher
 		void make_many(ptr<ast::matcher> mp) {
 			// idea is to set up a new anonymous non-terminal R_i and set next to R_i
-			// R_i = m.m <ri> R_i end | [ri] end
+			// R_i = m.m <0> R_i end | [0] end
 
 			// set rule node for new anonymous non-terminal
 			ptr<nonterminal> R_i = make_ptr<nonterminal>("*" + std::to_string(mi++));
 			ptr<node> nt = rule_node::make(out(), R_i);
 
 			// build anonymous rule
-			flags::index i = ri++;                 // get a restriction index to use
+			flags::index ri_bak = ri; ri = 1;      // save ri
 			next = end_node::make();               // make end node for rule
-			arc skip = out(flags::vector::of(i));  // save arc that skips match
+			arc skip = out(flags::vector::of(0));  // save arc that skips match
 			next = rule_node::make(out(), R_i);    // build recursive invocation of rule
-			next = cut_node::make(out(), i);       // set up cut on out-edges of many-expression
-			flags::index ri_bak = ri; ri = 0;      // save ri
+			next = cut_node::make(out(), 0);       // set up cut on out-edges of many-expression
 			mp->accept(this);                      // build many-expression
 			ri = ri_bak;                           // restore ri
 			R_i->sub = alt_node::make(out(),       // reset rule's substitution
