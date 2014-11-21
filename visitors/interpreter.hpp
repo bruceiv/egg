@@ -110,7 +110,7 @@ namespace dlf {
 		/// Information about a nonterminal
 		struct nt_info {
 			nt_info(const flags::vector& cuts)
-			: cuts{cuts}, nCuts{cuts.empty() ? 0 : cuts.last()}, inDeriv{false} {}
+			: cuts{cuts}, nCuts{cuts.last() + 1}, inDeriv{false} {}
 
 			flags::vector cuts;  ///< Cuts used by non-terminal
 			flags::index nCuts;  ///< Number of cuts used by non-terminal
@@ -148,6 +148,25 @@ namespace dlf {
 
 		/// Called when a set of cuts is applied
 		void block_new() {
+			// apply new blocks to root node
+			if ( root.blocking.intersects(new_blocked) ) {
+				root.succ = fail_node::make();
+			} else {
+				// check if root node is alt_node, if so check its successors
+				if ( root.succ->type() == alt_type ) {
+					alt_node& an = *as_ptr<alt_node>(root.succ);
+					auto it = an.out.begin();
+					while ( it != an.out.end() ) {
+						if ( root.blocking.intersects(new_blocked) ) {
+							it = an.out.erase(it);
+						} else {
+							++it;
+						}
+					}
+					if ( an.out.empty() ) { root.succ = fail_node::make(); }
+				}
+			}
+
 			// apply new blocks to pending list
 			auto it = pending.begin();
 			while ( it != pending.end() ) {
@@ -174,18 +193,30 @@ namespace dlf {
 
 		/// Called when a set of cuts will never match
 		void release_new() {
+			// apply new releases to root node
+			root.blocking -= new_released;
+			// Also apply to arc successors if alt_node
+			if ( root.succ->type() == alt_type ) {
+				alt_node& an = *as_ptr<alt_node>(root.succ);
+				for (const arc& a : an.out) {
+					const_cast<flags::vector&>(a.blocking) -= new_released;
+				}
+			}
+
 			// apply new releases to pending list
 			auto it = pending.begin();
 			while ( it != pending.end() ) {
 				flags::index cut = it->first;
 				cut_info& info = it->second;
 
-				// block any pending cuts that are no longer blocked
-				info.blocking -= new_released;
-				if ( info.blocking.empty() ) {
-					new_blocked |= cut;
-					pending.erase(it++);
-					continue;
+				// block any cuts that have been fired pending some newly released blocks
+				if ( info.fired ) {
+					info.blocking -= new_released;
+					if ( info.blocking.empty() ) {
+						new_blocked |= cut;
+						pending.erase(it++);
+						continue;
+					}
 				}
 
 				++it;
@@ -279,8 +310,7 @@ namespace dlf {
 		/// Checks if the current expression is an unrestricted match
 		bool matched() const {
 			// Check root arc for possible blockages
-			if ( !( root.blocking.empty() 
-                                || (root.blocking - released).empty() ) ) return false;
+			if ( ! root.blocking.empty() ) return false;
 
 			// Check for root match
 			if ( root.succ->type() == match_type ) return true;
@@ -289,10 +319,8 @@ namespace dlf {
 			if ( root.succ->type() != alt_type ) return false;
 			for (const arc& a : as_ptr<alt_node>(root.succ)->out) {
 				// Can only be one level of alt-node, so only need to check matches here
-				if ( a.succ->type() == match_type ) {
-					// Can only be one match successor, check it and return
-					return a.blocking.empty() || (a.blocking - released).empty();
-				}
+				// Can only be one match successor, check it and return
+				if ( a.succ->type() == match_type ) return a.blocking.empty();
 			}
 
 			return false;
@@ -309,7 +337,6 @@ namespace dlf {
 			auto it = pending.find(cut);
 			if ( it == pending.end() ) return;
 			cut_info& info = it->second;
- 
 			if ( --info.refs == 0 && ! info.fired ) {
 				// Cut never fired, never will now
 				new_released |= cut;
@@ -357,6 +384,7 @@ namespace dlf {
 		}
 
 		void visit(const cut_node& n)   {
+			assert(false && "should never take derivative of cut node");
 			auto it = pending.find(n.cut);
 			if ( it != pending.end() ) {
 				// Fire unconditionally
