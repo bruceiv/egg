@@ -58,7 +58,7 @@ namespace flags {
 
 		/// Creates a singleton vector, with the single index set
 		static vector of(index n) {
-			vector s{n};
+			vector s(n);
 			s |= n;
 			return s;
 		}
@@ -219,7 +219,7 @@ namespace flags {
 				m = v.size();
 				big = this;
 			}
-			std::vector<uint64_t> d{m};
+			std::vector<uint64_t> d(m, 0);
 			switch ( n ) {
 			case 0:  break;
 			case 1:  set_union(v.front(), o.v.front(), d.front()); break;
@@ -244,7 +244,7 @@ namespace flags {
 		/// Creates a new vector with the intersection of the the two vectors
 		vector operator& (const vector& o) const {
 			index n = std::min(v.size(), o.v.size());
-			std::vector<uint64_t> d{n};
+			std::vector<uint64_t> d(n, 0);
 			switch ( n ) {
 			case 0:  break;
 			case 1:  set_intersection(v.front(), o.v.front(), d.front()); break;
@@ -267,7 +267,7 @@ namespace flags {
 		/// Creates a new vector with the set difference of this vector and another
 		vector operator- (const vector& o) const {
 			index n = std::min(v.size(), o.v.size());
-			std::vector<uint64_t> d{v.size()};
+			std::vector<uint64_t> d(v.size(), 0);
 			switch ( n ) {
 			case 0:  break;
 			case 1:  set_difference(v.front(), o.v.front(), d.front()); break;
