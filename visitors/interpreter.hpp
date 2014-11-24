@@ -110,7 +110,7 @@ namespace dlf {
 		/// Information about a nonterminal
 		struct nt_info {
 			nt_info(const flags::vector& cuts)
-			: cuts{cuts}, nCuts{cuts.last() + 1}, inDeriv{false} {}
+			: cuts{cuts}, nCuts{cuts.empty() ? 0 : cuts.last() + 1}, inDeriv{false} {}
 
 			flags::vector cuts;  ///< Cuts used by non-terminal
 			flags::index nCuts;  ///< Number of cuts used by non-terminal
@@ -278,26 +278,34 @@ namespace dlf {
 
 		/// Takes the derivative of the node on the other side of an arc
 		arc&& deriv(arc&& a) {
-			rVal = traverse(std::move(a));
-			rVal.succ->accept(this);
+			pVal = traverse(std::move(a));
+			pVal.succ->accept(this);
+			pVal.succ.reset();
 			return std::move(rVal);
 		}
-		inline arc deriv(const arc& a) { return deriv(arc{a}); }
+//		inline arc deriv(const arc& a) { return deriv(arc{a}); }
+		inline arc&& deriv(const arc& a) { return std::move(deriv(arc{a})); }
 
 		/// Sets a failure arc into rVal
-		inline void fail() { rVal.succ = fail_node::make(); }
+//		inline void fail() { rVal = arc{fail_node::make(), std::move(pVal.blocking)}; }
+		inline void fail() { rVal = arc{fail_node::make(), flags::vector{pVal.blocking}}; }
 
 		/// Merges the given arc into rVal
-		inline void follow(const arc& a) { rVal = traverse(merge(a, rVal.blocking)); }
+		inline void follow(const arc& a) { rVal = traverse(merge(a, pVal.blocking)); }
 
 		/// Resets rVal to the given node
-		inline void reset(ptr<node> np) { rVal.succ = np; }
+//		inline void reset(ptr<node> np) { rVal = arc{np, std::move(pVal.blocking)}; }
+		inline void reset(ptr<node> np) { rVal = arc{np, flags::vector{pVal.blocking}}; }
+
+		/// Sets rVal to the passed parameter
+		inline void pass() { rVal = pVal; }
 
 	public:
 		/// Sets up derivative computation for a nonterminal
 		derivative(ptr<nonterminal> nt)
 		: nt_state{}, blocked{}, released{}, pending{}, new_blocked{}, new_released{},
-		  next_restrict{0}, match_ptr{}, root{ptr<node>{}}, rVal{ptr<node>{}}, x{'\0'} {
+		  next_restrict{0}, match_ptr{}, root{ptr<node>{}}, 
+		  pVal{ptr<node>{}}, rVal{ptr<node>{}}, x{'\0'} {
 			ptr<node> mp = match_node::make();
 			match_ptr = mp;
 			root.succ = expand(nt, arc{mp});
@@ -330,13 +338,14 @@ namespace dlf {
 		bool failed() const { return match_ptr.expired(); }
 
 		/// Called when new cuts are added
-		void acquire_cut(flags::index cut) { pending[cut].refs++; }
+		void acquire_cut(flags::index cut) { pending[cut].refs++; assert(pending[cut].refs == 1); }
 
 		/// Called when cuts can no longer be applied
 		void release_cut(flags::index cut) {
 			auto it = pending.find(cut);
 			if ( it == pending.end() ) return;
 			cut_info& info = it->second;
+			assert(info.refs == 1);
 			if ( --info.refs == 0 && ! info.fired ) {
 				// Cut never fired, never will now
 				new_released |= cut;
@@ -353,9 +362,9 @@ namespace dlf {
 			else if ( ! new_released.empty() ) { release_new(); }
 		}
 
-		void visit(const match_node& n) { /* do nothing */ }
-		void visit(const fail_node&)    { /* do nothing */ }
-		void visit(const inf_node&)     { /* do nothing */ }
+		void visit(const match_node&)   { pass(); }
+		void visit(const fail_node&)    { pass(); }
+		void visit(const inf_node&)     { pass(); }
 		void visit(const end_node&)     { assert(false && "Should never take derivative of end node"); }
 
 		void visit(const char_node& n)  { x == n.c ? follow(n.out) : fail(); }
@@ -396,8 +405,11 @@ namespace dlf {
 		}
 
 		void visit(const alt_node& n)   {
+			arc pVal_bak{pVal};
 			arc_set as;
 			for (const arc& o : n.out) { as.emplace(deriv(o)); }
+			pVal = std::move(pVal_bak);
+
 			switch ( as.size() ) {
 			case 0:  fail();                                     return;  // no following node
 			case 1:  follow(*as.begin());                        return;  // merge single node
@@ -421,6 +433,7 @@ namespace dlf {
 	public:
 		arc root;                              ///< Current root arc
 	private:
+		arc pVal;                              ///< Parameter value for derivative computation
 		arc rVal;                              ///< Return value from derivative computation
 		char x;                                ///< Character to take derivative with respect to
 	};  // derivative
