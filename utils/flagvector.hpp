@@ -34,6 +34,8 @@
 
 #include "flags.hpp"
 
+#include <iostream> // FIXME
+
 namespace flags {
 
 	using index = uint64_t;
@@ -282,15 +284,23 @@ namespace flags {
 			if ( i == 0 || v.size() == 0 ) return *this;
 			v.resize(v.size() + ((i + 63) >> 6), 0);
 			lsh(v.data(), i, v.data(), v.size());
+			// TODO clear high-order limbs (move the resize down and change the sense)
 			return *this;
 		}
 
 		/// Creates a new vector as a copy of this one shifted left by the specified number of bits
 		vector operator<< (index i) const {
+			// TODO different size, smaller
+std::cout << "\t\t\t["; for (auto j : *this) std::cout << " " << j; std::cout << " ]{" << v.size() << "} << " << i << std::endl;
 			if ( i == 0 || v.size() == 0 ) return vector{*this};
 			std::vector<uint64_t> d(v.size() + ((i + 63) >> 6), 0);
+auto k = flags::first(d.data(), d.size());
+std::cout << "\t\t\t\t \\["; while ( k != -1 ) { std::cout << " " << k; k = flags::next(d.data(), d.size(), i); } std::cout << " ]" << std::endl;
 			lsh(v.data(), i, d.data(), v.size());
-			return vector{std::move(d)};
+//			return vector{std::move(d)};
+vector w{std::move(d)};
+std::cout << "\t\t\t = ["; for (auto j : w) std::cout << " " << j; std::cout << " ]{" << w.v.size() << "}" << std::endl;
+return w;
 		}
 
 	private:

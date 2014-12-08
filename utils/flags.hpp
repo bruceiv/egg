@@ -24,6 +24,10 @@
 
 #include <cstdint>
 
+#include <cstdio> // FIXME
+#include <iostream> // FIXME
+#include <cinttypes> // FIXME
+
 namespace flags {
 
 /// Gets the array element containing an index
@@ -251,24 +255,54 @@ static inline void set_difference(const uint64_t* a, const uint64_t* b, uint64_t
 	for (uint64_t i = 0; i < n; ++i) set_difference(a[i], b[i], c[i]);
 }
 
-/// shifts a (length n) left by s bits, writing the result into c
+/// shifts a (length n) left by s bits, writing the result into c (won't clear unshifted limbs of c)
 static void lsh(const uint64_t* a, const uint64_t s, uint64_t* c, uint64_t n) {
 	uint64_t s_l = s >> 6;   // s / 64, number of limbs to shift
 	uint64_t s_b = s & 0x3F; // s % 64, number of bits to shift
 	uint64_t u_s = 64 - s_b; // number of bits to unshift high-order bits
+
+	for (uint64_t i = 0; i < n-1-s_l; ++i) {
+		// get low-order bits of current limb, then high-order bits of next back
+		c[i] = (a[s_l+i] << s_b) | (a[s_l+i+1] >> u_s);
+	}
+	c[n-1-s_l] = a[n-1] << s_b;
+	// 
+/*std::cout << "\t\t\t\tlsh: s_l=" << s_l << " s_b=" << s_b << " u_s=" << u_s << std::endl;
+char in[17], in2[17], out[17], out0[17];
+uint64_t zin[2] = {0, 0}, oin[2] = {1, 0}, fin[2] = {0xffffffffffffffff, 0}; 
+uint64_t t = zin[1] >> u_s;
+std::sprintf(out0, "%0.16" PRIx64, t);
+t = oin[1] >> u_s;
+std::sprintf(out, "%0.16" PRIx64, t);
+t = fin[1] >> u_s;
+std::sprintf(in2, "%0.16" PRIx64, t);
+std::cout << "\t\t\t\t\t shifted from 0 above=" << out0 << " 1 above=" << out << " f... above=" << in2 << std::endl;
 	
 	// get high order bits of high limb
+std::sprintf(out0, "%0.16" PRIx64, c[n+s_l]);
 	c[n+s_l] = a[n-1] >> u_s;
+std::sprintf(in, "%0.16" PRIx64, a[n-1]);
+std::sprintf(out, "%0.16" PRIx64, c[n+s_l]);
+std::cout << "\t\t\t\t\tin[" << (n-1) << "]=" << in << " -> out[" << (n+s_l) << "]=" << out << " <- " << out0 << std::endl; 
 	// shift remaining limbs
 	for (uint64_t i = n-1; i > 0; --i) {
 		// get low order bits of current limb, then high order bits of next back
+std::sprintf(out0, "%0.16" PRIx64, c[i+s_l]);
 		c[i+s_l] = (a[i] << s_b) | (a[i-1] >> u_s);
+std::sprintf(in, "%0.16" PRIx64, a[i]);
+std::sprintf(in2, "%0.16" PRIx64, a[i-1]);
+std::sprintf(out, "%0.16" PRIx64, c[i+s_l]);
+std::cout << "\t\t\t\t\tin[" << i << "," << (i-1) << "]=" << in << " " << in2 << " -> out[" << (i+s_l) << "]=" << out << " <- " << out0 << std::endl;
 	}
 	// get low order bits of low limb
+std::sprintf(out0, "%0.16" PRIx64, c[s_l]);
 	c[s_l] = a[0] << s_b;
+std::sprintf(in, "%0.16" PRIx64, a[0]);
+std::sprintf(out, "%0.16" PRIx64, c[s_l]);
+std::cout << "\t\t\t\t\tin[0]=" << in << " -> out[" << s_l << "]=" << out << " <- " << out0 << std::endl;
 	// zero remaining low order limbs
 	clear(c, s_l);
-}
+*/}
 
 } /* namespace flags */
 

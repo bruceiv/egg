@@ -56,10 +56,13 @@ namespace dlf {
 	class clone : public visitor {
 		/// Common code for visiting an arc
 		arc clone_of(const arc& a) {
-			return ( a.succ->type() == end_type ) ?
+//			return ( a.succ->type() == end_type ) ?
+arc c = ( a.succ->type() == end_type ) ?
 				arc{out.succ, out.blocking | (a.blocking << nShift)} :
 			 	arc{clone_of(a.succ), a.blocking << nShift};
-		}  
+std::cout << "\t\tclone_of " << a.succ->type() << " ["; for (auto i : a.blocking) std::cout << " " << i; std::cout << " ] = " << c.succ->type() << " ["; for (auto i : c.blocking) std::cout << " " << i; std::cout << " ]" << std::endl;
+return c;
+		}
 
 		/// Functional interface for visitor pattern
 		ptr<node> clone_of(const ptr<node> np) {
@@ -139,6 +142,7 @@ namespace dlf {
 		ptr<node> expand(ptr<nonterminal> nt, const arc& out, const nt_info& info) {
 			flags::index nShift = next_restrict;
 			next_restrict += info.nCuts;
+std::cout << "\texpand: nShift=" << nShift << " info.nCuts=" << info.nCuts << " next_restrict=" << next_restrict << std::endl;
 			return clone(*nt, out, this, nShift);
 		}
 
@@ -232,6 +236,9 @@ namespace dlf {
 
 		/// Returns a new arc merging in the block-set of another arc
 		inline arc merge(const arc& a, const flags::vector& blocking) {
+//arc b{a.succ, a.blocking | blocking};
+//std::cout << "\t["; for (auto i : a.blocking) std::cout << " " << i; std::cout << " ] | ["; for (auto i : blocking) std::cout << " " << i; std::cout << " ] = ["; for (auto i : b.blocking) std::cout << " " << i; std::cout << " ]" << std::endl;
+//return b;
 			return arc{a.succ, a.blocking | blocking};
 		}
 
@@ -278,9 +285,12 @@ namespace dlf {
 
 		/// Takes the derivative of the node on the other side of an arc
 		arc&& deriv(arc&& a) {
+//std::cout << "\t["; for (auto i : a.blocking) std::cout << " " << i; std::cout << " ]";
 			pVal = traverse(std::move(a));
+//std::cout << " t-> ["; for (auto i : pVal.blocking) std::cout << " " << i; std::cout << " ]";
 			pVal.succ->accept(this);
 			pVal.succ.reset();
+//std::cout << " d-> ["; for (auto i : rVal.blocking) std::cout << " " << i; std::cout << " ]" << std::endl;
 			return std::move(rVal);
 		}
 //		inline arc deriv(const arc& a) { return deriv(arc{a}); }
