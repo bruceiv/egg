@@ -282,18 +282,21 @@ namespace flags {
 		/// Shifts the elements of this vector left by the specified number of bits
 		vector& operator<<= (index i) {
 			if ( i == 0 || v.size() == 0 ) return *this;
-			v.resize(v.size() + ((i + 63) >> 6), 0);
+//			v.resize(v.size() + ((i + 63) >> 6), 0);
 			lsh(v.data(), i, v.data(), v.size());
-			// TODO clear high-order limbs (move the resize down and change the sense)
+			// clear high-order limbs
+			v.resize(v.size() - (i >> 6), 0);
 			return *this;
 		}
 
 		/// Creates a new vector as a copy of this one shifted left by the specified number of bits
 		vector operator<< (index i) const {
-			// TODO different size, smaller
 std::cout << "\t\t\t["; for (auto j : *this) std::cout << " " << j; std::cout << " ]{" << v.size() << "} << " << i << std::endl;
 			if ( i == 0 || v.size() == 0 ) return vector{*this};
-			std::vector<uint64_t> d(v.size() + ((i + 63) >> 6), 0);
+			int64_t ds = v.size() - (i >> 6);
+			if ( ds <= 0 ) return vector{};
+			std::vector<uint64_t> d(ds, 0);
+//			std::vector<uint64_t> d(v.size() + ((i + 63) >> 6), 0);
 auto k = flags::first(d.data(), d.size());
 std::cout << "\t\t\t\t \\["; while ( k != -1 ) { std::cout << " " << k; k = flags::next(d.data(), d.size(), i); } std::cout << " ]" << std::endl;
 			lsh(v.data(), i, d.data(), v.size());
