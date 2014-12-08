@@ -279,7 +279,7 @@ namespace flags {
 			return vector{std::move(d)};
 		}
 
-		/// Shifts the elements of this vector left by the specified number of bits
+		/// Shifts the elements of this vector left (lower) by the specified number of bits
 		vector& operator<<= (index i) {
 			if ( i == 0 || v.size() == 0 ) return *this;
 //			v.resize(v.size() + ((i + 63) >> 6), 0);
@@ -289,21 +289,40 @@ namespace flags {
 			return *this;
 		}
 
-		/// Creates a new vector as a copy of this one shifted left by the specified number of bits
+		/// Creates a new vector as a copy of this one shifted left (lower) by the specified number of bits
 		vector operator<< (index i) const {
-std::cout << "\t\t\t["; for (auto j : *this) std::cout << " " << j; std::cout << " ]{" << v.size() << "} << " << i << std::endl;
+//std::cout << "\t\t\t["; for (auto j : *this) std::cout << " " << j; std::cout << " ]{" << v.size() << "} << " << i << std::endl;
 			if ( i == 0 || v.size() == 0 ) return vector{*this};
 			int64_t ds = v.size() - (i >> 6);
 			if ( ds <= 0 ) return vector{};
 			std::vector<uint64_t> d(ds, 0);
 //			std::vector<uint64_t> d(v.size() + ((i + 63) >> 6), 0);
-auto k = flags::first(d.data(), d.size());
-std::cout << "\t\t\t\t \\["; while ( k != -1 ) { std::cout << " " << k; k = flags::next(d.data(), d.size(), i); } std::cout << " ]" << std::endl;
+//auto k = flags::first(d.data(), d.size());
+//std::cout << "\t\t\t\t \\["; while ( k != -1 ) { std::cout << " " << k; k = flags::next(d.data(), d.size(), i); } std::cout << " ]" << std::endl;
 			lsh(v.data(), i, d.data(), v.size());
-//			return vector{std::move(d)};
-vector w{std::move(d)};
-std::cout << "\t\t\t = ["; for (auto j : w) std::cout << " " << j; std::cout << " ]{" << w.v.size() << "}" << std::endl;
-return w;
+			return vector{std::move(d)};
+//vector w{std::move(d)};
+//std::cout << "\t\t\t = ["; for (auto j : w) std::cout << " " << j; std::cout << " ]{" << w.v.size() << "}" << std::endl;
+//return w;
+		}
+
+		/// Shifts the elements of this vector right (higher) by the specified number of bits
+		vector& operator>>= (index i) {
+			if ( i == 0 || v.size() == 0 ) return *this;
+			uint64_t n = v.size();
+			v.resize(n + ((i + 63) >> 6), 0);
+			rsh(v.data(), i, v.data(), n);
+			// clear low-order limbs
+			flags::clear(v.data(), i >> 6);
+			return *this;
+		}
+
+		/// Creates a new vector as a copy of this one shifted right (higher) by the specified number of bits
+		vector operator>> (index i) const {
+			if ( i == 0 || v.size() == 0 ) return vector{*this};
+			std::vector<uint64_t> d(v.size() + ((i + 63) >> 6), 0);
+			rsh(v.data(), i, d.data(), v.size());
+			return vector{std::move(d)};
 		}
 
 	private:

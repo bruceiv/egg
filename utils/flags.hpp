@@ -304,5 +304,19 @@ std::cout << "\t\t\t\t\tin[0]=" << in << " -> out[" << s_l << "]=" << out << " <
 	clear(c, s_l);
 */}
 
+/// shifts a (length n) right by s bits, writing the result into c (won't clear low-order limbs of c)
+static void rsh(const uint64_t* a, const uint64_t s, uint64_t* c, uint64_t n) {
+	uint64_t s_l = s >> 6;    // s / 64, number of limbs to shift
+	uint64_t s_b = s & 0x3F;  // s % 64, number of bits to shift
+	uint64_t u_s = 64 - s_b;  // number of bits to unshift low-order bits
+
+	c[n+s_l] = a[n-1] << u_s;
+	for (uint64_t i = n-1; i > 0; --i) {
+		// get high order bits of current limb, then low-order bits of previous
+		c[i+s_l] = (a[i-1] << u_s) | (a[i] >> s_b);
+	}
+	c[s_l] = a[0] >> s_b;
+}
+
 } /* namespace flags */
 

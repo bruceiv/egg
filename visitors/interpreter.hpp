@@ -58,8 +58,8 @@ namespace dlf {
 		arc clone_of(const arc& a) {
 //			return ( a.succ->type() == end_type ) ?
 arc c = ( a.succ->type() == end_type ) ?
-				arc{out.succ, out.blocking | (a.blocking << nShift)} :
-			 	arc{clone_of(a.succ), a.blocking << nShift};
+				arc{out.succ, out.blocking | (a.blocking >> nShift)} :
+			 	arc{clone_of(a.succ), a.blocking >> nShift};
 std::cout << "\t\tclone_of " << a.succ->type() << " ["; for (auto i : a.blocking) std::cout << " " << i; std::cout << " ] = " << c.succ->type() << " ["; for (auto i : c.blocking) std::cout << " " << i; std::cout << " ]" << std::endl;
 return c;
 		}
