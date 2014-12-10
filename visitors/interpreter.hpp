@@ -56,12 +56,9 @@ namespace dlf {
 	class clone : public visitor {
 		/// Common code for visiting an arc
 		arc clone_of(const arc& a) {
-//			return ( a.succ->type() == end_type ) ?
-arc c = ( a.succ->type() == end_type ) ?
+			return ( a.succ->type() == end_type ) ?
 				arc{out.succ, out.blocking | (a.blocking >> nShift)} :
 			 	arc{clone_of(a.succ), a.blocking >> nShift};
-std::cout << "\t\tclone_of " << a.succ->type() << " ["; for (auto i : a.blocking) std::cout << " " << i; std::cout << " ] = " << c.succ->type() << " ["; for (auto i : c.blocking) std::cout << " " << i; std::cout << " ]" << std::endl;
-return c;
 		}
 
 		/// Functional interface for visitor pattern
@@ -109,7 +106,8 @@ return c;
 	};  // clone
 
 	/// Implements the derivative computation over a DLF DAG
-	class derivative : public visitor, public cut_listener {
+//	class derivative : public visitor, public cut_listener {
+	class derivative : public cut_listener {
 		/// Information about a nonterminal
 		struct nt_info {
 			nt_info(const flags::vector& cuts)
@@ -142,7 +140,6 @@ return c;
 		ptr<node> expand(ptr<nonterminal> nt, const arc& out, const nt_info& info) {
 			flags::index nShift = next_restrict;
 			next_restrict += info.nCuts;
-std::cout << "\texpand: nShift=" << nShift << " info.nCuts=" << info.nCuts << " next_restrict=" << next_restrict << std::endl;
 			return clone(*nt, out, this, nShift);
 		}
 
@@ -234,11 +231,141 @@ std::cout << "\texpand: nShift=" << nShift << " info.nCuts=" << info.nCuts << " 
 			if ( ! new_blocked.empty() ) { block_new(); }
 		}
 
-		/// Returns a new arc merging in the block-set of another arc
+		/// Functionalal interface to actually take the derivative
+		class deriv : public visitor {
+			static inline arc merge(const arc& a, const flags::vector& blocking) {
+				return arc{a.succ, a.blocking | blocking};
+			}
+
+			static arc traverse(arc&& a, derivative& st) {
+				// Clear released cuts
+				a.blocking -= st.released;
+
+				// Fail on blocked arc
+				if ( a.blocking.intersects(st.blocked) ) {
+					a.succ = fail_node::make();
+					return a;
+				}
+
+				// Conditionally apply cut node
+				if ( a.succ->type() == cut_type ) {
+					const cut_node& cn = *as_ptr<cut_node>(a.succ);
+					auto it = st.pending.find(cn.cut);
+
+					// If the cut hasn't already been applied
+					if ( it != st.pending.end() ) {
+						cut_info& info = it->second;
+
+						// Apply blocking set to cut
+						if ( info.fired ) {
+							info.blocking &= a.blocking;
+						} else {
+							info.fired = true;
+							info.blocking = a.blocking;
+						}
+
+						// Block if necessary
+						if ( info.blocking.empty() ) {
+							st.new_blocked |= cn.cut;
+							st.pending.erase(it);
+						}
+					}
+
+					// Merge block-set into successor and traverse
+					a = merge(cn.out, a.blocking);
+					return traverse(std::move(a), st);
+				}
+
+				return a;
+			}
+			inline arc traverse(arc&& a) { return traverse(std::move(a), st); }
+
+			/// Sets a failure arc into rVal
+	                inline void fail() { rVal.succ = fail_node::make(); }
+
+	                /// Merges the given arc into rVal
+        	        inline void follow(const arc& a) { rVal = traverse(merge(a, rVal.blocking)); }
+
+	                /// Resets rVal to the given node
+        	        inline void reset(ptr<node> np) { rVal.succ = np; }
+
+			/// Does nothing to rVal
+			inline void pass() {}
+
+			/// Takes the derivative of another arc
+			inline arc d(arc&& a) { return deriv(std::move(a), x, st); }
+			inline arc d(const arc& a) { return d(arc{a}); }
+		
+		public:	
+			deriv(arc&& a, char x, derivative& st)
+			: st(st), rVal(traverse(std::move(a), st)), x(x) {
+				rVal.succ->accept(this);
+			}
+			operator arc() { return rVal; }
+			
+			void visit(const match_node&)   { pass(); }
+	                void visit(const fail_node&)    { pass(); }
+        	        void visit(const inf_node&)     { pass(); }
+
+                	void visit(const end_node&) {
+				assert(false && "Should never take derivative of end node");
+			}
+
+	                void visit(const char_node& n)  { x == n.c ? follow(n.out) : fail(); }
+
+        	        void visit(const range_node& n) { n.b <= x && x <= n.e ? follow(n.out) : fail(); }
+
+                	void visit(const any_node& n)   { x != '\0' ? follow(n.out) : fail(); }
+
+	                void visit(const str_node& n) {
+        	                if ( x == (*n.sp)[n.i] ) {
+                	                n.size() == 1 ?
+                        	                follow(n.out) :
+                                	        reset(node::make<str_node>(arc{n.out}, n.sp, n.i+1));
+	                        } else fail();
+        	        }
+
+			void visit(const rule_node& n) {
+				nt_info& info = st.get_info(n.r);
+				// return infinite loop on left-recursion
+				if ( info.inDeriv ) {
+					reset(inf_node::make());
+					return;
+				}
+
+				// take derivative of expanded rule under left-recursion flag
+				info.inDeriv = true;
+				reset(st.expand(n.r, n.out, info));
+				rVal = d(std::move(rVal));
+				info.inDeriv = false;
+			}
+
+			void visit(const cut_node& n) {
+				assert(false && "should never take derivative of cut node");
+			}
+
+			void visit(const alt_node& n) {
+				arc_set as;
+				for (const arc& o : n.out) { as.emplace(d(o)); }
+
+				switch ( as.size() ) {
+				case 0: fail(); return;  // no following node
+				case 1: follow(*as.begin()); return; // merge single node
+				default: reset(node::make<alt_node>(std::move(as))); return; // replace alt
+				}
+			}
+
+		private:
+			derivative& st;  ///< Derivative state
+			arc rVal;        ///< Return value
+			char x;          ///< Character to take derivative with respect to
+		};  // deriv
+
+		inline arc d(arc&& a, char x) { return deriv(std::move(a), x, *this); }
+		inline arc d(const arc& a, char x) { return d(arc{a}, x); }
+
+/*		/// Returns a new arc merging in the block-set of another arc
 		inline arc merge(const arc& a, const flags::vector& blocking) {
-//arc b{a.succ, a.blocking | blocking};
-//std::cout << "\t["; for (auto i : a.blocking) std::cout << " " << i; std::cout << " ] | ["; for (auto i : blocking) std::cout << " " << i; std::cout << " ] = ["; for (auto i : b.blocking) std::cout << " " << i; std::cout << " ]" << std::endl;
-//return b;
 			return arc{a.succ, a.blocking | blocking};
 		}
 
@@ -285,37 +412,34 @@ std::cout << "\texpand: nShift=" << nShift << " info.nCuts=" << info.nCuts << " 
 
 		/// Takes the derivative of the node on the other side of an arc
 		arc&& deriv(arc&& a) {
-//std::cout << "\t["; for (auto i : a.blocking) std::cout << " " << i; std::cout << " ]";
+std::cout << "\t\t\ta["; for (auto ii = a.blocking.begin(); ii != a.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
 			pVal = traverse(std::move(a));
-//std::cout << " t-> ["; for (auto i : pVal.blocking) std::cout << " " << i; std::cout << " ]";
+std::cout << "\t\t\tp["; for (auto ii = pVal.blocking.begin(); ii != pVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
 			pVal.succ->accept(this);
 			pVal.succ.reset();
-//std::cout << " d-> ["; for (auto i : rVal.blocking) std::cout << " " << i; std::cout << " ]" << std::endl;
+std::cout << "\t\t\tr["; for (auto ii = rVal.blocking.begin(); ii != rVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
 			return std::move(rVal);
 		}
-//		inline arc deriv(const arc& a) { return deriv(arc{a}); }
 		inline arc&& deriv(const arc& a) { return std::move(deriv(arc{a})); }
 
 		/// Sets a failure arc into rVal
-//		inline void fail() { rVal = arc{fail_node::make(), std::move(pVal.blocking)}; }
 		inline void fail() { rVal = arc{fail_node::make(), flags::vector{pVal.blocking}}; }
 
 		/// Merges the given arc into rVal
 		inline void follow(const arc& a) { rVal = traverse(merge(a, pVal.blocking)); }
 
 		/// Resets rVal to the given node
-//		inline void reset(ptr<node> np) { rVal = arc{np, std::move(pVal.blocking)}; }
 		inline void reset(ptr<node> np) { rVal = arc{np, flags::vector{pVal.blocking}}; }
 
 		/// Sets rVal to the passed parameter
 		inline void pass() { rVal = pVal; }
-
+*/
 	public:
 		/// Sets up derivative computation for a nonterminal
 		derivative(ptr<nonterminal> nt)
 		: nt_state{}, blocked{}, released{}, pending{}, new_blocked{}, new_released{},
-		  next_restrict{0}, match_ptr{}, root{ptr<node>{}}, 
-		  pVal{ptr<node>{}}, rVal{ptr<node>{}}, x{'\0'} {
+		  next_restrict{0}, match_ptr{}, root{ptr<node>{}}/*, 
+		  pVal{ptr<node>{}}, rVal{ptr<node>{}}, x{'\0'}*/ {
 			ptr<node> mp = match_node::make();
 			match_ptr = mp;
 			root.succ = expand(nt, arc{mp});
@@ -365,14 +489,15 @@ std::cout << "\texpand: nShift=" << nShift << " info.nCuts=" << info.nCuts << " 
 
 		/// Takes the derviative of the current root node
 		void operator() (char x) {
-			this->x = x;
-			root = deriv(std::move(root));
+//			this->x = x;
+//			root = deriv(std::move(root));
+			root = d(std::move(root), x);
 
 			if ( ! new_blocked.empty() ) { block_new(); }
 			else if ( ! new_released.empty() ) { release_new(); }
 		}
 
-		void visit(const match_node&)   { pass(); }
+/*		void visit(const match_node&)   { pass(); }
 		void visit(const fail_node&)    { pass(); }
 		void visit(const inf_node&)     { pass(); }
 		void visit(const end_node&)     { assert(false && "Should never take derivative of end node"); }
@@ -398,7 +523,11 @@ std::cout << "\texpand: nShift=" << nShift << " info.nCuts=" << info.nCuts << " 
 
 			// take derivative of expanded rule under left-recursion flag
 			info.inDeriv = true;
-			expand(n.r, n.out, info)->accept(this);
+std::cout << "\t\t\t\tpar["; for (auto ii = pVal.blocking.begin(); ii != pVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
+			reset(expand(n.r, n.out, info));
+std::cout << "\t\t\t\texp["; for (auto ii = rVal.blocking.begin(); ii != rVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
+			rVal = deriv(std::move(rVal));
+std::cout << "\t\t\t\tret["; for (auto ii = rVal.blocking.begin(); ii != rVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
 			info.inDeriv = false;
 		}
 
@@ -415,18 +544,34 @@ std::cout << "\texpand: nShift=" << nShift << " info.nCuts=" << info.nCuts << " 
 		}
 
 		void visit(const alt_node& n)   {
+std::cout << "\talt["; for (auto ii = rVal.blocking.begin(); ii != rVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
 			arc pVal_bak{pVal};
 			arc_set as;
-			for (const arc& o : n.out) { as.emplace(deriv(o)); }
+//			for (const arc& o : n.out) { as.emplace(deriv(o)); }
+for (const arc& o : n.out) {  
+std::cout << "\t\too["; for (auto ii = o.blocking.begin(); ii != o.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
+arc od = deriv(o);
+std::cout << "\t\tod["; for (auto ii = od.blocking.begin(); ii != od.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
+as.emplace(std::move(od));
+}
 			pVal = std::move(pVal_bak);
 
 			switch ( as.size() ) {
-			case 0:  fail();                                     return;  // no following node
-			case 1:  follow(*as.begin());                        return;  // merge single node
-			default: reset(node::make<alt_node>(std::move(as))); return;  // replace alt node
+//			case 0:  fail();                                     return;  // no following node
+case 0: fail();
+std::cout << "\t{0}["; for (auto ii = rVal.blocking.begin(); ii != rVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
+return;
+//			case 1:  follow(*as.begin());                        return;  // merge single node
+case 1: follow(*as.begin());
+std::cout << "\t{1}["; for (auto ii = rVal.blocking.begin(); ii != rVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
+return;
+//			default: reset(node::make<alt_node>(std::move(as))); return;  // replace alt node
+default: reset(node::make<alt_node>(std::move(as)));
+std::cout << "\t{*}["; for (auto ii = rVal.blocking.begin(); ii != rVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
+return;
 			}
 		}
-
+*/
 	private:
 		/// Stored state for each nonterminal
 		std::unordered_map<ptr<nonterminal>, nt_info> nt_state;
@@ -442,11 +587,11 @@ std::cout << "\texpand: nShift=" << nShift << " info.nCuts=" << info.nCuts << " 
 		std::weak_ptr<node> match_ptr;         ///< Pointer to match node
 	public:
 		arc root;                              ///< Current root arc
-	private:
+/*	private:
 		arc pVal;                              ///< Parameter value for derivative computation
 		arc rVal;                              ///< Return value from derivative computation
 		char x;                                ///< Character to take derivative with respect to
-	};  // derivative
+*/	};  // derivative
 
 	/// Recognizes the input
 	/// @param l		Loaded DLF DAG
