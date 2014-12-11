@@ -40,8 +40,9 @@
 #include "dlf-loader.hpp"
 #include "dlf-printer.hpp"
 
-namespace dlf {
+#include "../utils/DBG_MSG.hpp"
 
+namespace dlf {
 	/// Gets all the cuts in an expression
 	class cuts_in : public iterator {
 	public:
@@ -106,7 +107,6 @@ namespace dlf {
 	};  // clone
 
 	/// Implements the derivative computation over a DLF DAG
-//	class derivative : public visitor, public cut_listener {
 	class derivative : public cut_listener {
 		/// Information about a nonterminal
 		struct nt_info {
@@ -364,82 +364,11 @@ namespace dlf {
 		inline arc d(arc&& a, char x) { return deriv(std::move(a), x, *this); }
 		inline arc d(const arc& a, char x) { return d(arc{a}, x); }
 
-/*		/// Returns a new arc merging in the block-set of another arc
-		inline arc merge(const arc& a, const flags::vector& blocking) {
-			return arc{a.succ, a.blocking | blocking};
-		}
-
-		/// Traverses an arc, modifying it in-place
-		arc traverse(arc&& a) {
-			// Clear released cuts
-			a.blocking -= released;
-
-			// Fail on blocked arc
-			if ( a.blocking.intersects(blocked) ) { a.succ = fail_node::make(); return a; }
-
-			// Conditionally apply cut node
-			if ( a.succ->type() == cut_type ) {
-				const cut_node& cn = *as_ptr<cut_node>(a.succ);
-				auto it = pending.find(cn.cut);
-
-				// If cut hasn't already been applied
-				if ( it != pending.end() ) {
-					cut_info& info = it->second;
-
-					// Apply blocking set to cut
-					if ( info.fired ) {
-						info.blocking &= a.blocking;
-					} else {
-						info.fired = true;
-						info.blocking = a.blocking;
-					}
-
-					// Block if necessary
-					if ( info.blocking.empty() ) {
-						new_blocked |= cn.cut;
-						pending.erase(it);
-					}
-				}
-
-				// Merge block-set into successor and traverse
-				a = merge(cn.out, a.blocking);
-				return traverse(std::move(a));
-			}
-
-			return a;
-		}
-		inline arc traverse(const arc& a) { return traverse(arc{a}); }
-
-		/// Takes the derivative of the node on the other side of an arc
-		arc&& deriv(arc&& a) {
-std::cout << "\t\t\ta["; for (auto ii = a.blocking.begin(); ii != a.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
-			pVal = traverse(std::move(a));
-std::cout << "\t\t\tp["; for (auto ii = pVal.blocking.begin(); ii != pVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
-			pVal.succ->accept(this);
-			pVal.succ.reset();
-std::cout << "\t\t\tr["; for (auto ii = rVal.blocking.begin(); ii != rVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
-			return std::move(rVal);
-		}
-		inline arc&& deriv(const arc& a) { return std::move(deriv(arc{a})); }
-
-		/// Sets a failure arc into rVal
-		inline void fail() { rVal = arc{fail_node::make(), flags::vector{pVal.blocking}}; }
-
-		/// Merges the given arc into rVal
-		inline void follow(const arc& a) { rVal = traverse(merge(a, pVal.blocking)); }
-
-		/// Resets rVal to the given node
-		inline void reset(ptr<node> np) { rVal = arc{np, flags::vector{pVal.blocking}}; }
-
-		/// Sets rVal to the passed parameter
-		inline void pass() { rVal = pVal; }
-*/
 	public:
 		/// Sets up derivative computation for a nonterminal
 		derivative(ptr<nonterminal> nt)
 		: nt_state{}, blocked{}, released{}, pending{}, new_blocked{}, new_released{},
-		  next_restrict{0}, match_ptr{}, root{ptr<node>{}}/*, 
-		  pVal{ptr<node>{}}, rVal{ptr<node>{}}, x{'\0'}*/ {
+		  next_restrict{0}, match_ptr{}, root{ptr<node>{}} {
 			ptr<node> mp = match_node::make();
 			match_ptr = mp;
 			root.succ = expand(nt, arc{mp});
@@ -489,97 +418,20 @@ std::cout << "\t\t\tr["; for (auto ii = rVal.blocking.begin(); ii != rVal.blocki
 
 		/// Takes the derviative of the current root node
 		void operator() (char x) {
-//			this->x = x;
-//			root = deriv(std::move(root));
 			root = d(std::move(root), x);
-
 			if ( ! new_blocked.empty() ) { block_new(); }
 			else if ( ! new_released.empty() ) { release_new(); }
 		}
 
-/*		void visit(const match_node&)   { pass(); }
-		void visit(const fail_node&)    { pass(); }
-		void visit(const inf_node&)     { pass(); }
-		void visit(const end_node&)     { assert(false && "Should never take derivative of end node"); }
-
-		void visit(const char_node& n)  { x == n.c ? follow(n.out) : fail(); }
-
-		void visit(const range_node& n) { n.b <= x && x <= n.e ? follow(n.out) : fail(); }
-
-		void visit(const any_node& n)   { x != '\0' ? follow(n.out) : fail(); }
-
-		void visit(const str_node& n)   {
-			if ( x == (*n.sp)[n.i] ) {
-				n.size() == 1 ?
-					follow(n.out) : 
-					reset(node::make<str_node>(arc{n.out}, n.sp, n.i+1));
-			} else fail();
-		}
-
-		void visit(const rule_node& n)  {
-			nt_info& info = get_info(n.r);
-			// return infinite loop on left-recursion
-			if ( info.inDeriv ) { reset(inf_node::make()); return; }
-
-			// take derivative of expanded rule under left-recursion flag
-			info.inDeriv = true;
-std::cout << "\t\t\t\tpar["; for (auto ii = pVal.blocking.begin(); ii != pVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
-			reset(expand(n.r, n.out, info));
-std::cout << "\t\t\t\texp["; for (auto ii = rVal.blocking.begin(); ii != rVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
-			rVal = deriv(std::move(rVal));
-std::cout << "\t\t\t\tret["; for (auto ii = rVal.blocking.begin(); ii != rVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
-			info.inDeriv = false;
-		}
-
-		void visit(const cut_node& n)   {
-			assert(false && "should never take derivative of cut node");
-			auto it = pending.find(n.cut);
-			if ( it != pending.end() ) {
-				// Fire unconditionally
-				new_blocked |= n.cut;
-				pending.erase(it);
-			}
-
-			follow(n.out);
-		}
-
-		void visit(const alt_node& n)   {
-std::cout << "\talt["; for (auto ii = rVal.blocking.begin(); ii != rVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
-			arc pVal_bak{pVal};
-			arc_set as;
-//			for (const arc& o : n.out) { as.emplace(deriv(o)); }
-for (const arc& o : n.out) {  
-std::cout << "\t\too["; for (auto ii = o.blocking.begin(); ii != o.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
-arc od = deriv(o);
-std::cout << "\t\tod["; for (auto ii = od.blocking.begin(); ii != od.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
-as.emplace(std::move(od));
-}
-			pVal = std::move(pVal_bak);
-
-			switch ( as.size() ) {
-//			case 0:  fail();                                     return;  // no following node
-case 0: fail();
-std::cout << "\t{0}["; for (auto ii = rVal.blocking.begin(); ii != rVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
-return;
-//			case 1:  follow(*as.begin());                        return;  // merge single node
-case 1: follow(*as.begin());
-std::cout << "\t{1}["; for (auto ii = rVal.blocking.begin(); ii != rVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
-return;
-//			default: reset(node::make<alt_node>(std::move(as))); return;  // replace alt node
-default: reset(node::make<alt_node>(std::move(as)));
-std::cout << "\t{*}["; for (auto ii = rVal.blocking.begin(); ii != rVal.blocking.end(); ++ii) std::cout << " " << *ii; std::cout << " ]" << std::endl;
-return;
-			}
-		}
-*/
 	private:
 		/// Stored state for each nonterminal
 		std::unordered_map<ptr<nonterminal>, nt_info> nt_state;
-
+	public:
 		flags::vector blocked;                 ///< Blocked indices
 		flags::vector released;                ///< Safe indices
 		std::unordered_map<flags::index,
 		                   cut_info> pending;  ///< Information about outstanding cut indices
+	private:
 		flags::vector new_blocked;             ///< Indices blocked this step
 		flags::vector new_released;            ///< Indices released this step
 
@@ -587,11 +439,7 @@ return;
 		std::weak_ptr<node> match_ptr;         ///< Pointer to match node
 	public:
 		arc root;                              ///< Current root arc
-/*	private:
-		arc pVal;                              ///< Parameter value for derivative computation
-		arc rVal;                              ///< Return value from derivative computation
-		char x;                                ///< Character to take derivative with respect to
-*/	};  // derivative
+	};  // derivative
 
 	/// Recognizes the input
 	/// @param l		Loaded DLF DAG
@@ -618,7 +466,21 @@ return;
 		// take derivatives until failure, match, or end of input
 		char x = '\x7f';  // DEL character; never read
 		do {
-			if ( dbg ) { p.print(d.root); }
+			if ( dbg ) {
+				for (auto p : d.pending) {
+					if ( ! p.second.fired ) continue;
+					std::cout << p.first << ":[";
+					if ( ! p.second.blocking.empty() ) {
+						auto ii = p.second.blocking.begin();
+						std::cout << *ii;
+						while ( ++ii != p.second.blocking.end() ) {
+							std::cout << " " << *ii;
+						}
+					}
+					std::cout << "] ";
+				}
+				p.print(d.root);
+			}
 
 			if ( d.failed() ) return false;
 			else if ( d.matched() ) return true;

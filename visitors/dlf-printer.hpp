@@ -62,14 +62,24 @@ namespace dlf {
 			}
 		}
 
+		/// Prints a blocking vector
+		void print_blockset(const flags::vector& s) {
+		}
+
 		/// Prints an arc, with its restrictions and successor
-		void print_arc(const arc& a) {
+		void print_arc(const arc& a, bool follow_override = false) {
 			if ( ! a.blocking.empty() ) {
 				out << "[";
-				for (auto i : a.blocking) { out << " " << i; }
-				out << " ] ";
+				auto ii = a.blocking.begin();
+				out << *ii;
+				while ( ++ii != a.blocking.end() ) {
+					out << " " << *ii;
+				}
+				out << "]";
+				if ( do_follow || follow_override ) out << " ";
 			}
-			print_deduped(a.succ);
+			if ( do_follow ) print_deduped(a.succ);
+			else if ( follow_override ) a.succ->accept(this);
 		}
 
 		/// Prints the set of un-printed nonterminals
@@ -85,7 +95,7 @@ namespace dlf {
 		printer(std::ostream& out = std::cout,
 		        const std::unordered_set<ptr<nonterminal>>& rp
 		              = std::unordered_set<ptr<nonterminal>>{})
-			: out{out}, rp{rp}, pl{}, dups{} {}
+			: out{out}, rp{rp}, pl{}, dups{}, do_follow{true} {}
 
 		/// Prints the definition of a rule
 		void print(ptr<nonterminal> nt) {
@@ -114,6 +124,14 @@ namespace dlf {
 			dups.clear();  // shouldn't persist duplicates over top-level calls
 		}
 
+		/// Prints an arcs restrictions and immediate followers, but nothing else
+		void print_next(const arc& a) {
+			do_follow = false;
+			print_arc(a, true);
+			out << std::endl;
+			do_follow = true;
+		}
+
 		/// Prints the nonterminal; optionally provides output stream and pre-printed rules
 		static void print(ptr<nonterminal> nt, std::ostream& out,
 		                  const std::unordered_set<ptr<nonterminal>>& rp
@@ -136,6 +154,12 @@ namespace dlf {
 		                        = std::unordered_set<ptr<nonterminal>>{}) {
 			printer p(out, rp);
 			p.print(a);
+		}
+
+		/// Prints an arc's restrictions and immediate followers
+		static void next(const arc& a, std::ostream& out = std::cout) {
+			printer p(out);
+			p.print_next(a);
 		}
 
 		virtual void visit(const match_node&)  { out << "{MATCH}"; }
@@ -182,7 +206,7 @@ namespace dlf {
 			out << "(";
 			auto it = n.out.begin();
 			if ( it != n.out.end() ) do {
-				print_arc(*it);
+				print_arc(*it, true);
 				if ( ++it == n.out.end() ) break;
 				out << " | ";
 			} while (true);
@@ -195,6 +219,7 @@ namespace dlf {
 		std::list<ptr<nonterminal>> pl;           ///< List of rules to print
 		std::unordered_map<const node*,
 		                   unsigned long> dups;   ///< IDs for duplicated nodes
+		bool do_follow;                           ///< Flag to follow successor arcs
 	}; // printer
 
 } // namespace dlf
