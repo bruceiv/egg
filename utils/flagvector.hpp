@@ -197,6 +197,9 @@ namespace flags {
 
 		/// Unions another vector with this one
 		vector& operator|= (const vector& o) {
+			if ( o.v.empty() ) return *this;
+			if ( v.empty() ) return *this = o;
+
 			index n = std::min(v.size(), o.v.size());
 			switch ( n ) {
 			case 0:  break;
@@ -279,7 +282,7 @@ namespace flags {
 
 		/// Shifts the elements of this vector left (lower) by the specified number of bits
 		vector& operator<<= (index i) {
-			if ( i == 0 || v.size() == 0 ) return *this;
+			if ( i == 0 || v.empty() ) return *this;
 			lsh(v.data(), i, v.data(), v.size());
 			// clear high-order limbs
 			v.resize(v.size() - (i >> 6), 0);
@@ -288,7 +291,7 @@ namespace flags {
 
 		/// Creates a new vector as a copy of this one shifted left (lower) by the specified number of bits
 		vector operator<< (index i) const {
-			if ( i == 0 || v.size() == 0 ) return vector{*this};
+			if ( i == 0 || v.empty() ) return vector{*this};
 			int64_t ds = v.size() - (i >> 6);
 			if ( ds <= 0 ) return vector{};
 			std::vector<uint64_t> d(ds, 0);
@@ -298,7 +301,7 @@ namespace flags {
 
 		/// Shifts the elements of this vector right (higher) by the specified number of bits
 		vector& operator>>= (index i) {
-			if ( i == 0 || v.size() == 0 ) return *this;
+			if ( i == 0 || v.empty() ) return *this;
 			uint64_t n = v.size();
 			v.resize(n + ((i + 63) >> 6), 0);
 			rsh(v.data(), i, v.data(), n);
@@ -309,7 +312,7 @@ namespace flags {
 
 		/// Creates a new vector as a copy of this one shifted right (higher) by the specified number of bits
 		vector operator>> (index i) const {
-			if ( i == 0 || v.size() == 0 ) return vector{*this};
+			if ( i == 0 || v.empty() ) return vector{*this};
 			std::vector<uint64_t> d(v.size() + ((i + 63) >> 6), 0);
 			rsh(v.data(), i, d.data(), v.size());
 			return vector{std::move(d)};
