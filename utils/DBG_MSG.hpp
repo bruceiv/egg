@@ -34,25 +34,3 @@ static int _DBG_IDENT = 0;
 #define IN_DBG_ARC(msg, arc) IN_DBG(msg, dlf::printer::next(arc))
 #define PRE_DBG_ARC(msg, arc) PRE_DBG(msg, dlf::printer::next(arc))
 #define POST_DBG_ARC(msg, arc) POST_DBG(msg, dlf::printer::next(arc))
-
-/*namespace dlf {
-	static int dbg_ident = 0;
-
-	static void dbg_arc(const arc& a, const char* msg = nullptr, int idiff = 0) {
-		if ( idiff > 0 ) dbg_ident += idiff;
-		
-//		for (int i = 0; i < dbg_ident; ++i) std::cout << ' ';
-		dbg_level std::cout << "[";
-		if ( ! a.blocking.empty() ) {
-			auto ii = a.blocking.begin();
-			std::cout << *ii;
-			while ( ++ii != a.blocking.end() ) { std::cout << " " << *ii; }
-		}
-		std::cout << "]";
-		if ( msg ) std::cout << " " << msg;
-		std::cout << std::endl;
-	
-		if ( idiff < 0 ) dbg_ident += idiff;
-	}
-}*/
-
