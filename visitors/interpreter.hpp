@@ -149,6 +149,7 @@ namespace dlf {
 
 		/// Called when a set of cuts is applied
 		void block_new() {
+//DBG("marking ["; for (auto ii : new_blocked) std::cout << " " << ii; std::cout << " ] blocked" << std::endl);
 			// apply new blocks to root node
 			if ( root.blocking.intersects(new_blocked) ) {
 				root.succ = fail_node::make();
@@ -205,6 +206,7 @@ namespace dlf {
 
 		/// Called when a set of cuts will never match
 		void release_new() {
+//DBG("marking ["; for (auto ii : new_released) std::cout << " " << ii; std::cout << " ] released" << std::endl);
 			// apply new releases to root node
 			root.blocking -= new_released;
 			// Also apply to arc successors if alt_node
@@ -263,10 +265,10 @@ namespace dlf {
 					
 					if ( a.blocking.empty() ) {
 						st.new_blocked |= cn.cut;
-//DBG("blocking " << cn.cut << " by traversal" << std::endl);
+//DBG("new " << cn.cut << " blocked by traversal" << std::endl);
 					} else {
 						st.pending.emplace(cn.cut, a.blocking);
-//DBG("new " << cn.cut << " pending" << std::endl);
+//DBG("new " << cn.cut << " blocked pending ["; for (auto ii : a.blocking) std::cout << " " << ii; std::cout << " ] by traversal" << std::endl);
 					}
 					
 					// Merge block-set into successor and traverse
@@ -297,9 +299,11 @@ namespace dlf {
 		public:	
 			deriv(arc&& a, char x, derivative& st)
 			: st(st), rVal(traverse(std::move(a), st)), x(x) {
+//PRE_DBG_ARC("take deriv of ", rVal);
 				rVal.succ->accept(this);
 			}
 			operator arc() { return rVal; }
+//operator arc() { POST_DBG_ARC("deriv result is ", rVal); return rVal; }
 			
 			void visit(const match_node&)   { pass(); }
 			void visit(const fail_node&)    { pass(); }
@@ -343,11 +347,15 @@ namespace dlf {
 
 			void visit(const alt_node& n) {
 				arc_set as;
-				for (const arc& o : n.out) { as.emplace(d(o)); }
+				for (arc o : n.out) {
+					o.blocking |= rVal.blocking;
+					as.emplace(d(std::move(o)));
+				}
 
 				switch ( as.size() ) {
 				case 0: fail(); return;  // no following node
-				case 1: follow(*as.begin()); return; // merge single node
+//				case 1: follow(*as.begin()); return; // merge single node
+				case 1: rVal = *as.begin(); return;  // replace with single node
 				default: reset(node::make<alt_node>(std::move(as))); return; // replace alt
 				}
 			}
@@ -402,14 +410,20 @@ namespace dlf {
 
 		/// Called when cuts can no longer be applied
 		void release_cut(flags::index cut) {
-			auto rg = pending.equal_range(cut);
+			// can't release cut that's already blocked
+			if ( new_blocked(cut) || blocked(cut) ) return;
+//if ( new_blocked(cut) || blocked(cut) ) { DBG("blocked " << cut << " freed" << std::endl); return; }
 			
+			auto rg = pending.equal_range(cut);
 			if ( rg.first == rg.second ) {
+				// release cut that is freed and not pending
 				new_released |= cut;
-//DBG("released " << cut << " due to free" << std::endl);
+//DBG("new " << cut << " released due to free" << std::endl);
 			} else do {
+				// mark all pending instances of this cut freed
+				// can't be new instances, because the cut won't occur again
 				rg.first->second.freed = true;
-//DBG("marked pending " << cut << " freed" << std::endl);
+//DBG("pending " << cut << " freed" << std::endl);
 				++rg.first;
 			} while ( rg.first != rg.second );
 		}
@@ -417,8 +431,10 @@ namespace dlf {
 		/// Takes the derviative of the current root node
 		void operator() (char x) {
 			root = d(std::move(root), x);
+//if ( !( new_blocked.empty() && new_released.empty() ) ) { PRE_DBG("applying block-set changes" << std::endl); 
 			if ( ! new_blocked.empty() ) { block_new(); }
 			else if ( ! new_released.empty() ) { release_new(); }
+//POST_DBG_ARC("changes applied; now ", root); }
 		}
 
 	private:
