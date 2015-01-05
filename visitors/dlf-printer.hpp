@@ -62,10 +62,6 @@ namespace dlf {
 			}
 		}
 
-		/// Prints a blocking vector
-		void print_blockset(const flags::vector& s) {
-		}
-
 		/// Prints an arc, with its restrictions and successor
 		void print_arc(const arc& a, bool follow_override = false) {
 			if ( ! a.blocking.empty() ) {
