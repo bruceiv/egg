@@ -27,32 +27,10 @@
 
 static int _DBG_IDENT = 0;
 
-#define IN_DBG(msg, act) do { for(int _i = 0; _i < _DBG_IDENT; ++_i) std::cout << ' '; std::cout << msg; act; } while(false)
-#define PRE_DBG(msg, act) do { _DBG_IDENT += 2; IN_DBG(msg, act); } while(false)
-#define POST_DBG(msg, act) do { IN_DBG(msg, act); _DBG_IDENT -= 2; } while(false)
+#define DBG(msg) do { for(int _i = 0; _i < _DBG_IDENT; ++_i) std::cout << ' '; std::cout << msg; } while(false)
+#define PRE_DBG(msg) do { _DBG_IDENT += 2; DBG(msg); } while(false)
+#define POST_DBG(msg) do { DBG(msg); _DBG_IDENT -= 2; } while(false)
 
-#define IN_DBG_ARC(msg, arc) IN_DBG(msg, dlf::printer::next(arc))
-#define PRE_DBG_ARC(msg, arc) PRE_DBG(msg, dlf::printer::next(arc))
-#define POST_DBG_ARC(msg, arc) POST_DBG(msg, dlf::printer::next(arc))
-
-/*namespace dlf {
-	static int dbg_ident = 0;
-
-	static void dbg_arc(const arc& a, const char* msg = nullptr, int idiff = 0) {
-		if ( idiff > 0 ) dbg_ident += idiff;
-		
-//		for (int i = 0; i < dbg_ident; ++i) std::cout << ' ';
-		dbg_level std::cout << "[";
-		if ( ! a.blocking.empty() ) {
-			auto ii = a.blocking.begin();
-			std::cout << *ii;
-			while ( ++ii != a.blocking.end() ) { std::cout << " " << *ii; }
-		}
-		std::cout << "]";
-		if ( msg ) std::cout << " " << msg;
-		std::cout << std::endl;
-	
-		if ( idiff < 0 ) dbg_ident += idiff;
-	}
-}*/
-
+#define DBG_ARC(msg, arc) DBG(msg; dlf::printer::next(arc))
+#define PRE_DBG_ARC(msg, arc) PRE_DBG(msg; dlf::printer::next(arc))
+#define POST_DBG_ARC(msg, arc) POST_DBG(msg; dlf::printer::next(arc))
