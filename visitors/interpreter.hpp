@@ -147,9 +147,32 @@ namespace dlf {
 			return expand(nt, out, get_info(nt));
 		}
 
+		/// Called at end-of-input to block all pending cuts
+		void apply_pending() {
+			if ( pending.empty() ) return;
+
+			// mark all pending cuts as blocked
+			auto it = pending.begin();
+			while ( it != pending.end() ) {
+				new_blocked |= it->first;
+//DBG("firing pending " << it->first << std::endl);
+				++it;
+			}
+			pending.clear();
+			
+			block_new(); // apply block indices that are no longer pending
+
+			// mark all remaining pending matches as applied
+			auto jt = pending_matches.begin();
+			while ( jt != pending_matches.end() ) {
+				jt->second.clear();
+				++jt;
+			}
+		}
+
 		/// Called when a set of cuts is applied
 		void block_new() {
-DBG("marking ["; for (auto ii : new_blocked) std::cout << " " << ii; std::cout << " ] blocked" << std::endl);
+//DBG("marking ["; for (auto ii : new_blocked) std::cout << " " << ii; std::cout << " ] blocked" << std::endl);
 			// apply new blocks to root node
 			if ( root.blocking.intersects(new_blocked) ) {
 				root.succ = fail_node::make();
@@ -186,14 +209,24 @@ DBG("marking ["; for (auto ii : new_blocked) std::cout << " " << ii; std::cout <
 				if ( info.blocking.intersects(new_blocked) ) {
 					if ( info.freed && pending.count(cut) == 1 ) {
 						new_released |= cut;
-DBG("releasing " << cut << " by new blocked" << std::endl);
+//DBG("releasing " << cut << " by new blocked" << std::endl);
 					}
-else DBG("removing pending " << cut << " by new blocked" << std::endl);
+//else DBG("removing pending " << cut << " by new blocked" << std::endl);
 					it = pending.erase(it);
 					continue;
 				}
 				
 				++it;
+			}
+
+			// apply new blocks to pending match list
+			auto jt = pending_matches.begin();
+			while ( jt != pending_matches.end() ) {
+				if ( jt->second.intersects(new_blocked) ) {
+					jt = pending_matches.erase(jt);
+					continue;
+				}
+				++jt;
 			}
 
 			// clear the new_blocked list
@@ -206,7 +239,7 @@ else DBG("removing pending " << cut << " by new blocked" << std::endl);
 
 		/// Called when a set of cuts will never match
 		void release_new() {
-DBG("marking ["; for (auto ii : new_released) std::cout << " " << ii; std::cout << " ] released" << std::endl);
+//DBG("marking ["; for (auto ii : new_released) std::cout << " " << ii; std::cout << " ] released" << std::endl);
 			// apply new releases to root node
 			root.blocking -= new_released;
 			// Also apply to arc successors if alt_node
@@ -227,12 +260,19 @@ DBG("marking ["; for (auto ii : new_released) std::cout << " " << ii; std::cout 
 				info.blocking -= new_released;
 				if ( info.blocking.empty() ) {
 					new_blocked |= cut;
-DBG("firing " << cut << " by new released" << std::endl);
+//DBG("firing " << cut << " by new released" << std::endl);
 					it = pending.erase(it);
 					continue;
 				}
 
 				++it;
+			}
+
+			// apply new releases to pending match list
+			auto jt = pending_matches.begin();
+			while ( jt != pending_matches.end() ) {
+				jt->second -= new_released;
+				++jt;
 			}
 
 			// clear the new_released list
@@ -259,24 +299,32 @@ DBG("firing " << cut << " by new released" << std::endl);
 					return a;
 				}
 
+				switch ( a.succ->type() ) {
 				// Conditionally apply cut node
-				if ( a.succ->type() == cut_type ) {
+				case cut_type: { 
 					const cut_node& cn = *as_ptr<cut_node>(a.succ);
 					
 					if ( a.blocking.empty() ) {
 						st.new_blocked |= cn.cut;
-DBG("new " << cn.cut << " blocked by traversal" << std::endl);
+//DBG("new " << cn.cut << " blocked by traversal" << std::endl);
 					} else {
 						st.pending.emplace(cn.cut, a.blocking);
-DBG("new " << cn.cut << " blocked pending ["; for (auto ii : a.blocking) std::cout << " " << ii; std::cout << " ] by traversal" << std::endl);
+//DBG("new " << cn.cut << " blocked pending ["; for (auto ii : a.blocking) std::cout << " " << ii; std::cout << " ] by traversal" << std::endl);
 					}
 					
 					// Merge block-set into successor and traverse
 					a = merge(cn.out, a.blocking);
 					return traverse(std::move(a), st);
 				}
-
-				return a;
+				// Conditionally apply match node
+				case match_type: {
+					st.pending_matches.emplace_back(st.input_index, a.blocking);
+//DBG("new match blocked pending["; for (auto ii : a.blocking) std::cout << " " << ii; std::cout << " ]" << std::endl);
+					return fail_node::make();
+				}
+				// Return non-mutator node
+				default: return a;
+				}
 			}
 			inline arc traverse(arc&& a) { return traverse(std::move(a), st); }
 
@@ -299,13 +347,15 @@ DBG("new " << cn.cut << " blocked pending ["; for (auto ii : a.blocking) std::co
 		public:	
 			deriv(arc&& a, char x, derivative& st)
 			: st(st), rVal(traverse(std::move(a), st)), x(x) {
-PRE_DBG_ARC("take deriv of ", rVal);
+//PRE_DBG_ARC("take deriv of ", rVal);
 				rVal.succ->accept(this);
 			}
-//			operator arc() { return rVal; }
-operator arc() { POST_DBG_ARC("deriv result is ", rVal); return rVal; }
+			operator arc() { return rVal; }
+//operator arc() { POST_DBG_ARC("deriv result is ", rVal); return rVal; }
 			
-			void visit(const match_node&)   { pass(); }
+			void visit(const match_node&)   {
+				assert(false && "Should never take derivative of match node");
+			}
 			void visit(const fail_node&)    { pass(); }
 			void visit(const inf_node&)     { pass(); }
 			void visit(const end_node&)     {
@@ -319,12 +369,12 @@ operator arc() { POST_DBG_ARC("deriv result is ", rVal); return rVal; }
 			void visit(const any_node& n)   { x != '\0' ? follow(n.out) : fail(); }
 
 			void visit(const str_node& n) {
-	                if ( x == (*n.sp)[n.i] ) {
-        	                n.size() == 1 ?
-                	                follow(n.out) :
-                        	        reset(node::make<str_node>(arc{n.out}, n.sp, n.i+1));
-                    } else fail();
-	        }
+				if ( x == (*n.sp)[n.i] ) {
+					n.size() == 1 ?
+						follow(n.out) :
+						reset(node::make<str_node>(arc{n.out}, n.sp, n.i+1));
+				} else fail();
+			}
 
 			void visit(const rule_node& n) {
 				nt_info& info = st.get_info(n.r);
@@ -354,7 +404,6 @@ operator arc() { POST_DBG_ARC("deriv result is ", rVal); return rVal; }
 
 				switch ( as.size() ) {
 				case 0: fail(); return;  // no following node
-//				case 1: follow(*as.begin()); return; // merge single node
 				case 1: rVal = *as.begin(); return;  // replace with single node
 				default: reset(node::make<alt_node>(std::move(as))); return; // replace alt
 				}
@@ -373,6 +422,7 @@ operator arc() { POST_DBG_ARC("deriv result is ", rVal); return rVal; }
 		/// Sets up derivative computation for a nonterminal
 		derivative(ptr<nonterminal> nt)
 		: nt_state{}, blocked{}, released{}, pending{}, new_blocked{}, new_released{},
+		  input_index{0}, pending_matches{}, 
 		  next_restrict{0}, match_ptr{}, root{ptr<node>{}} {
 			ptr<node> mp = match_node::make();
 			match_ptr = mp;
@@ -385,21 +435,11 @@ operator arc() { POST_DBG_ARC("deriv result is ", rVal); return rVal; }
 
 		/// Checks if the current expression is an unrestricted match
 		bool matched() const {
-			// Check root arc for possible blockages
-			if ( ! root.blocking.empty() ) return false;
-
-			// Check for root match
-			if ( root.succ->type() == match_type ) return true;
-
-			// Check for alt-match without possibly blocking cut
-			if ( root.succ->type() != alt_type ) return false;
-			for (const arc& a : as_ptr<alt_node>(root.succ)->out) {
-				// Can only be one level of alt-node, so only need to check matches here
-				// Can only be one match successor, check it and return
-				if ( a.succ->type() == match_type ) return a.blocking.empty();
+			for (const auto& p : pending_matches) {
+				if ( p.second.empty() ) return true;
 			}
-
 			return false;
+
 		}
 
 		/// Checks if the current expression cannot match
@@ -412,18 +452,18 @@ operator arc() { POST_DBG_ARC("deriv result is ", rVal); return rVal; }
 		void release_cut(flags::index cut) {
 			// can't release cut that's already blocked
 			if ( new_blocked(cut) || blocked(cut) ) return;
-if ( new_blocked(cut) || blocked(cut) ) { DBG("blocked " << cut << " freed" << std::endl); return; }
+//if ( new_blocked(cut) || blocked(cut) ) { DBG("blocked " << cut << " freed" << std::endl); return; }
 			
 			auto rg = pending.equal_range(cut);
 			if ( rg.first == rg.second ) {
 				// release cut that is freed and not pending
 				new_released |= cut;
-DBG("new " << cut << " released due to free" << std::endl);
+//DBG("new " << cut << " released due to free" << std::endl);
 			} else do {
 				// mark all pending instances of this cut freed
 				// can't be new instances, because the cut won't occur again
 				rg.first->second.freed = true;
-DBG("pending " << cut << " freed" << std::endl);
+//DBG("pending " << cut << " freed" << std::endl);
 				++rg.first;
 			} while ( rg.first != rg.second );
 		}
@@ -431,10 +471,12 @@ DBG("pending " << cut << " freed" << std::endl);
 		/// Takes the derviative of the current root node
 		void operator() (char x) {
 			root = d(std::move(root), x);
-if ( !( new_blocked.empty() && new_released.empty() ) ) { PRE_DBG("applying block-set changes" << std::endl); 
+//if ( !( new_blocked.empty() && new_released.empty() ) ) { PRE_DBG("applying block-set changes" << std::endl); 
 			if ( ! new_blocked.empty() ) { block_new(); }
 			else if ( ! new_released.empty() ) { release_new(); }
-POST_DBG_ARC("changes applied; now ", root); }
+			if ( x == '\0' ) { apply_pending(); }
+			++input_index;
+//POST_DBG_ARC("changes applied; now ", root); }
 		}
 
 	private:
@@ -448,6 +490,10 @@ POST_DBG_ARC("changes applied; now ", root); }
 	private:
 		flags::vector new_blocked;      ///< Indices blocked this step
 		flags::vector new_released;     ///< Indices released this step
+		
+		unsigned long input_index;      ///< Current index in the input
+		/// Information about possible matches
+		std::vector<std::pair<unsigned long, flags::vector>> pending_matches;
 
 		flags::index next_restrict;     ///< Index of next available restriction
 		std::weak_ptr<node> match_ptr;  ///< Pointer to match node
