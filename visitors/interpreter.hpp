@@ -165,6 +165,7 @@ namespace dlf {
 			// mark all remaining pending matches as applied
 			auto jt = pending_matches.begin();
 			while ( jt != pending_matches.end() ) {
+//DBG("marking match at " << jt->first << " successful" << std::endl);
 				jt->second.clear();
 				++jt;
 			}
@@ -223,6 +224,7 @@ namespace dlf {
 			auto jt = pending_matches.begin();
 			while ( jt != pending_matches.end() ) {
 				if ( jt->second.intersects(new_blocked) ) {
+//DBG("removing match at " << jt->first << std::endl);
 					jt = pending_matches.erase(jt);
 					continue;
 				}
@@ -319,7 +321,7 @@ namespace dlf {
 				// Conditionally apply match node
 				case match_type: {
 					st.pending_matches.emplace_back(st.input_index, a.blocking);
-//DBG("new match blocked pending["; for (auto ii : a.blocking) std::cout << " " << ii; std::cout << " ]" << std::endl);
+//DBG("new match at " << st.input_index << " blocked pending["; for (auto ii : a.blocking) std::cout << " " << ii; std::cout << " ]" << std::endl);
 					return fail_node::make();
 				}
 				// Return non-mutator node
@@ -439,11 +441,10 @@ namespace dlf {
 				if ( p.second.empty() ) return true;
 			}
 			return false;
-
 		}
 
 		/// Checks if the current expression cannot match
-		bool failed() const { return match_ptr.expired(); }
+		bool failed() const { return pending_matches.empty() && match_ptr.expired(); }
 
 		/// Called when new cuts are added
 		void acquire_cut(flags::index cut) {}
@@ -471,7 +472,7 @@ namespace dlf {
 		/// Takes the derviative of the current root node
 		void operator() (char x) {
 			root = d(std::move(root), x);
-//if ( !( new_blocked.empty() && new_released.empty() ) ) { PRE_DBG("applying block-set changes" << std::endl); 
+//if ( !( new_blocked.empty() && new_released.empty() && x != '\0' ) ) { PRE_DBG("applying block-set changes" << std::endl); 
 			if ( ! new_blocked.empty() ) { block_new(); }
 			else if ( ! new_released.empty() ) { release_new(); }
 			if ( x == '\0' ) { apply_pending(); }
