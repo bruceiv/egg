@@ -491,11 +491,11 @@ namespace dlf {
 	private:
 		flags::vector new_blocked;      ///< Indices blocked this step
 		flags::vector new_released;     ///< Indices released this step
-		
+	public:	
 		unsigned long input_index;      ///< Current index in the input
 		/// Information about possible matches
 		std::vector<std::pair<unsigned long, flags::vector>> pending_matches;
-
+	private:
 		flags::index next_restrict;     ///< Index of next available restriction
 		std::weak_ptr<node> match_ptr;  ///< Pointer to match node
 	public:
@@ -528,17 +528,31 @@ namespace dlf {
 		char x = '\x7f';  // DEL character; never read
 		do {
 			if ( dbg ) {
-				for (auto p : d.pending) {
-					std::cout << p.first << ":[";
-					if ( ! p.second.blocking.empty() ) {
-						auto ii = p.second.blocking.begin();
+				// print pending cuts
+				for (auto c : d.pending) {
+					std::cout << c.first << ":[";
+					if ( ! c.second.blocking.empty() ) {
+						auto ii = c.second.blocking.begin();
 						std::cout << *ii;
-						while ( ++ii != p.second.blocking.end() ) {
+						while ( ++ii != c.second.blocking.end() ) {
 							std::cout << " " << *ii;
 						}
 					}
 					std::cout << "] ";
 				}
+				// print pending matches
+				for (auto m : d.pending_matches) {
+					std::cout << "@" << m.first << ":[";
+					if ( ! m.second.empty() ) {
+						auto ii = m.second.begin();
+						std::cout << *ii;
+						while ( ++ii != m.second.end() ) {
+							std::cout << " " << *ii;
+						}
+					}
+					std::cout << "] ";
+				}
+				// print root node
 				p.print(d.root);
 			}
 
