@@ -191,6 +191,7 @@ namespace dlf {
 						++it;
 					}
 					if ( an.out.empty() ) { root.succ = fail_node::make(); }
+					// TODO collapse single-option alts here
 				}
 			}
 
@@ -452,12 +453,12 @@ namespace dlf {
 		/// Called when cuts can no longer be applied
 		void release_cut(flags::index cut) {
 			// can't release cut that's already blocked
-			if ( new_blocked(cut) || blocked(cut) ) return;
-//if ( new_blocked(cut) || blocked(cut) ) { DBG("blocked " << cut << " freed" << std::endl); return; }
 			
 			auto rg = pending.equal_range(cut);
 			if ( rg.first == rg.second ) {
-				// release cut that is freed and not pending
+				// release cut that is freed and not pending or blocked
+				if ( new_blocked(cut) || blocked(cut) ) return;
+//if ( new_blocked(cut) || blocked(cut) ) { DBG("blocked " << cut << " freed" << std::endl); return; }
 				new_released |= cut;
 //DBG("new " << cut << " released due to free" << std::endl);
 			} else do {
@@ -477,6 +478,8 @@ namespace dlf {
 			else if ( ! new_released.empty() ) { release_new(); }
 			if ( x == '\0' ) { apply_pending(); }
 			++input_index;
+//DBG("new blocked:["; for (auto ii : blocked) std::cout << " " << ii; std::cout << " ]" << std::endl);
+//DBG("new released:["; for (auto ii : released) std::cout << " " << ii; std::cout << " ]" << std::endl);
 //POST_DBG_ARC("changes applied; now ", root); }
 		}
 
