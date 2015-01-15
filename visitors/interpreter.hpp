@@ -174,7 +174,11 @@ namespace dlf {
 						++it;
 					}
 					if ( an.out.empty() ) { root.succ = fail_node::make(); }
-					// TODO collapse single-option alts here
+					else if ( an.out.size() == 1 ) {
+						const arc& aa = *an.out.begin();
+						root.blocking |= aa.blocking;
+						root.succ = aa.succ;
+					}
 				}
 			}
 
