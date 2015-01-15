@@ -51,7 +51,7 @@ namespace dlf {
 		void visit(const cut_node& n) { cuts |= n.cut; iterator::visit(n); }
 	private:
 		flags::vector cuts;  ///< Cuts included in this expression
-	};  // restrictions_of
+	};  // cuts_in
 
 	/// Clones a nonterminal, repointing its out-arcs to the given node
 	class clone : public visitor {
@@ -147,28 +147,11 @@ namespace dlf {
 			return expand(nt, out, get_info(nt));
 		}
 
-		/// Called at end-of-input to block all pending cuts
-		void apply_pending() {
-			if ( pending.empty() ) return;
-
-			// mark all pending cuts as blocked
-			auto it = pending.begin();
-			while ( it != pending.end() ) {
-				new_blocked |= it->first;
-//DBG("firing pending " << it->first << std::endl);
-				++it;
-			}
-			pending.clear();
-			
-			block_new(); // apply block indices that are no longer pending
-
-			// mark all remaining pending matches as applied
-			auto jt = pending_matches.begin();
-			while ( jt != pending_matches.end() ) {
-//DBG("marking match at " << jt->first << " successful" << std::endl);
-				jt->second.clear();
-				++jt;
-			}
+		/// Mark all cut nodes left in the DAG as unfired for end-of-input
+		void release_unfired() {
+			new_released = cuts_in(root.succ);
+//DBG("marking ["; for(auto ii : new_released) std::cout << " " << ii; std::cout << " ] released by unfired" << std::endl);
+			if ( ! new_released.empty() ) release_new();
 		}
 
 		/// Called when a set of cuts is applied
@@ -476,7 +459,7 @@ namespace dlf {
 //if ( !( new_blocked.empty() && new_released.empty() && x != '\0' ) ) { PRE_DBG("applying block-set changes" << std::endl); 
 			if ( ! new_blocked.empty() ) { block_new(); }
 			else if ( ! new_released.empty() ) { release_new(); }
-			if ( x == '\0' ) { apply_pending(); }
+			if ( x == '\0' ) { release_unfired(); }
 			++input_index;
 //DBG("new blocked:["; for (auto ii : blocked) std::cout << " " << ii; std::cout << " ]" << std::endl);
 //DBG("new released:["; for (auto ii : released) std::cout << " " << ii; std::cout << " ]" << std::endl);
