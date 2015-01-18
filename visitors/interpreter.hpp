@@ -98,7 +98,7 @@ namespace dlf {
 
 	private:
 		ptr<node> rVal;          ///< Return value of last visit
-		arc out;                 ///< Replacement for end nodes
+		const arc out;           ///< Replacement for end nodes
 		cut_listener* listener;  ///< Cut listener to release cloned cuts to
 		flags::index nShift;     ///< Amount to shift restrictions by
 
@@ -310,7 +310,20 @@ namespace dlf {
 				case match_type: {
 					st.pending_matches.emplace_back(st.input_index, a.blocking);
 //DBG("new match at " << st.input_index << " blocked pending["; for (auto ii : a.blocking) std::cout << " " << ii; std::cout << " ]" << std::endl);
-					return fail_node::make();
+					return arc{fail_node::make()};
+				}
+				// Traverse all branches of an alternation
+				case alt_type: {
+					const alt_node& an = *as_ptr<alt_node>(a.succ);
+					arc_set as;
+					for (const arc& aa : an.out) {
+						as.emplace(traverse(merge(aa, a.blocking), st));
+					}
+					switch ( as.size() ) {
+					case 0:  return arc{fail_node::make()};
+					case 1:  return merge(*as.begin(), a.blocking);
+					default: a.succ = alt_node::make(std::move(as)); return a;
+					}
 				}
 				// Return non-mutator node
 				default: return a;

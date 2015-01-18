@@ -122,10 +122,10 @@ namespace dlf {
 
 		/// Prints an arcs restrictions and immediate followers, but nothing else
 		void print_next(const arc& a) {
-			do_follow = false;
+//			do_follow = false;
 			print_arc(a, true);
 			out << std::endl;
-			do_follow = true;
+//			do_follow = true;
 		}
 
 		/// Prints the nonterminal; optionally provides output stream and pre-printed rules
