@@ -35,8 +35,6 @@
 #include "../ast.hpp"
 #include "../dlf.hpp"
 
-#include "../utils/flagvector.hpp"
-
 #include "dlf-loader.hpp"
 #include "dlf-printer.hpp"
 
@@ -47,10 +45,10 @@ namespace dlf {
 	class cuts_in : public iterator {
 	public:
 		cuts_in(ptr<node> np) : cuts{} { if ( np ) iterator::visit(np); }
-		operator flags::vector () { return cuts; }
+		operator cutset () { return cuts; }
 		void visit(const cut_node& n) { cuts |= n.cut; iterator::visit(n); }
 	private:
-		flags::vector cuts;  ///< Cuts included in this expression
+		cutset cuts;  ///< Cuts included in this expression
 	};  // cuts_in
 
 	/// Clones a nonterminal, repointing its out-arcs to the given node
@@ -72,7 +70,7 @@ namespace dlf {
 		}
 	public:
 		clone(nonterminal& nt, const arc& out,
-		      cut_listener* listener = nullptr, flags::index nShift = 0)
+		      cut_listener* listener = nullptr, cutind nShift = 0)
 		: rVal{out.succ}, out{out}, listener{listener}, nShift{nShift}, visited{} {
 			rVal = clone_of(nt.sub);
 		}
@@ -100,7 +98,7 @@ namespace dlf {
 		ptr<node> rVal;          ///< Return value of last visit
 		const arc out;           ///< Replacement for end nodes
 		cut_listener* listener;  ///< Cut listener to release cloned cuts to
-		flags::index nShift;     ///< Amount to shift restrictions by
+		cutind nShift;           ///< Amount to shift restrictions by
 
 		/// Memoizes visited nodes to maintain the structure of the DAG
 		std::unordered_map<ptr<node>, ptr<node>> visited;
@@ -111,20 +109,20 @@ namespace dlf {
 		/// Pending cut application, blocked according to some outstanding indices
 		struct cut_info {
 			cut_info() : blocking{}, freed{false} {}
-			cut_info(flags::vector& blocking) : blocking{blocking}, freed{false} {}
+			cut_info(const cutset& blocking) : blocking{blocking}, freed{false} {}
 
-			flags::vector blocking;  ///< Restrictions that can block the cut
-			bool freed;              ///< Have all references to this cut been freed?
+			cutset blocking;  ///< Restrictions that can block the cut
+			bool freed;       ///< Have all references to this cut been freed?
 		};  // block_info
 		
 		/// Information about a nonterminal
 		struct nt_info {
-			nt_info(const flags::vector& cuts)
+			nt_info(const cutset& cuts)
 			: cuts{cuts}, nCuts{cuts.empty() ? 0 : cuts.last() + 1}, inDeriv{false} {}
 
-			flags::vector cuts;  ///< Cuts used by non-terminal
-			flags::index nCuts;  ///< Number of cuts used by non-terminal
-			bool inDeriv;        ///< Flag used when currently in derivative
+			cutset cuts;   ///< Cuts used by non-terminal
+			cutind nCuts;  ///< Number of cuts used by non-terminal
+			bool inDeriv;  ///< Flag used when currently in derivative
 		}; // nt_info
 
 		/// Gets the info block for a nonterminal
@@ -138,7 +136,7 @@ namespace dlf {
 
 		/// Expands a nonterminal
 		ptr<node> expand(ptr<nonterminal> nt, const arc& out, const nt_info& info) {
-			flags::index nShift = next_restrict;
+			cutind nShift = next_restrict;
 			next_restrict += info.nCuts;
 			return clone(*nt, out, this, nShift);
 		}
@@ -185,7 +183,7 @@ namespace dlf {
 			// apply new blocks to pending list
 			auto it = pending.begin();
 			while ( it != pending.end() ) {
-				flags::index cut = it->first;
+				cutind cut = it->first;
 				cut_info& info = it->second;
 
 				// remove newly blocked cuts from pending list
@@ -236,14 +234,14 @@ namespace dlf {
 			if ( root.succ->type() == alt_type ) {
 				alt_node& an = *as_ptr<alt_node>(root.succ);
 				for (const arc& a : an.out) {
-					const_cast<flags::vector&>(a.blocking) -= new_released;
+					const_cast<cutset&>(a.blocking) -= new_released;
 				}
 			}
 
 			// apply new releases to pending list
 			auto it = pending.begin();
 			while ( it != pending.end() ) {
-				flags::index cut = it->first;
+				cutind cut = it->first;
 				cut_info& info = it->second;
 
 				// block any cuts that have been fired pending some newly released blocks
@@ -275,7 +273,7 @@ namespace dlf {
 
 		/// Functionalal interface to actually take the derivative
 		class deriv : public visitor {
-			static inline arc merge(const arc& a, const flags::vector& blocking) {
+			static inline arc merge(const arc& a, const cutset& blocking) {
 				return arc{a.succ, a.blocking | blocking};
 			}
 
@@ -448,10 +446,10 @@ namespace dlf {
 		bool failed() const { return pending_matches.empty() && match_ptr.expired(); }
 
 		/// Called when new cuts are added
-		void acquire_cut(flags::index cut) {}
+		void acquire_cut(cutind cut) {}
 
 		/// Called when cuts can no longer be applied
-		void release_cut(flags::index cut) {
+		void release_cut(cutind cut) {
 			// can't release cut that's already blocked
 			
 			auto rg = pending.equal_range(cut);
@@ -487,23 +485,26 @@ namespace dlf {
 		/// Stored state for each nonterminal
 		std::unordered_map<ptr<nonterminal>, nt_info> nt_state;
 	public:
-		flags::vector blocked;          ///< Blocked indices
-		flags::vector released;         ///< Safe indices
+		cutset blocked;                 ///< Blocked indices
+		cutset released;                ///< Safe indices
 		/// Information about outstanding cut indices
-		std::unordered_multimap<flags::index, cut_info> pending;
+		std::unordered_multimap<cutind, cut_info> pending;
 	private:
-		flags::vector new_blocked;      ///< Indices blocked this step
-		flags::vector new_released;     ///< Indices released this step
+		cutset new_blocked;             ///< Indices blocked this step
+		cutset new_released;            ///< Indices released this step
 	public:	
 		unsigned long input_index;      ///< Current index in the input
 		/// Information about possible matches
-		std::vector<std::pair<unsigned long, flags::vector>> pending_matches;
+		std::vector<std::pair<unsigned long, cutset>> pending_matches;
 	private:
-		flags::index next_restrict;     ///< Index of next available restriction
+		cutind next_restrict;           ///< Index of next available restriction
 		std::weak_ptr<node> match_ptr;  ///< Pointer to match node
 	public:
 		arc root;                       ///< Current root arc
 	};  // derivative
+
+	/// Levels of debug output
+	enum dbg_level { no_dbg, cat_dbg, full_dbg };
 
 	/// Recognizes the input
 	/// @param l		Loaded DLF DAG
@@ -511,7 +512,7 @@ namespace dlf {
 	/// @param rule		Start rule
 	/// @param dbg		Print debug output? (default false)
 	/// @return true for match, false for failure
-	bool match(loader& l, std::istream& in, std::string rule, bool dbg = false) {
+	bool match(loader& l, std::istream& in, std::string rule, dbg_level dbg = no_dbg) {
 		// find rule
 		auto& nts = l.get_nonterminals();
 		auto nt = nts.find(rule);
@@ -530,7 +531,7 @@ namespace dlf {
 		// take derivatives until failure, match, or end of input
 		char x = '\x7f';  // DEL character; never read
 		do {
-			if ( dbg ) {
+			if ( dbg == full_dbg ) {
 				// print pending cuts
 				for (auto c : d.pending) {
 					std::cout << c.first << ":[";
@@ -565,9 +566,15 @@ namespace dlf {
 
 			if ( ! in.get(x) ) { x = '\0'; }  // read character, \0 for EOF
 
-			if ( dbg ) {
+			switch ( dbg ) {
+			case full_dbg:
 				std::cout << "d(\'" << (x == '\0' ? "\\0" : strings::escape(x)) << "\') =====>"
 				          << std::endl;
+				break;
+			case cat_dbg:
+				if ( x != '\0' ) std::cout << x;
+				break;
+			case no_dbg: break;
 			}
 
 			// take derivative
@@ -581,8 +588,8 @@ namespace dlf {
 	/// @param rule		Start rule
 	/// @param dbg		Print debug output? (default false)
 	/// @return true for match, false for failure
-	bool match(ast::grammar& g, std::istream& in, std::string rule, bool dbg = false) {
-		loader l(g, dbg);
+	bool match(ast::grammar& g, std::istream& in, std::string rule, dbg_level dbg = no_dbg) {
+		loader l(g, dbg == full_dbg);
 		return match(l, in, rule, dbg);
 	}
 
