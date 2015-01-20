@@ -29,7 +29,8 @@
 #include <unordered_set>
 #include <utility>
 
-#include "utils/flagset.hpp"
+//#include "utils/flagset.hpp"
+#include "utils/flagvector.hpp"
 
 /**
 * Implements dynamic left-factoring parsing for parsing expression grammars, according to the
@@ -45,7 +46,8 @@ namespace dlf {
 	using cutind = flags::index;
 
 	/// Set of restriction indices
-	using cutset = flags::set;
+//	using cutset = flags::set;
+	using cutset = flags::vector;
 	
 	/// Shorthand for shared_ptr
 	template <typename T>

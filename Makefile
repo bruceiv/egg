@@ -27,11 +27,11 @@ CXX = g++
 
 # Profiling
 #CXXFLAGS = -O0 -ggdb --std=c++0x -DNDEBUG
-CXXFLAGS = -O2 -ggdb --std=c++0x -DNDEBUG
+#CXXFLAGS = -O2 -ggdb --std=c++0x -DNDEBUG
 
 # Release
 #CXXFLAGS = -O2 --std=c++0x -DNDEBUG
-#CXXFLAGS = -O3 --std=c++0x -DNDEBUG
+CXXFLAGS = -O3 --std=c++0x -DNDEBUG
 
 #OBJS = dlf.o
 
