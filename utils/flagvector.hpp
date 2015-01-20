@@ -206,6 +206,10 @@ namespace flags {
 			case 1:  set_union(v.front(), o.v.front(), v.front()); break;
 			default: set_union(v.data(), o.v.data(), v.data(), n); break;
 			}
+			if ( v.size() < o.v.size() ) {
+				v.resize(o.v.size(), 0);
+				for (index i = n; i < v.size(); ++i) { v[i] = o.v[i]; }
+			}
 			return *this;
 		}
 

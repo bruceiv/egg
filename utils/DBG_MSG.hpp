@@ -34,3 +34,4 @@ static int _DBG_IDENT = 0;
 #define DBG_ARC(msg, arc) DBG(msg; dlf::printer::next(arc))
 #define PRE_DBG_ARC(msg, arc) PRE_DBG(msg; dlf::printer::next(arc))
 #define POST_DBG_ARC(msg, arc) POST_DBG(msg; dlf::printer::next(arc))
+

@@ -30,8 +30,6 @@
 
 #include "dlf-printer.hpp"
 
-#include "../utils/flagvector.hpp"
-
 namespace dlf {
 	/// Loads a set of derivatives from the grammar AST
 	class loader : public ast::visitor {
@@ -51,7 +49,7 @@ namespace dlf {
 		void set_nonterminal(const std::string& s, ptr<node> n) { get_nonterminal(s)->sub = n; }
 
 		/// Produces a new arc to the next node
-		arc out(flags::vector&& blocking = flags::vector{}) { return arc{next, std::move(blocking)}; }
+		arc out(cutset&& blocking = cutset{}) { return arc{next, std::move(blocking)}; }
 
 		/// Makes an anonymous nonterminal for the given matcher
 		void make_many(ptr<ast::matcher> mp) {
@@ -63,14 +61,14 @@ namespace dlf {
 			ptr<node> nt = rule_node::make(out(), R_i);
 
 			// build anonymous rule
-			flags::index ri_bak = ri; ri = 1;      // save ri
-			next = end_node::make();               // make end node for rule
-			arc skip = out(flags::vector::of(0));  // save arc that skips match
-			next = rule_node::make(out(), R_i);    // build recursive invocation of rule
-			next = cut_node::make(out(), 0);       // set up cut on out-edges of many-expression
-			mp->accept(this);                      // build many-expression
-			ri = ri_bak;                           // restore ri
-			R_i->sub = alt_node::make(out(),       // reset rule's substitution
+			cutind ri_bak = ri; ri = 1;          // save ri
+			next = end_node::make();             // make end node for rule
+			arc skip = out(cutset::of(0));       // save arc that skips match
+			next = rule_node::make(out(), R_i);  // build recursive invocation of rule
+			next = cut_node::make(out(), 0);     // set up cut on out-edges of many-expression
+			mp->accept(this);                    // build many-expression
+			ri = ri_bak;                         // restore ri
+			R_i->sub = alt_node::make(out(),     // reset rule's substitution
                                                   std::move(skip));
 
 			// reset next to rule reference
@@ -123,11 +121,11 @@ namespace dlf {
 
 		virtual void visit(ast::opt_matcher& m) {
 			// Idea: m.m <i> next | [i] next
-			flags::index i = ri++;                 // get a restriction index to use
-			arc skip = out(flags::vector::of(i));  // save arc that skips the optional
-			next = cut_node::make(out(), i);       // add blocker for skip branch
-			m.m->accept(this);                     // build opt-expression
-			next = alt_node::make(out(),           // make alternation of two paths
+			cutind i = ri++;                  // get a restriction index to use
+			arc skip = out(cutset::of(i));    // save arc that skips the optional
+			next = cut_node::make(out(), i);  // add blocker for skip branch
+			m.m->accept(this);                // build opt-expression
+			next = alt_node::make(out(),      // make alternation of two paths
 			                      std::move(skip));
 		}
 
@@ -150,22 +148,22 @@ namespace dlf {
 			if ( m.ms.empty() ) { next = fail_node::make(); return; }
 
 			ptr<node> alt_next = next;  // save next value
-			flags::vector blocking;     // cuts for greedy longest match
+			cutset blocking;            // cuts for greedy longest match
 
 			arc_set rs;
 			for (unsigned long i = 0; i < m.ms.size() - 1; ++i) {
 				auto& mi = m.ms[i];
 
-				flags::index ci = ri++;                    // get a restriction index to use
-				next = cut_node::make(out(), ci);          // flag cut for greedy longest match
-				mi->accept(this);                          // build subexpression
-				rs.emplace(out(flags::vector{blocking}));  // add to list of arcs
-				next = alt_next;                           // restore next values for next iteration
-				blocking |= ci;                            // add index to greedy longest match blocker
+				cutind ci = ri++;                   // get a restriction index to use
+				next = cut_node::make(out(), ci);   // flag cut for greedy longest match
+				mi->accept(this);                   // build subexpression
+				rs.emplace(out(cutset{blocking}));  // add to list of arcs
+				next = alt_next;                    // restore next values for next iteration
+				blocking |= ci;                     // add index to greedy longest match blocker
 			}
 			// Don't put a cut on the last branch
 			m.ms.back()->accept(this);
-			rs.emplace(out(flags::vector{blocking}));
+			rs.emplace(out(std::move(blocking)));
 
 			next = alt_node::make(std::move(rs));
 		}
@@ -175,14 +173,14 @@ namespace dlf {
 			// If m.m matches, we cut out the [j] <i> branch, freeing next to proceed safely
 
 			// save restriction indices
-			flags::index j = ri++;
-			flags::index i = ri++;
+			cutind j = ri++;
+			cutind i = ri++;
 			// build continuing branch
-			arc cont = out(flags::vector::of(i));
+			arc cont = out(cutset::of(i));
 			// build cut branch
 			next = fail_node::make();
 			next = cut_node::make(out(), i);
-			arc cut = out(flags::vector::of(j));
+			arc cut = out(cutset::of(j));
 			// build matching branch
 			next = fail_node::make();
 			next = cut_node::make(out(), j);
@@ -193,12 +191,12 @@ namespace dlf {
 
 		virtual void visit(ast::not_matcher& m) {
 			// Idea - match both paths, failing if the not path matches: m.m <i> fail | [i] next
-			flags::index i = ri++;                  // get a restriction index to use
-			arc cont = out(flags::vector::of(i));   // build continuing branch
-			next = fail_node::make();               // terminate blocking branch
-			next = cut_node::make(out(), i);        // with a cut on the match index
-			m.m->accept(this);                      // build blocking branch
-			next = alt_node::make(out(),            // alternate continuing and blocking branches
+			cutind i = ri++;                  // get a restriction index to use
+			arc cont = out(cutset::of(i));    // build continuing branch
+			next = fail_node::make();         // terminate blocking branch
+			next = cut_node::make(out(), i);  // with a cut on the match index
+			m.m->accept(this);                // build blocking branch
+			next = alt_node::make(out(),      // alternate continuing and blocking branches
 			                      std::move(cont));
 		}
 
@@ -220,7 +218,7 @@ namespace dlf {
 	private:
 		std::map<std::string, ptr<nonterminal>> nts;  ///< List of non-terminals
 		ptr<node> next;                               ///< Next node
-		flags::index ri;                              ///< Current restriction index
+		cutind ri;                                    ///< Current restriction index
 		unsigned long mi;                             ///< Index to uniquely name many-nodes
 	}; // loader
 }

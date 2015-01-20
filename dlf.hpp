@@ -29,7 +29,7 @@
 #include <unordered_set>
 #include <utility>
 
-#include "utils/flagvector.hpp"
+#include "utils/flagset.hpp"
 
 /**
 * Implements dynamic left-factoring parsing for parsing expression grammars, according to the
@@ -41,6 +41,12 @@
 * original expression which start with the given prefix.
 */
 namespace dlf {
+	/// Restriction index
+	using cutind = flags::index;
+
+	/// Set of restriction indices
+	using cutset = flags::set;
+	
 	/// Shorthand for shared_ptr
 	template <typename T>
 	using ptr = std::shared_ptr<T>;
@@ -145,12 +151,21 @@ namespace dlf {
 		/// Accept visitor
 		virtual void accept(visitor*) const = 0;
 
+		/// Check if this node has a single successor arc it can return
+		virtual bool has_succ() const = 0;
+
+		/// Returns the single successor node (or nullptr if none such)
+		virtual arc get_succ() const = 0;
+
+		/// Returns a clone of this node, with the provided successor
+		virtual ptr<node> clone_with_succ(arc&& succ) const = 0;
+
 		/// New node with present output alternated with successor of added one.
 		/// Added node can be assumed to be of the same type.
 		virtual ptr<node> merge_succ(arc&& add) const = 0;
 
 		/// Adds `blocks` to successor's block set
-		virtual void block_succ_on(const flags::vector& blocks) = 0;
+		virtual void block_succ_on(const cutset& blocks) = 0;
 
 		/// Expression node type
 		virtual node_type type() const = 0;
@@ -170,23 +185,24 @@ namespace dlf {
 		virtual ~cut_listener() = default;
 
 		/// State that these cuts can newly be acquired
-		virtual void acquire_cut(flags::index cut) = 0;
+		virtual void acquire_cut(cutind cut) = 0;
 
 		/// State that these cuts can no longer be acquired
-		virtual void release_cut(flags::index cut) = 0;
+		virtual void release_cut(cutind cut) = 0;
 	}; // cut listener
 
 	/// Directed arc linking two nodes
 	struct arc {
-		arc(ptr<node> succ, flags::vector&& blocking = flags::vector{})
+		arc(ptr<node> succ, cutset&& blocking = cutset{})
 		: succ{succ}, blocking{std::move(blocking)} {}
 
-		ptr<node> succ;          ///< Successor pointer
-		flags::vector blocking;  ///< Restrictions blocking this arc
+		ptr<node> succ;   ///< Successor pointer
+		cutset blocking;  ///< Restrictions blocking this arc
 	};
 
 	/// Returns a new arc pointing to the alternation of a and b.
-	arc alternate(arc&& a, const arc& b);
+//	arc alternate(arc&& a, const arc& b);
+	arc alternate(const arc& a, const arc& b);
 
 	/// Terminal node representing a match
 	class match_node : public node {
@@ -206,11 +222,14 @@ namespace dlf {
 			return as_ptr<node>(mn);
 		}
 		/// Return clone of this node
-		        ptr<node>   clone() { return self.lock(); }
+		ptr<node>   clone() const { return self.lock(); }
 
 		virtual void        accept(visitor* v) const { v->visit(*this); }
+		virtual bool        has_succ() const { return false; }
+		virtual arc         get_succ() const { return arc{ptr<node>{}}; }
+		virtual ptr<node>   clone_with_succ(arc&& succ) const { return clone(); }
 		virtual ptr<node>   merge_succ(arc&& a) const { return self.lock(); }
-		virtual void        block_succ_on(const flags::vector& blocks) { /* do nothing */ }
+		virtual void        block_succ_on(const cutset& blocks) { /* do nothing */ }
 		virtual node_type   type() const { return match_type; }
 		virtual std::size_t hash() const { return tag_with(match_type); }
 		virtual bool        equiv(ptr<node> o) const { return o->type() == match_type; }
@@ -235,8 +254,11 @@ namespace dlf {
 		}
 
 		virtual void        accept(visitor* v) const { v->visit(*this); }
+		virtual bool        has_succ() const { return false; }
+		virtual arc         get_succ() const { return arc{ptr<node>{}}; }
+		virtual ptr<node>   clone_with_succ(arc&& succ) const { return fail_node::make(); }
 		virtual ptr<node>   merge_succ(arc&& a) const { return fail_node::make(); }
-		virtual void        block_succ_on(const flags::vector& blocks) { /* do nothing */ }
+		virtual void        block_succ_on(const cutset& blocks) { /* do nothing */ }
 		virtual node_type   type() const { return fail_type; }
 		virtual std::size_t hash() const { return tag_with(fail_type); }
 		virtual bool        equiv(ptr<node> o) const { return o->type() == fail_type; }
@@ -258,8 +280,11 @@ namespace dlf {
 			return singleton;
 		}
 		virtual void        accept(visitor* v) const { v->visit(*this); }
+		virtual bool        has_succ() const { return false; }
+		virtual arc         get_succ() const { return arc{ptr<node>{}}; }
+		virtual ptr<node>   clone_with_succ(arc&& succ) const { return inf_node::make(); }
 		virtual ptr<node>   merge_succ(arc&& a) const { return inf_node::make(); }
-		virtual void        block_succ_on(const flags::vector& blocks) { /* do nothing */ }
+		virtual void        block_succ_on(const cutset& blocks) { /* do nothing */ }
 		virtual node_type   type() const { return inf_type; }
 		virtual std::size_t hash() const { return tag_with(inf_type); }
 		virtual bool        equiv(ptr<node> o) const { return o->type() == inf_type; }
@@ -274,8 +299,11 @@ namespace dlf {
 		static  ptr<node>   make() { return node::make<end_node>(); }
 
 		virtual void        accept(visitor* v) const { v->visit(*this); }
+		virtual bool        has_succ() const { return false; }
+		virtual arc         get_succ() const { return arc{ptr<node>{}}; }
+		virtual ptr<node>   clone_with_succ(arc&& succ) const { return end_node::make(); }
 		virtual ptr<node>   merge_succ(arc&& a) const { return end_node::make(); }
-		virtual void        block_succ_on(const flags::vector& blocks) { /* do nothing */ }
+		virtual void        block_succ_on(const cutset& blocks) { /* do nothing */ }
 		virtual node_type   type() const { return end_type; }
 		virtual std::size_t hash() const { return tag_with(end_type); }
 		virtual bool        equiv(ptr<node> o) const { return o->type() == end_type; }
@@ -290,10 +318,16 @@ namespace dlf {
 		static  ptr<node>   make(arc&& out, char c) { return node::make<char_node>(std::move(out), c); }
 
 		virtual void        accept(visitor* v) const { v->visit(*this); }
-		virtual ptr<node>   merge_succ(arc&& a) const {
-			return node::make<char_node>(alternate(std::move(as_ptr<char_node>(a.succ)->out), out), c);
+		virtual bool        has_succ() const { return true; }
+		virtual arc         get_succ() const { return out; }
+		virtual ptr<node>   clone_with_succ(arc&& succ) const {
+			return node::make<char_node>(std::move(succ), c);
 		}
-		virtual void        block_succ_on(const flags::vector& blocks) { out.blocking |= blocks; }
+		virtual ptr<node>   merge_succ(arc&& a) const {
+//			return node::make<char_node>(alternate(std::move(as_ptr<char_node>(a.succ)->out), out), c);
+			return node::make<char_node>(alternate(as_ptr<char_node>(a.succ)->out, out), c);
+		}
+		virtual void        block_succ_on(const cutset& blocks) { out.blocking |= blocks; }
 		virtual node_type   type() const { return char_type; }
 		virtual std::size_t hash() const { return tag_with(char_type, c); }
 		virtual bool        equiv(ptr<node> o) const {
@@ -317,10 +351,16 @@ namespace dlf {
 		}
 
 		virtual void        accept(visitor* v) const { v->visit(*this); }
-		virtual ptr<node>   merge_succ(arc&& a) const {
-			return node::make<range_node>(alternate(std::move(as_ptr<range_node>(a.succ)->out), out), b, e);
+		virtual bool        has_succ() const { return true; }
+		virtual arc         get_succ() const { return out; }
+		virtual ptr<node>   clone_with_succ(arc&& succ) const {
+			return node::make<range_node>(std::move(succ), b, e);
 		}
-		virtual void        block_succ_on(const flags::vector& blocks) { out.blocking |= blocks; }
+		virtual ptr<node>   merge_succ(arc&& a) const {
+//			return node::make<range_node>(alternate(std::move(as_ptr<range_node>(a.succ)->out), out), b, e);
+			return node::make<range_node>(alternate(as_ptr<range_node>(a.succ)->out, out), b, e);
+		}
+		virtual void        block_succ_on(const cutset& blocks) { out.blocking |= blocks; }
 		virtual node_type   type() const { return range_type; }
 		virtual std::size_t hash() const { return tag_with(range_type, (b << 8) | e); }
 		virtual bool        equiv(ptr<node> o) const {
@@ -343,10 +383,16 @@ namespace dlf {
 		static  ptr<node>   make(arc&& out) { return node::make<any_node>(std::move(out)); }
 
 		virtual void        accept(visitor* v) const { v->visit(*this); }
-		virtual ptr<node>   merge_succ(arc&& a) const {
-			return node::make<any_node>(alternate(std::move(as_ptr<any_node>(a.succ)->out), out));
+		virtual bool        has_succ() const { return true; }
+		virtual arc         get_succ() const { return out; }
+		virtual ptr<node>   clone_with_succ(arc&& succ) const {
+			return node::make<any_node>(std::move(succ));
 		}
-		virtual void        block_succ_on(const flags::vector& blocks) { out.blocking |= blocks; }
+		virtual ptr<node>   merge_succ(arc&& a) const {
+//			return node::make<any_node>(alternate(std::move(as_ptr<any_node>(a.succ)->out), out));
+			return node::make<any_node>(alternate(as_ptr<any_node>(a.succ)->out, out));
+		}
+		virtual void        block_succ_on(const cutset& blocks) { out.blocking |= blocks; }
 		virtual node_type   type() const { return any_type; }
 		virtual std::size_t hash() const { return tag_with(any_type); }
 		virtual bool        equiv(ptr<node> o) const { return o->type() == any_type; }
@@ -373,10 +419,16 @@ namespace dlf {
 		}
 
 		virtual void        accept(visitor* v) const { v->visit(*this); }
-		virtual ptr<node>   merge_succ(arc&& a) const {
-			return node::make<str_node>(alternate(std::move(as_ptr<str_node>(a.succ)->out), out), sp, i);
+		virtual bool        has_succ() const { return true; }
+		virtual arc         get_succ() const { return out; }
+		virtual ptr<node>   clone_with_succ(arc&& succ) const {
+			return node::make<str_node>(std::move(succ), sp, i);
 		}
-		virtual void        block_succ_on(const flags::vector& blocks) { out.blocking |= blocks; }
+		virtual ptr<node>   merge_succ(arc&& a) const {
+//			return node::make<str_node>(alternate(std::move(as_ptr<str_node>(a.succ)->out), out), sp, i);
+			return node::make<str_node>(alternate(as_ptr<str_node>(a.succ)->out, out), sp, i);
+		}
+		virtual void        block_succ_on(const cutset& blocks) { out.blocking |= blocks; }
 		virtual node_type   type() const { return str_type; }
 		virtual std::size_t hash() const { return tag_with(str_type, std::size_t(sp.get()) ^ i); }
 		virtual bool        equiv(ptr<node> o) const {
@@ -413,10 +465,16 @@ namespace dlf {
 		}
 
 		virtual void        accept(visitor* v) const { v->visit(*this); }
-		virtual ptr<node>   merge_succ(arc&& a) const {
-			return node::make<rule_node>(alternate(std::move(as_ptr<rule_node>(a.succ)->out), out), r);
+		virtual bool        has_succ() const { return true; }
+		virtual arc         get_succ() const { return out; }
+		virtual ptr<node>   clone_with_succ(arc&& succ) const {
+			return node::make<rule_node>(std::move(succ), r);
 		}
-		virtual void        block_succ_on(const flags::vector& blocks) { out.blocking |= blocks; }
+		virtual ptr<node>   merge_succ(arc&& a) const {
+//			return node::make<rule_node>(alternate(std::move(as_ptr<rule_node>(a.succ)->out), out), r);
+			return node::make<rule_node>(alternate(as_ptr<rule_node>(a.succ)->out, out), r);
+		}
+		virtual void        block_succ_on(const cutset& blocks) { out.blocking |= blocks; }
 		virtual node_type   type() const { return rule_type; }
 		virtual std::size_t hash() const { return tag_with(rule_type, std::size_t(r.get())); }
 		virtual bool        equiv(ptr<node> o) const {
@@ -430,10 +488,10 @@ namespace dlf {
 	/// Node representing a cut in the graph
 	class cut_node : public node {
 	public:
-		cut_node(arc&& out, flags::index cut) : out{std::move(out)}, cut{cut}, listener{nullptr} {}
-		cut_node(arc&& out, flags::index cut, cut_listener& _listener)
+		cut_node(arc&& out, cutind cut) : out{std::move(out)}, cut{cut}, listener{nullptr} {}
+		cut_node(arc&& out, cutind cut, cut_listener& _listener)
 		: out{std::move(out)}, cut{cut}, listener{&_listener} { _listener.acquire_cut(cut); }
-		cut_node(arc&& out, flags::index cut, cut_listener* listener)
+		cut_node(arc&& out, cutind cut, cut_listener* listener)
 		: out{std::move(out)}, cut{cut}, listener{listener} {
 			if ( listener ) { listener->acquire_cut(cut); }
 		}
@@ -471,19 +529,29 @@ namespace dlf {
 
 		virtual ~cut_node() { if ( listener ) listener->release_cut(cut); }
 
-		static  ptr<node>   make(arc&& out, flags::index cut) {
+		static  ptr<node>   make(arc&& out, cutind cut) {
 			return node::make<cut_node>(std::move(out), cut);
 		}
-		static  ptr<node>   make(arc&& out, flags::index cut, cut_listener& listener) {
+		static  ptr<node>   make(arc&& out, cutind cut, cut_listener& listener) {
 			return node::make<cut_node>(std::move(out), cut, listener);
 		}
 
 		virtual void        accept(visitor* v) const { v->visit(*this); }
-		virtual ptr<node>   merge_succ(arc&& a) const {
-			return node::make<cut_node>(alternate(std::move(as_ptr<cut_node>(a.succ)->out), out),
-			                            cut, listener);
+		virtual bool        has_succ() const { return true; }
+		virtual arc         get_succ() const { return out; }
+		virtual ptr<node>   clone_with_succ(arc&& succ) const {
+			ptr<node> r = node::make<cut_node>(std::move(succ), cut);
+			// silently transfer listenership to new node WARNING this is horrific
+			as_ptr<cut_node>(r)->listener = listener;
+			const_cast<cut_node*>(this)->listener = nullptr;
+			return r;
 		}
-		virtual void        block_succ_on(const flags::vector& blocks) { out.blocking |= blocks; }
+		virtual ptr<node>   merge_succ(arc&& a) const {
+//			return node::make<cut_node>(alternate(std::move(as_ptr<cut_node>(a.succ)->out), out),
+//			                            cut, listener);
+			return node::make<cut_node>(alternate(as_ptr<cut_node>(a.succ)->out, out), cut, listener);
+		}
+		virtual void        block_succ_on(const cutset& blocks) { out.blocking |= blocks; }
 		virtual node_type   type() const { return cut_type; }
 		virtual std::size_t hash() const { return tag_with(cut_type, cut); }
 		virtual bool        equiv(ptr<node> o) const {
@@ -491,7 +559,7 @@ namespace dlf {
 		}
 
 		arc out;                 ///< Successor node
-		flags::index cut;        ///< Index to block
+		cutind cut;              ///< Index to block
 		cut_listener* listener;  ///< Listener to alert of changes in the cut state
 	};  // cut_node
 
@@ -607,6 +675,9 @@ namespace dlf {
 		}
 
 		virtual void        accept(visitor* v) const { v->visit(*this); }
+		virtual bool        has_succ() const { return false; }
+		virtual arc         get_succ() const { return arc{ptr<node>{}}; }
+		virtual ptr<node>   clone_with_succ(arc&& succ) const { return fail_node::make(); }
 		virtual ptr<node>   merge_succ(arc&& a) const {
 			arc_set as{out};
 			alt_node& aa = *as_ptr<alt_node>(a.succ);
@@ -616,9 +687,9 @@ namespace dlf {
 			}
 			return node::make<alt_node>(std::move(as));
 		}
-		virtual void        block_succ_on(const flags::vector& blocks) {
+		virtual void        block_succ_on(const cutset& blocks) {
 			for (arc_set::iterator it = out.begin(); it != out.end(); ++it) {
-				const_cast<flags::vector&>(it->blocking) |= blocks;
+				const_cast<cutset&>(it->blocking) |= blocks;
 			}
 		}
 		virtual node_type   type() const { return alt_type; }
@@ -628,11 +699,17 @@ namespace dlf {
 		arc_set out;
 	}; // alt_node
 	
-	inline arc alternate(arc&& a, const arc& b) {
+/*	inline arc alternate(arc&& a, const arc& b) {
 		arc bn{b.succ, b.blocking - a.blocking};
 		arc an{std::move(a.succ), a.blocking - b.blocking};
 		return arc{alt_node::make(std::move(an), std::move(bn)),
 		           std::move(a.blocking &= b.blocking)};
+	}
+*/	inline arc alternate(const arc& a, const arc& b) {
+		arc bn{b.succ, b.blocking - a.blocking};
+		arc an{a.succ, a.blocking - b.blocking};
+		return arc{alt_node::make(std::move(an), std::move(bn)),
+		           a.blocking & b.blocking};
 	}
 
 	std::pair<arc_set::iterator, bool> arc_set::emplace_invar(arc&& a) {
@@ -661,15 +738,16 @@ namespace dlf {
 		// merge nodes that are already present
 		arc e{*ai};
 		s.erase(ai);
-		if ( e.succ == a.succ ) {
-			/// same node, merge blocking sets
+		if ( e.succ == a.succ || ! e.succ->has_succ() ) {
+			/// same node or unfollowed, merge blocking sets
 			e.blocking &= a.blocking;
 		} else {
 			/// distinct node, merge blocking sets and alternate successors
-			e.succ->block_succ_on(e.blocking - a.blocking);
-			a.succ->block_succ_on(a.blocking - e.blocking);
+			arc ee = e.succ->get_succ(), aa = a.succ->get_succ();
+			ee.blocking |= (e.blocking - a.blocking);
+			aa.blocking |= (a.blocking - e.blocking);
 			e.blocking &= a.blocking;
-			e.succ = e.succ->merge_succ(std::move(a));
+			e.succ = e.succ->clone_with_succ(alt_node::make(std::move(ee), std::move(aa)));
 		}
 		return s.emplace(std::move(e));
 	}

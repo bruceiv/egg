@@ -192,7 +192,7 @@ public:
 	args(int argc, char** argv) 
 		: in(nullptr), out(nullptr), src(nullptr),
 		  inName(), outName(), srcName(), outType(STREAM_TYPE), pName(), rName(),
-		  dbgFlag(false), nameFlag(false), normFlag(true), memoFlag(true), 
+		  dbgFlag(dlf::no_dbg), nameFlag(false), normFlag(true), memoFlag(true), 
 		  eMode(COMPILE_MODE) {
 		
 		i = 1;
@@ -222,7 +222,9 @@ public:
 				if ( i+1 >= argc ) return;
 				parse_rule(argv[++i]);
 			} else if ( eq("--dbg", argv[i]) ) {
-				dbgFlag = true;
+				dbgFlag = dlf::full_dbg;
+			} else if ( eq("--cat", argv[i]) ) {
+				dbgFlag = dlf::cat_dbg;
 			} else if ( eq("--no-norm", argv[i]) ) {
 				normFlag = false;
 			} else if ( eq("--no-memo", argv[i]) ) {
@@ -260,27 +262,27 @@ public:
 	file_type outputType() { return outType; }
 	std::string name() { return pName; }
 	std::string rule() { return rName; }
-	bool dbg()  { return dbgFlag; }
+	dlf::dbg_level dbg()  { return dbgFlag; }
 	bool norm() { return normFlag; }
 	bool memo() { return memoFlag; }
 	egg_mode mode() { return eMode; }
 
 private:
-	int i;				  ///< next unparsed value
-	std::ifstream* in;	  ///< pointer to input stream (0 for stdin)
-	std::ofstream* out;	  ///< pointer to output stream (0 for stdout)
-	std::ifstream* src;   ///< pointer to the interpreted source file (0 for stdin)
-	std::string inName;   ///< Name of the input file (empty if none)
-	std::string outName;  ///< Name of the output file (empty if none)
-	std::string srcName;  ///< Name of the interpreted source file (empty if none)
-	file_type outType;    ///< Type of output type (default STREAM_TYPE)
-	std::string pName; 	  ///< the name of the parser (empty if none)
-	std::string rName;    ///< the name of the rule to interpret (empty if none)
-	bool dbgFlag;         ///< should egg print debugging information?
-	bool nameFlag;		  ///< has the parser name been explicitly set?
-	bool normFlag;        ///< should egg do grammar normalization?
-	bool memoFlag;        ///< should the generated grammar do memoization?
-	egg_mode eMode;		  ///< compiler mode to use
+	int i;                   ///< next unparsed value
+	std::ifstream* in;       ///< pointer to input stream (0 for stdin)
+	std::ofstream* out;      ///< pointer to output stream (0 for stdout)
+	std::ifstream* src;      ///< pointer to the interpreted source file (0 for stdin)
+	std::string inName;      ///< Name of the input file (empty if none)
+	std::string outName;     ///< Name of the output file (empty if none)
+	std::string srcName;     ///< Name of the interpreted source file (empty if none)
+	file_type outType;       ///< Type of output type (default STREAM_TYPE)
+	std::string pName;       ///< the name of the parser (empty if none)
+	std::string rName;       ///< the name of the rule to interpret (empty if none)
+	dlf::dbg_level dbgFlag;  ///< should egg print debugging information?
+	bool nameFlag;           ///< has the parser name been explicitly set?
+	bool normFlag;           ///< should egg do grammar normalization?
+	bool memoFlag;           ///< should the generated grammar do memoization?
+	egg_mode eMode;          ///< compiler mode to use
 };
 
 /** Command line interface
@@ -320,7 +322,7 @@ int main(int argc, char** argv) {
 	ast::grammar_ptr g;
 	
 	if ( egg::grammar(ps, g) ) {
-		if ( a.dbg() ) { std::cout << "DONE PARSING" << std::endl; }
+		if ( a.dbg() == dlf::full_dbg ) { std::cout << "DONE PARSING" << std::endl; }
 		if ( a.norm() ) {
 			visitor::normalizer n;
 			n.normalize(*g);
@@ -337,7 +339,7 @@ int main(int argc, char** argv) {
 			c.compile(*g);
 			break;
 		} case MATCH_MODE: {    // Interpret grammar
-			if ( a.dbg() ) {
+			if ( a.dbg() == dlf::full_dbg ) {
 				visitor::printer p(std::cout);
 				p.print(*g); 
 				std::cout << std::endl;
@@ -348,14 +350,14 @@ int main(int argc, char** argv) {
 			           << ( b ? "matched" : "DID NOT match" ) << std::endl;
 			break;
 		} case LINES_MODE: {   // Interpret grammar line-by-line
-			if ( a.dbg() ) {
+			if ( a.dbg() == dlf::full_dbg ) {
 				visitor::printer p(std::cout);
 				p.print(*g); 
 				std::cout << std::endl;
 			}
 			
 			std::string line;
-			dlf::loader l(*g, a.dbg());
+			dlf::loader l(*g, a.dbg() == dlf::full_dbg);
 			while ( std::getline(a.source(), line) ) {
 				std::stringstream ss(line);
 				bool b = dlf::match(l, ss, a.rule(), a.dbg());

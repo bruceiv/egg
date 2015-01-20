@@ -271,7 +271,7 @@ static void rsh(const uint64_t* a, const uint64_t s, uint64_t* c, uint64_t n) {
 	uint64_t s_b = s & 0x3F;  // s % 64, number of bits to shift
 	uint64_t u_s = 64 - s_b;  // number of bits to unshift low-order bits
 
-	c[n+s_l] = a[n-1] << u_s;
+	if ( s_b > 0 ) { c[n+s_l] = a[n-1] << u_s; }
 	for (uint64_t i = n-1; i > 0; --i) {
 		// get high order bits of current limb, then low-order bits of previous
 		c[i+s_l] = (a[i-1] << u_s) | (a[i] >> s_b);
