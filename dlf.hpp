@@ -29,7 +29,10 @@
 #include <unordered_set>
 #include <utility>
 
-#include "utils/flagset.hpp"
+//#include "utils/flagset.hpp"
+#include "utils/flagvector.hpp"
+
+#include "utils/plalloc.hpp"
 
 /**
 * Implements dynamic left-factoring parsing for parsing expression grammars, according to the
@@ -45,7 +48,8 @@ namespace dlf {
 	using cutind = flags::index;
 
 	/// Set of restriction indices
-	using cutset = flags::set;
+//	using cutset = flags::set;
+	using cutset = flags::vector;
 	
 	/// Shorthand for shared_ptr
 	template <typename T>
@@ -577,7 +581,7 @@ namespace dlf {
 		};
 
 		/// Underlying set type
-		using impl_set = std::unordered_set<arc, succ_hash, succ_equiv>;
+		using impl_set = std::unordered_set<arc, succ_hash, succ_equiv, plalloc<arc>>;
 
 		// STL defines
 		using key_type = impl_set::key_type;

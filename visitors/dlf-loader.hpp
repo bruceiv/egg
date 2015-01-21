@@ -51,10 +51,10 @@ namespace dlf {
 		/// Produces a new arc to the next node
 		arc out(cutset&& blocking = cutset{}) { return arc{next, std::move(blocking)}; }
 
-		/// Makes an anonymous nonterminal for the given matcher
+		/// Makes an anonymous nonterminal for the given many-matcher
 		void make_many(ptr<ast::matcher> mp) {
 			// idea is to set up a new anonymous non-terminal R_i and set next to R_i
-			// R_i = m.m <0> R_i end | [0] end
+			// R_i = mp <0> R_i end | [0] end
 
 			// set rule node for new anonymous non-terminal
 			ptr<nonterminal> R_i = make_ptr<nonterminal>("*" + std::to_string(mi++));
@@ -70,6 +70,31 @@ namespace dlf {
 			ri = ri_bak;                         // restore ri
 			R_i->sub = alt_node::make(out(),     // reset rule's substitution
                                                   std::move(skip));
+
+			// reset next to rule reference
+			next = nt;
+		}
+
+		/// Makes an anonymous nonterminal for the given some-matcher
+		void make_some(ptr<ast::matcher> mp) {
+			// idea is to set up a new anonymous non-terminal R_i and set next to R_i
+			// R_i = mp (R_i <0> end | [0] end)
+
+			// set rule node for new anonymous non-terminal
+			ptr<nonterminal> R_i = make_ptr<nonterminal>("+" + std::to_string(mi++));
+			ptr<node> nt = rule_node::make(out(), R_i);
+
+			// build anonymous rule
+			cutind ri_bak = ri; ri = 1;          // save ri
+			next = end_node::make();             // make end node for rule
+			arc skip = out(cutset::of(0));       // save arc that skips match
+			next = cut_node::make(out(), 0);     // set up cut for successive match
+			next = rule_node::make(out(), R_i);  // build recursive invocation of rule
+			next = alt_node::make(out(),         // alternate successor and skip branches
+                                              std::move(skip));
+			mp->accept(this);                    // match subexpression
+			ri = ri_bak;                         // restore ri
+			R_i->sub = next;                     // reset rule's substitution
 
 			// reset next to rule reference
 			next = nt;
@@ -131,12 +156,59 @@ namespace dlf {
 
 		virtual void visit(ast::many_matcher& m) {
 			make_many(m.m);  // generate new many-rule nonterminal
-		}
+/*			cutind si = ri++;                  // get restriction for skip
+			arc skip = out(cutset::of(si));    // save arc that skips match
+			next = cut_node::make(out(), si);  // block skip arc on later match
+			make_some(m.m);                    // build match arc
+			next = alt_node::make(out(),       // alternate match and skip arcs
+			                      std::move(skip));
+*//*			// idea is to set up a new anonymous non-terminal R_i and set next to R_i
+			// R_i = m.m <0> R_i end | [0] end
+
+			// set rule node for new anonymous non-terminal
+			ptr<nonterminal> R_i = make_ptr<nonterminal>("*" + std::to_string(mi++));
+			ptr<node> nt = rule_node::make(out(), R_i);
+
+			// build anonymous rule
+			cutind ri_bak = ri; ri = 1;          // save ri
+			next = end_node::make();             // make end node for rule
+			arc skip = out(cutset::of(0));       // save arc that skips match
+			next = rule_node::make(out(), R_i);  // build recursive invocation of rule
+			next = cut_node::make(out(), 0);     // set up cut on out-edges of many-expression
+			m.m->accept(this);                   // build many-expression
+			ri = ri_bak;                         // restore ri
+			R_i->sub = alt_node::make(out(),     // reset rule's substitution
+                                                  std::move(skip));
+
+			// reset next to rule reference
+			next = nt;
+*/		}
 
 		virtual void visit(ast::some_matcher& m) {
 			make_many(m.m);     // generate new many-rule nonterminal
 			m.m->accept(this);  // sequence one copy of the rule before
-		}
+/*			// idea is to set up a new anonymous non-terminal R_i and set next to R_i
+			// R_i = m.m (R_i <0> end | [0] end)
+
+			// set rule node for new anonymous non-terminal
+			ptr<nonterminal> R_i = make_ptr<nonterminal>("+" + std::to_string(mi++));
+			ptr<node> nt = rule_node::make(out(), R_i);
+
+			// build anonymous rule
+			cutind ri_bak = ri; ri = 1;          // save ri
+			next = end_node::make();             // make end node for rule
+			arc skip = out(cutset::of(0));       // save arc that skips match
+			next = cut_node::make(out(), 0);     // set up cut for successive match
+			next = rule_node::make(out(), R_i);  // build recursive invocation of rule
+			next = alt_node::make(out(),         // alternate successor and skip branches
+                                              std::move(skip));
+			m.m->accept(this);                   // match subexpression
+			ri = ri_bak;                         // restore ri
+			R_i->sub = next;                     // reset rule's substitution
+
+			// reset next to rule reference
+			next = nt;
+*/		}
 
 		virtual void visit(ast::seq_matcher& m) {
 			// build out sequence in reverse order
