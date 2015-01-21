@@ -107,8 +107,6 @@ public:
 		wrapped_const_iterator it;
 	}; // const_iterator
 	
-	using iterator = const_iterator;
-	
 	hash_bag() = default;
 	template<typename It> hash_bag(It first, It last) { insert(first, last); }
 	hash_bag(const hash_bag&) = default;
