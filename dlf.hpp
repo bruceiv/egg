@@ -661,8 +661,7 @@ namespace dlf {
 		}
 
 		// merge nodes that are already present
-		arc e{*ai};
-		s.erase(ai);
+		arc& e = const_cast<arc&>(*ai);
 		if ( e.succ == a.succ || ! e.succ->has_succ() ) {
 			/// same node or unfollowed, merge blocking sets
 			e.blocking &= a.blocking;
@@ -674,7 +673,6 @@ namespace dlf {
 			e.blocking &= a.blocking;
 			e.succ = e.succ->clone_with_succ(alt_node::make(std::move(ee), std::move(aa)));
 		}
-		s.emplace(std::move(e));
 	}
 
 	/// Default visitor that just visits all the nodes; override individual methods to add
