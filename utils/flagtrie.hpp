@@ -23,84 +23,84 @@
  */
 
 #include <cstdint>
+#include <iterator>
 #include <utility>
+
+#include "flags.hpp"
 
 namespace flags {
 
 	using index = uint64_t;
 
+	class node;
+		
+	/// Memory manager for T objects; current version is just a giant memory leak.
+	class mem_mgr {
+	public:
+		node* make();
+		void acquire(node* n);
+		void release(node* n, index l);
+	}; // mem_mgr
+	extern mem_mgr mem;
+	
+	/// Either a node pointer or a 64-bit bitvector
+	union nptr {
+		/// Constructor from node*
+		static nptr of(node* p) { nptr n; n.ptr = p; return n; }
+		/// Constructor from bits
+		static nptr of(uint64_t x) { nptr n; n.bits = x; return n; }
+		
+		/// True if value is zeroed
+		bool empty() const { return ptr == nullptr; }
+
+		bool operator== (const nptr& o) const { return bits == o.bits; }
+		bool operator!= (const nptr& o) const { return bits != o.bits; }
+		
+		node* ptr;
+		uint64_t bits;
+	};
+		
+	/// A trie node
+	struct node {
+		node() = default;
+		node(const node&) = default;
+		node(node&&) = default;
+		
+		node& operator= (const node&) = default;
+		node& operator= (node&&) = default;
+		
+		/// Constructor from 8-array of nptrs (will return nullptr if all empty)
+		static nptr of(nptr* a);
+		
+		/// Clones this node with p placed in the i'th slot of the clone
+		nptr set(index i, nptr p) const;
+		
+		/// True if all slots but 0 are empty
+		bool only_first() const;
+		
+		/// True if all slots but 0 and i are empty
+		bool only_first_and(index i) const;
+		
+		/// True if all slots but i are empty
+		bool only(index i) const;
+		
+		nptr a[8];  ///< Children of this node
+	}; // node
+
 	/// A set of indices. Implemented as an octary trie with bitvectors for the bottom level and a 
 	/// public interface consistent with flags::vector.
 	class trie {
-		class node;
-		
-		/// Memory manager for T objects; current version is just a giant memory leak.
-		class mem_mgr {
-		public:
-			node* make();
-			void acquire(node* n);
-			void release(node* n, index l);
-		}; // mem_mgr
-		static mem_mgr* mem;
-		
-		/// Makes a new node
-		static node* mem_make();
-		
-		/// Either a node pointer or a 64-bit bitvector
-		union nptr {
-			/// Constructor from node*
-			static nptr of(node* p) { nptr n; n.ptr = p; return n; }
-			/// Constructor from bits
-			static nptr of(uint64_t x) { nptr n; n.bits = x; return n; }
-			
-			/// True if value is zeroed
-			bool empty() const { return ptr == nullptr; }
-
-			bool operator== (const nptr& o) const { return bits == o.bits; }
-			bool operator!= (const nptr& o) const { return bits != o.bits; }
-			
-			node* ptr;
-			uint64_t bits;
-		};
-		
-		/// A trie node
-		struct node {
-			node() = default;
-			node(const node&) = default;
-			node(node&&) = default;
-			
-			node& operator= (const node&) = default;
-			node& operator= (node&&) = default;
-			
-			/// Constructor from 8-array of nptrs (will return nullptr if all empty)
-			static nptr of(nptr* a);
-			
-			/// Clones this node with p placed in the i'th slot of the clone
-			nptr set(index i, nptr p);
-			
-			/// True if all slots but 0 are empty
-			bool only_first();
-			
-			/// True if all slots but 0 and i are empty
-			bool only_first_and(index i);
-			
-			/// True if all slots but i are empty
-			bool only(index i);
-			
-			nptr a[8];  ///< Children of this node
-		}; // node
-		
 		/// Gets the number of bits covered by level l of the trie
-		static constexpr index bits(index l);
+		static index bits(index l);
 		
 		/// Gets the number of values contained in the range of an l-level trie
-		static constexpr index levelsize(index l);
+		static index levelsize(index l);
 		
 		/// Gets the trie level needed to store an index
 		static index levelof(index i);
 		
 		/// Gets the array index of i at level l > 0 of the trie
-		static constexpr index el(index i, index l);
+		static index el(index i, index l);
 		
 		/// Gets the leftmost subtrie of this l-level trie, rooted no higher than level l
 		static nptr leftat(nptr p, index m, index l);
@@ -251,7 +251,7 @@ namespace flags {
 			} else {
 				// extend range upward
 				do {
-					node* n = trie::mem_make();
+					node* n = mem.make();
 					n->a[0] = p;
 					p = nptr::of(n); ++l;
 				} while ( li > l );
@@ -388,17 +388,17 @@ namespace flags {
 				
 				if ( bs == 7 ) {
 					if ( ! p2.first.empty() ) {
-						node* n = trie::mem_make();
+						node* n = mem.make();
 						n->a[7] = p2.first;
 						p2.first = nptr::of(n);
 					}
 					if ( ! p2.second.empty() ) {
-						node* m = trie::mem_make();
+						node* m = mem.make();
 						m->a[0] = p2.second;
 						p2.second = nptr::of(m);
 					}
 				} else {
-					node* n = trie::mem_make();
+					node* n = mem.make();
 					n->a[bs] = p2.first;
 					n->a[bs+1] = p2.second;
 					p2.first = nptr::of(n);
@@ -412,7 +412,7 @@ namespace flags {
 			if ( p2.second.empty() ) {
 				p = p2.first;
 			} else {
-				node* n = trie::mem_make();
+				node* n = mem.make();
 				n->a[0] = p2.first;
 				n->a[1] = p2.second;
 				p = nptr::of(n);
@@ -436,17 +436,17 @@ namespace flags {
 				
 				if ( bs == 7 ) {
 					if ( ! p2.first.empty() ) {
-						node* n = trie::mem_make();
+						node* n = mem.make();
 						n->a[7] = p2.first;
 						p2.first = nptr::of(n);
 					}
 					if ( ! p2.second.empty() ) {
-						node* m = trie::mem_make();
+						node* m = mem.make();
 						m->a[0] = p2.second;
 						p2.second = nptr::of(m);
 					}
 				} else {
-					node* n = trie::mem_make();
+					node* n = mem.make();
 					n->a[bs] = p2.first;
 					n->a[bs+1] = p2.second;
 					p2.first = nptr::of(n);
@@ -460,7 +460,7 @@ namespace flags {
 			if ( p2.second.empty() ) {
 				return trie{p2.first, m};
 			} else {
-				node* n = trie::mem_make();
+				node* n = mem.make();
 				n->a[0] = p2.first;
 				n->a[1] = p2.second;
 				return trie{nptr::of(n), m+1};
@@ -472,5 +472,4 @@ namespace flags {
 		index l;  ///< number of trie levels under the root pointer
 	};
 
-	trie::mem = nullptr;
 }

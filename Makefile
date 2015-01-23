@@ -33,10 +33,10 @@ CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=10 -fdiagnostics-color=auto -ftemp
 #CXXFLAGS = -O2 --std=c++0x -DNDEBUG
 #CXXFLAGS = -O3 --std=c++0x -DNDEBUG
 
-#OBJS = dlf.o
+OBJS = flagtrie.o
 
-#dlf.o:  dlf.cpp dlf.hpp utils/flagvector.hpp utils/flags.hpp
-#	$(CXX) $(CXXFLAGS) -c dlf.cpp
+flagtrie.o: utils/flagtrie.hpp utils/flagtrie.cpp utils/flags.hpp
+	$(CXX) $(CXXFLAGS) -c utils/flagtrie.cpp
 
 egg:  main.cpp $(OBJS) egg.hpp parser.hpp \
       dlf.hpp utils/flagvector.hpp utils/flags.hpp visitors/dlf-loader.hpp \
