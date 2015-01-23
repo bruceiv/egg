@@ -533,8 +533,8 @@ namespace dlf {
 		};
 
 		/// Underlying set type
-//		using impl_set = std::unordered_set<arc, succ_hash, succ_equiv, plalloc<arc>>;
-		using impl_set = hash_bag<arc, succ_hash, succ_equiv>;
+		using impl_set = std::unordered_set<arc, succ_hash, succ_equiv, plalloc<arc>>;
+//		using impl_set = hash_bag<arc, succ_hash, succ_equiv>;
 
 		// STL defines
 		using value_type = impl_set::value_type;
