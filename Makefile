@@ -23,7 +23,7 @@ CXX = g++
 
 # Development
 #CXXFLAGS = -O0 -ggdb --std=c++0x
-#CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=10 -fdiagnostics-color=auto -ftemplate-backtrace-limit=0
+CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=10 -fdiagnostics-color=auto -ftemplate-backtrace-limit=0
 
 # Profiling
 #CXXFLAGS = -O0 -ggdb --std=c++0x -DNDEBUG
@@ -31,7 +31,7 @@ CXX = g++
 
 # Release
 #CXXFLAGS = -O2 --std=c++0x -DNDEBUG
-CXXFLAGS = -O3 --std=c++0x -DNDEBUG
+#CXXFLAGS = -O3 --std=c++0x -DNDEBUG
 
 #OBJS = dlf.o
 

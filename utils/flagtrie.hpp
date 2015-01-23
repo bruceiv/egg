@@ -41,14 +41,22 @@ namespace flags {
 		class node;
 		
 		/// Memory manager for T objects; current version is just a giant memory leak.
-		template<typename T>
 		class mem_mgr {
 		public:
-			T* make() { return new T; }
-			void acquire() { /* do nothing */ }
-			void release() { /* do nothing */ }
+			node* make() { return new node; }
+			void acquire(node* n) { /* do nothing */ }
+			void release(node* n, index l) { /* do nothing */ }
 		}; // mem_mgr
-		static mem_mgr<node> mem;
+		static mem_mgr* mem;
+		
+		/// Gets memory manager
+		static inline mem_mgr& get_mem() {
+			if ( mem == nullptr ) { mem = new mem_mgr; }
+			return *mem;
+		}
+
+		/// Makes a new node
+		static node* mem_make() { return get_mem().make(); }
 		
 		/// Either a node pointer or a 64-bit bitvector
 		union nptr {
@@ -59,6 +67,9 @@ namespace flags {
 			
 			/// True if value is zeroed
 			bool empty() const { return ptr == nullptr; }
+
+			bool operator== (const nptr& o) const { return bits == o.bits; }
+			bool operator!= (const nptr& o) const { return bits != o.bits; }
 			
 			node* ptr;
 			uint64_t bits;
@@ -79,7 +90,7 @@ namespace flags {
 				bool is_mt = true;
 				for (index i = 0; i < 8; ++i) {
 					if ( ! a[i].empty() ) {
-						if ( is_mt ) { n = trie::mem::make(); is_mt = false; }
+						if ( is_mt ) { n = trie::mem_make(); is_mt = false; }
 						n->a[i] = a[i];
 					}
 				}
@@ -88,7 +99,7 @@ namespace flags {
 			
 			/// Clones this node with p placed in the i'th slot of the clone
 			nptr set(index i, nptr p) {
-				node* n = trie::mem::make();
+				node* n = trie::mem_make();
 				index j = 0;
 				while ( j < i ) { n->a[j] = a[j]; ++j; }
 				n->a[i] = p; ++j;
@@ -160,7 +171,7 @@ namespace flags {
 			
 			i >>= 6;
 			do {
-				node* n = trie::mem::make();
+				node* n = trie::mem_make();
 				n->a[i & UINT64_C(7)] = p;
 				p = nptr::of(n);
 				
@@ -203,7 +214,7 @@ namespace flags {
 				if ( ! p.ptr->a[j].empty() ) {
 					return levelsize(l-1)*j + first(p.ptr->a[j], l-1);
 				}
-				++j
+				++j;
 			}
 			return -1;
 		}
@@ -282,7 +293,7 @@ namespace flags {
 			if ( p.empty() || q.empty() ) return false;
 			if ( l == 0 ) return flags::intersects(p.bits, q.bits);
 			
-			for (index i = 0; i < 8; ++i) if intersects(p.ptr->a[i], q.ptr->a[i], l-1) return true;
+			for (index i = 0; i < 8; ++i) if ( intersects(p.ptr->a[i], q.ptr->a[i], l-1) ) return true;
 			return false;
 		}
 		
@@ -292,7 +303,7 @@ namespace flags {
 			if ( p.empty() ) return p;
 			if ( l == 0 ) { flags::set_union(p.bits, q.bits, p.bits); return p; }
 			
-			node* n = mem::make();
+			node* n = mem_make();
 			for (index i = 0; i < 8; ++i) { n->a[i] = set_union(p.ptr->a[i], q.ptr->a[i], l-1); }
 			return nptr::of(n);
 		}
@@ -302,7 +313,7 @@ namespace flags {
 			assert(l >= m);
 			if ( l == m ) return set_union(p, q, l);
 			
-			if ( p.empty() ) { p = nptr::of(mem::make()); }
+			if ( p.empty() ) { p = nptr::of(mem_make()); }
 			return p.ptr->set(0, set_union(p.ptr->a[0], q, l-1, m));
 		}
 		
@@ -317,7 +328,7 @@ namespace flags {
 			for (index i = 0; i < 8; ++i) {
 				nptr r = set_intersection(p.ptr->a[i], q.ptr->a[i], l-1);
 				if ( ! r.empty() ) {
-					if ( is_mt ) { n = mem::make(); is_mt = false; }
+					if ( is_mt ) { n = mem_make(); is_mt = false; }
 					n->a[i] = r;
 				}
 			}
@@ -338,7 +349,7 @@ namespace flags {
 					if ( is_p && ! p.ptr->a[i].empty() ) {
 						is_p = false;
 						if ( ! is_mt ) {
-							n = mem::make();
+							n = mem_make();
 							for (index j = 0; j < i; ++j) { n->a[j] = p.ptr->a[j]; }
 						}
 					}
@@ -347,13 +358,13 @@ namespace flags {
 						is_mt = false;
 						if ( is_p && r != p.ptr->a[i] ) {
 							is_p = false;
-							n = mem::make();
+							n = mem_make();
 							n->a[i] = r;
 						}
 					} else {
 						if ( is_p && r != p.ptr->a[i] ) {
 							is_p = false;
-							n = mem::make();
+							n = mem_make();
 							for (index j = 0; j < i; ++j) { n->a[j] = p.ptr->a[j]; }
 						}
 						n->a[i] = r;
@@ -369,16 +380,16 @@ namespace flags {
 			if ( l == m ) return set_difference(p, q, l);
 			if ( p.empty() ) return p;
 			
-			nptr q = set_difference(p.ptr->a[0], q, l-1, m);
-			if ( q == p.ptr->a[0] ) return p;
-			if ( q.empty() && p.ptr->only_first() ) return q;
-			return p.ptr->set(0, q);
+			nptr r = set_difference(p.ptr->a[0], q, l-1, m);
+			if ( r == p.ptr->a[0] ) return p;
+			if ( r.empty() && p.ptr->only_first() ) return r;
+			return p.ptr->set(0, r);
 		}
 		
 		/// Returns the l-level trie shifted right by i bits (as a pair with its successor)
 		static std::pair<nptr, nptr> rsh(nptr p, index i, index l) {
 			assert ( i < levelsize(l) );
-			if ( p.empty() ) return std::pair{p, p};
+			if ( p.empty() ) return std::make_pair(p, p);
 			if ( i == 0 ) return std::make_pair(p, nptr::of(nullptr));
 			
 			if ( l == 0 ) {
@@ -391,7 +402,7 @@ namespace flags {
 			index bs = i >> bits(l-1);
 			index is = i & ( levelsize(l-1) - 1 );
 			
-			for (index j = 15; j > 7+bs+1; --j) { r[j] = UINT64_C(0); }
+			for (index j = 15; j > 7+bs+1; --j) { r[j] = nptr::of(nullptr); }
 			auto p2 = rsh(p.ptr->a[7], is, l-1);
 			r[7+bs] = p2.first; r[7+bs+1] = p2.second;
 			index j = 7;
@@ -405,7 +416,7 @@ namespace flags {
 		}
 		
 		/// Data constructor; sets the storage set directly
-		trie(nptr p, index l) : p{p}, l{l} {}
+		trie(nptr p, index l) : p(p), l(l) {}
 	public:
 
 		/// Default constructor; creates empty set
@@ -448,7 +459,7 @@ namespace flags {
 			index operator* () { return crnt; }
 
 			const_iterator& operator++ () {
-				if ( crnt != -1 ) { crnt = v.next(crnt); }
+				if ( crnt != -1 ) { crnt = t.next(crnt); }
 				return *this;
 			}
 
@@ -492,24 +503,26 @@ namespace flags {
 		void clear() { p = nptr::of(nullptr); l = 0; }
 
 		/// Gets the i'th bit
-		bool operator() (index i) const { return trie::get(p, i, l); }
+		bool operator() (index i) const {
+			return trie::levelof(i) > l ? false : trie::get(p, i, l);
+		}
 
 		/// Sets the i'th bit true
 		trie& operator|= (index i) {
-			index li = levelof(i);
+			index li = trie::levelof(i);
 			if ( li <= l ) {
 				// inserted value within current range, set
 				p = trie::set(p, i, l);
 			} else {
 				// extend range upward
 				do {
-					node* n = trie::mem::make();
+					node* n = trie::mem_make();
 					n->a[0] = p;
 					p = nptr::of(n); ++l;
 				} while ( li > l );
 				// set new value in
 				assert(trie::el(i,l) != 0 && "added value can't be in 0-limb, or its level would be lower");
-				n.ptr->a[trie::el(i, l)] = trie::of(i, l-1);
+				p.ptr->a[trie::el(i, l)] = trie::of(i, l-1);
 			}
 			return *this;
 		}
@@ -640,17 +653,17 @@ namespace flags {
 				
 				if ( bs == 7 ) {
 					if ( ! p2.first.empty() ) {
-						node* n = trie::mem::make();
+						node* n = trie::mem_make();
 						n->a[7] = p2.first;
 						p2.first = nptr::of(n);
 					}
 					if ( ! p2.second.empty() ) {
-						node* m = trie::mem::make();
+						node* m = trie::mem_make();
 						m->a[0] = p2.second;
 						p2.second = nptr::of(m);
 					}
 				} else {
-					node* n = trie::mem::make();
+					node* n = trie::mem_make();
 					n->a[bs] = p2.first;
 					n->a[bs+1] = p2.second;
 					p2.first = nptr::of(n);
@@ -664,7 +677,7 @@ namespace flags {
 			if ( p2.second.empty() ) {
 				p = p2.first;
 			} else {
-				node* n = trie::mem::make();
+				node* n = trie::mem_make();
 				n->a[0] = p2.first;
 				n->a[1] = p2.second;
 				p = nptr::of(n);
@@ -688,17 +701,17 @@ namespace flags {
 				
 				if ( bs == 7 ) {
 					if ( ! p2.first.empty() ) {
-						node* n = trie::mem::make();
+						node* n = trie::mem_make();
 						n->a[7] = p2.first;
 						p2.first = nptr::of(n);
 					}
 					if ( ! p2.second.empty() ) {
-						node* m = trie::mem::make();
+						node* m = trie::mem_make();
 						m->a[0] = p2.second;
 						p2.second = nptr::of(m);
 					}
 				} else {
-					node* n = trie::mem::make();
+					node* n = trie::mem_make();
 					n->a[bs] = p2.first;
 					n->a[bs+1] = p2.second;
 					p2.first = nptr::of(n);
@@ -712,7 +725,7 @@ namespace flags {
 			if ( p2.second.empty() ) {
 				return trie{p2.first, m};
 			} else {
-				node* n = trie::mem::make();
+				node* n = trie::mem_make();
 				n->a[0] = p2.first;
 				n->a[1] = p2.second;
 				return trie{nptr::of(n), m+1};
@@ -723,4 +736,6 @@ namespace flags {
 		nptr p;   ///< root pointer
 		index l;  ///< number of trie levels under the root pointer
 	};
+
+	trie::mem = nullptr;
 }
