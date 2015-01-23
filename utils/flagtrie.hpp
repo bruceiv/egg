@@ -22,6 +22,10 @@
  * THE SOFTWARE.
  */
 
+//uncomment to disable asserts
+//#define NDEBUG
+#include <cassert>
+
 #include <cstdint>
 #include <iterator>
 #include <utility>
@@ -155,7 +159,7 @@ namespace flags {
 	public:
 
 		/// Default constructor; creates empty set
-		trie() = default;
+		trie() : p(nptr::of(nullptr)), l(0) {};
 
 		trie(const trie& o) = default;
 		trie(trie&& o) = default;

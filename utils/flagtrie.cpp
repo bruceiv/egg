@@ -229,7 +229,7 @@ namespace flags {
 	
 	nptr trie::set_union(nptr p, nptr q, index l) {
 		if ( p.empty() ) return q;
-		if ( p.empty() ) return p;
+		if ( q.empty() ) return p;
 		if ( l == 0 ) { flags::set_union(p.bits, q.bits, p.bits); return p; }
 		
 		node* n = mem.make();
@@ -335,6 +335,7 @@ namespace flags {
 			p2 = rsh(p.ptr->a[j], is, l-1);
 			r[j+bs] = p2.first; r[j+bs+1] = set_union(r[j+bs+1], p2.second, l-1);
 		} while ( j > 0 );
+		for (index j = 0; j < bs; ++j) { r[j] = nptr::of(nullptr); }
 		
 		return std::make_pair(node::of(r), node::of(r+8));
 	}

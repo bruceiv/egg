@@ -23,10 +23,12 @@
 /** Tests for utility code. Returns 0 for all passed, 1 otherwise */
 
 #include <cstdint>
+#include <vector>
 
 #include "test.hpp"
 
 #include "../flags.hpp"
+#include "../flagtrie.hpp"
 
 void test_flags(tester& test) {
 	test.setup("flags");
@@ -140,10 +142,114 @@ void test_flags(tester& test) {
 	test.cleanup();
 }
 
+void test_flagtrie(tester& test) {
+	using flags::trie;
+	using l = std::vector<uint64_t>;
+	using std::vector;
+
+	test.setup("flagtrie");
+
+	// Test creation
+	trie t_mt;
+	trie t0 = trie::of(7);
+	trie t1 = trie::of(65);
+	trie t2 = trie::of(600);
+
+	test.equal_range(t_mt, l{}, "create empty");
+	test.equal_range(t0, l{7}, "create level-0");
+	test.equal_range(t1, l{65}, "create level-1");
+	test.equal_range(t2, l{600}, "create level-2");
+
+	// Test union
+	trie t0b = trie::of(0);
+	trie t0u = t0 | t0b;
+	test.equal_range(t0u, l{0, 7}, "union level-0");
+	
+	t0b |= t0;
+	test.equal_range(t0u, t0b, "union-assign level-0");
+
+	trie t1b = trie::of(72);
+	trie t1u = t1 | t1b;
+	test.equal_range(t1u, l{65, 72}, "union level-1");
+	
+	t1b |= t1;
+	test.equal_range(t1b, t1u, "union-assign level-1");
+
+	trie t01u = t0u | t1u;
+	test.equal_range(t01u, l{0, 7, 65, 72}, "union level-0+1");
+
+	// Test intersects
+	test.check(!t_mt.intersects(t0), "empty no-intersect level-0");
+	test.check(!t_mt.intersects(t1), "empty no-intersect level-1");
+	test.check(!t_mt.intersects(t2), "empty no-intersect level-2");
+	test.check(!t0.intersects(t1), "no-intersect level-0+1");
+	test.check(!t0.intersects(t2), "no-intersect level-0+2");
+	test.check(!t1.intersects(t2), "no-intersect level-1+2");
+	test.check(t0.intersects(t0u), "intersect level-0");
+	test.check(t1.intersects(t1u), "intersect level-1");
+	test.check(t0.intersects(t01u), "intersect level-0+1 from 0");
+	test.check(t1.intersects(t01u), "intersect level-0+1 from 1");
+
+	trie t01u_ = trie::of(0) | trie::of(7) | trie::of(65) | trie::of(72);
+	test.equal_range(t01u, t01u_, "independent rebuild level-0+1");
+	test.check(t01u.intersects(t01u_), "intersect independed rebuild level-0+1");
+
+	// Test subtract TODO more
+	trie t_mt_ = t01u - t01u_;
+	test.equal_range(t_mt_, l{}, "subtract trie from rebuilt self");
+	
+	trie t1c = t1b - t1;
+	test.equal_range(t1c, l{72}, "subtract level-0");
+	trie t1d = t1c - t1;
+	test.equal_range(t1c, t1d, "subtract non-present level-0");
+
+	// TODO Test intersect
+
+	// Test right-shift
+	trie t_zero = trie::of(0);
+	trie t_one = t_zero >> 1;
+	trie t_64 = t_zero >> 64;
+	trie t_65 = t_zero >> 65;
+	trie t_576 = t_zero >> 576;
+	trie t_600 = t_zero >> 600;
+	
+	test.equal_range(t_one, l{1}, "0 >> 1");
+	test.equal_range(t_64, l{64}, "0 >> 64");
+	test.equal_range(t_65, l{65}, "0 >> 65");
+	test.equal_range(t_576, l{576}, "0 >> 576");
+	test.equal_range(t_600, l{600}, "0 >> 600");
+
+	trie r0 = trie::of(0) | trie::of(65) | trie::of(130) | trie::of(195) 
+                  | trie::of(260) | trie::of(325) | trie::of(390) | trie::of(455);
+
+	trie r_1 = r0 >> 1;
+	trie r_63 = r0 >> 63;
+	trie r_64 = r0 >> 64;
+	trie r_448 = r0 >> 448;
+	trie r_450 = r0 >> 450;
+	trie r_511 = r0 >> 511;
+	trie r_512 = r0 >> 512;
+	trie r_550 = r0 >> 550;
+
+	test.equal_range(r_1, l{1, 66, 131, 196, 261, 326, 391, 456}, "r0 >> 1");
+	test.equal_range(r_63, l{63, 128, 193, 258, 323, 388, 453, 518}, "r0 >> 63");
+	test.equal_range(r_64, l{64, 129, 194, 259, 324, 389, 454, 519}, "r0 >> 64");
+	test.equal_range(r_448, l{448, 448+65, 448+130, 448+195, 448+260, 448+325, 448+390, 448+455}, "r0 >> 448");
+	test.equal_range(r_450, l{450, 450+65, 450+130, 450+195, 450+260, 450+325, 450+390, 450+455}, "r0 >> 450");
+	test.equal_range(r_511, l{511, 511+65, 511+130, 511+195, 511+260, 511+325, 511+390, 511+455}, "r0 >> 511");
+	test.equal_range(r_512, l{512, 512+65, 512+130, 512+195, 512+260, 512+325, 512+390, 512+455}, "r0 >> 512");
+	test.equal_range(r_550, l{550, 550+65, 550+130, 550+195, 550+260, 550+325, 550+390, 550+455}, "r0 >> 550");
+
+	// TODO test more complex things - you really want to lean on the boundary conditions and unions
+
+	test.cleanup();
+}
+
 int main(int argc, char** argv) {
 	tester test;
 
 	test_flags(test);
+	test_flagtrie(test);
 	
 	return test.success() ? 0 : 1;
 }

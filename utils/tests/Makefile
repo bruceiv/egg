@@ -18,12 +18,18 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-CXX = clang++
+#CXX = clang++
+CXX = g++
 
 #CXXFLAGS = -O2 --std=c++0x -Wno-format
 CXXFLAGS = -O0 -ggdb --std=c++0x -Wno-format
 
-test:
+OBJS = flagtrie.o
+
+flagtrie.o: ../flagtrie.hpp ../flagtrie.cpp ../flags.hpp
+	@$(CXX) $(CXXFLAGS) -c ../flagtrie.cpp
+
+test: test.hpp tests.cpp $(OBJS) ../flags.hpp
 	@$(CXX) $(CXXFLAGS) -o tests tests.cpp $(OBJS) $(LDFLAGS)
 	@-./tests
 	@rm tests

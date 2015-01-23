@@ -39,11 +39,16 @@ flagtrie.o: utils/flagtrie.hpp utils/flagtrie.cpp utils/flags.hpp
 	$(CXX) $(CXXFLAGS) -c utils/flagtrie.cpp
 
 egg:  main.cpp $(OBJS) egg.hpp parser.hpp \
-      dlf.hpp utils/flagvector.hpp utils/flags.hpp visitors/dlf-loader.hpp \
+      dlf.hpp visitors/dlf-loader.hpp \
       visitors/compiler.hpp visitors/normalizer.hpp visitors/interpreter.hpp \
       visitors/printer.hpp visitors/dlf-printer.hpp
 	$(CXX) $(CXXFLAGS) -o egg main.cpp $(OBJS) $(LDFLAGS)
 
+egg-vec:  main.cpp egg.hpp parser.hpp \
+      dlf.hpp utils/flagvector.hpp utils/flags.hpp visitors/dlf-loader.hpp \
+      visitors/compiler.hpp visitors/normalizer.hpp visitors/interpreter.hpp \
+      visitors/printer.hpp visitors/dlf-printer.hpp
+	$(CXX) $(CXXFLAGS) -DDLF_BITVEC -o egg-vec main.cpp $(LDFLAGS)
+
 clean:  
-#	-rm dlf.o
 	-rm egg

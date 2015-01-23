@@ -24,6 +24,8 @@
 
 #include <cstdint>
 #include <cstdio>
+#include <sstream>
+#include <string>
 
 struct tester {
 	int total_passed;
@@ -70,6 +72,37 @@ struct tester {
 		++tests;
 		if ( a == b ) ++passed;
 		else printf("\t\tFAILED %s %016llx != %016llx\n", err, a, b);
+	}
+
+	/// Check collections are equal (with optional description)
+	template<typename C, typename D>
+	void equal_range(C c, D d, const char* err = "") {
+		++tests;
+
+		auto begin1 = c.begin(), end1 = c.end();
+		auto begin2 = d.begin(), end2 = d.end();
+		unsigned long count = 0;
+		while ( begin1 != end1 && begin2 != end2) {
+			if ( *begin1 != *begin2 ) {
+				std::stringstream ss1, ss2;
+				ss1 << *begin1; ss2 << *begin2;
+				printf("\t\tFAILED %s @%lu %s != %s\n",
+				       err, count, ss1.str().c_str(), ss2.str().c_str());
+				return;
+			}
+			
+			++begin1; ++begin2; ++count;
+		}
+		if ( begin1 != end1 ) {
+			printf("\t\tFAILED %s @%lu first range has extra elements\n", err, count);
+			return;
+		}
+		if ( begin2 != end2 ) {
+			printf("\t\tFAILED %s @%lu second range has extra elements\n", err, count);
+			return;
+		}
+
+		++passed;
 	}
 
 }; /* struct tester */

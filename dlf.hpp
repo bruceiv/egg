@@ -30,8 +30,11 @@
 #include <utility>
 
 //#include "utils/flagset.hpp"
-//#include "utils/flagvector.hpp"
-#include "utils/flagtrie.hpp"
+#ifdef DLF_BITVEC
+  #include "utils/flagvector.hpp"
+#else
+  #include "utils/flagtrie.hpp"
+#endif
 
 #include "utils/hash_bag.hpp"
 
@@ -52,8 +55,11 @@ namespace dlf {
 
 	/// Set of restriction indices
 //	using cutset = flags::set;
-//	using cutset = flags::vector;
+#ifdef DLF_BITVEC
+	using cutset = flags::vector;
+#else
 	using cutset = flags::trie;
+#endif
 	
 	/// Shorthand for shared_ptr
 	template <typename T>
