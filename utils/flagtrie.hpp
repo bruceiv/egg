@@ -249,6 +249,8 @@ namespace flags {
 		/// Sets the i'th bit true
 		trie& operator|= (index i) {
 			index li = trie::levelof(i);
+			if ( p.empty() ) { p = trie::of(i, li); l = li; return *this; }
+			
 			if ( li <= l ) {
 				// inserted value within current range, set
 				p = trie::set(p, i, l);
