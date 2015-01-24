@@ -66,7 +66,7 @@ namespace flags {
 		
 	/// A trie node
 	struct node {
-		node() = default;
+		node() { for (int i = 0; i < 8; ++i) a[i] = nptr::of(nullptr); }
 		node(const node&) = default;
 		node(node&&) = default;
 		

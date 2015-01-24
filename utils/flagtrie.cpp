@@ -288,12 +288,14 @@ namespace flags {
 						n->a[i] = r;
 					}
 				} else {
-					if ( is_p && r != p.ptr->a[i] ) {
-						is_p = false;
-						n = mem.make();
-						for (index j = 0; j < i; ++j) { n->a[j] = p.ptr->a[j]; }
-					}
-					n->a[i] = r;
+					if ( is_p ) {
+						if ( r != p.ptr->a[i] ) {
+							is_p = false;
+							n = mem.make();
+							for (index j = 0; j < i; ++j) { n->a[j] = p.ptr->a[j]; }
+							n->a[i] = r;
+						}
+					} else { n->a[i] = r; }
 				}
 			}
 		}
