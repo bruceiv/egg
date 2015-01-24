@@ -29,15 +29,7 @@
 #include <unordered_set>
 #include <utility>
 
-//#include "utils/flagset.hpp"
-#ifdef DLF_BITVEC
-  #include "utils/flagvector.hpp"
-#else
-//  #include "utils/flagtrie.hpp"
-#include "utils/flagtest.hpp"
-#endif
-
-#include "utils/hash_bag.hpp"
+#include "utils/flagtrie.hpp"
 
 #include "utils/plalloc.hpp"
 
@@ -55,13 +47,7 @@ namespace dlf {
 	using cutind = flags::index;
 
 	/// Set of restriction indices
-//	using cutset = flags::set;
-#ifdef DLF_BITVEC
-	using cutset = flags::vector;
-#else
-//	using cutset = flags::trie;
-	using cutset = flags::test;
-#endif
+	using cutset = flags::trie;
 	
 	/// Shorthand for shared_ptr
 	template <typename T>
@@ -544,7 +530,6 @@ namespace dlf {
 
 		/// Underlying set type
 		using impl_set = std::unordered_set<arc, succ_hash, succ_equiv, plalloc<arc>>;
-//		using impl_set = hash_bag<arc, succ_hash, succ_equiv>;
 
 		// STL defines
 		using value_type = impl_set::value_type;

@@ -267,44 +267,13 @@ namespace flags {
 		if ( q.empty() ) return p;
 		if ( l == 0 ) { flags::set_difference(p.bits, q.bits, p.bits); return p; }
 		
-		node* n = nullptr;
-		bool is_mt = true, is_p = true;  // is_mt || is_p => haven't made n
+		nptr n[8];
 		for (index i = 0; i < 8; ++i) {
-			nptr r = set_difference(p.ptr->a[i], q.ptr->a[i], l-1);
-			if ( r.empty() ) {
-				if ( is_p && ! p.ptr->a[i].empty() ) {
-					is_p = false;
-					if ( ! is_mt ) {
-						n = mem.make();
-						for (index j = 0; j < i; ++j) { n->a[j] = p.ptr->a[j]; }
-					}
-				}
-			} else {
-				if ( is_mt ) {
-					is_mt = false;
-					if ( is_p ) {
-						if ( r != p.ptr->a[i] ) {
-							is_p = false;
-							n = mem.make();
-							n->a[i] = r;
-						}
-					} else {
-						n = mem.make();
-						n->a[i] = r;
-					}
-				} else {
-					if ( is_p ) {
-						if ( r != p.ptr->a[i] ) {
-							is_p = false;
-							n = mem.make();
-							for (index j = 0; j < i; ++j) { n->a[j] = p.ptr->a[j]; }
-							n->a[i] = r;
-						}
-					} else { n->a[i] = r; }
-				}
-			}
+			n[i] = set_difference(p.ptr->a[i], q.ptr->a[i], l-1);
 		}
-		return is_p ? p : nptr::of(n);
+		
+		for (index i = 0; i < 8; ++i) if ( n[i] != p.ptr->a[i] ) return node::of(n);
+		return p;
 	}
 	
 	nptr trie::set_difference(nptr p, nptr q, index l, index m) {

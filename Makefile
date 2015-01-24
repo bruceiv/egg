@@ -23,7 +23,7 @@ CXX = g++
 
 # Development
 #CXXFLAGS = -O0 -ggdb --std=c++0x
-CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=10 -fdiagnostics-color=auto -ftemplate-backtrace-limit=0
+#CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=10 -fdiagnostics-color=auto -ftemplate-backtrace-limit=0
 
 # Profiling
 #CXXFLAGS = -O0 -ggdb --std=c++0x -DNDEBUG
@@ -31,7 +31,7 @@ CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=10 -fdiagnostics-color=auto -ftemp
 
 # Release
 #CXXFLAGS = -O2 --std=c++0x -DNDEBUG
-#CXXFLAGS = -O3 --std=c++0x -DNDEBUG
+CXXFLAGS = -O3 --std=c++0x -DNDEBUG
 
 OBJS = flagtrie.o
 
@@ -43,12 +43,6 @@ egg:  main.cpp $(OBJS) egg.hpp parser.hpp \
       visitors/compiler.hpp visitors/normalizer.hpp visitors/interpreter.hpp \
       visitors/printer.hpp visitors/dlf-printer.hpp
 	$(CXX) $(CXXFLAGS) -o egg main.cpp $(OBJS) $(LDFLAGS)
-
-egg-vec:  main.cpp egg.hpp parser.hpp \
-      dlf.hpp utils/flagvector.hpp utils/flags.hpp visitors/dlf-loader.hpp \
-      visitors/compiler.hpp visitors/normalizer.hpp visitors/interpreter.hpp \
-      visitors/printer.hpp visitors/dlf-printer.hpp
-	$(CXX) $(CXXFLAGS) -DDLF_BITVEC -o egg-vec main.cpp $(LDFLAGS)
 
 clean:  
 	-rm egg
