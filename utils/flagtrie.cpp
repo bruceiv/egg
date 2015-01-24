@@ -282,8 +282,13 @@ namespace flags {
 			} else {
 				if ( is_mt ) {
 					is_mt = false;
-					if ( is_p && r != p.ptr->a[i] ) {
-						is_p = false;
+					if ( is_p ) {
+						if ( r != p.ptr->a[i] ) {
+							is_p = false;
+							n = mem.make();
+							n->a[i] = r;
+						}
+					} else {
 						n = mem.make();
 						n->a[i] = r;
 					}

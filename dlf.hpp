@@ -33,7 +33,8 @@
 #ifdef DLF_BITVEC
   #include "utils/flagvector.hpp"
 #else
-  #include "utils/flagtrie.hpp"
+//  #include "utils/flagtrie.hpp"
+#include "utils/flagtest.hpp"
 #endif
 
 #include "utils/hash_bag.hpp"
@@ -58,7 +59,8 @@ namespace dlf {
 #ifdef DLF_BITVEC
 	using cutset = flags::vector;
 #else
-	using cutset = flags::trie;
+//	using cutset = flags::trie;
+	using cutset = flags::test;
 #endif
 	
 	/// Shorthand for shared_ptr

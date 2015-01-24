@@ -194,7 +194,7 @@ void test_flagtrie(tester& test) {
 	test.equal_range(t01u, t01u_, "independent rebuild level-0+1");
 	test.check(t01u.intersects(t01u_), "intersect independed rebuild level-0+1");
 
-	// Test subtract TODO more
+	// Test subtract
 	trie t_mt_ = t01u - t01u_;
 	test.equal_range(t_mt_, l{}, "subtract trie from rebuilt self");
 	
@@ -202,6 +202,11 @@ void test_flagtrie(tester& test) {
 	test.equal_range(t1c, l{72}, "subtract level-0");
 	trie t1d = t1c - t1;
 	test.equal_range(t1c, t1d, "subtract non-present level-0");
+
+	trie s0 = trie::of(60) | trie::of(61) | trie::of(66) | trie::of(76) | trie::of(77);
+	trie s1 = trie::of(0) | trie::of(60) | trie::of(61) | trie::of(67);
+	s0 -= s1;
+	test.equal_range(s0, l{66, 76, 77}, "subtract from auto-test");
 
 	// TODO Test intersect
 
