@@ -35,13 +35,15 @@
 #include "../ast.hpp"
 #include "../dlf.hpp"
 
+#include "../utils/bag.hpp"
+
 #include "dlf-loader.hpp"
 #include "dlf-printer.hpp"
 
-#include "../utils/DBG_MSG.hpp"
+//#include "../utils/DBG_MSG.hpp"
 
 namespace dlf {
-	/// Gets all the cuts in an expression
+/*	/// Gets all the cuts in an expression
 	class cuts_in : public iterator {
 	public:
 		cuts_in(ptr<node> np) : cuts{} { if ( np ) iterator::visit(np); }
@@ -49,15 +51,47 @@ namespace dlf {
 		void visit(const cut_node& n) { cuts |= n.cut; iterator::visit(n); }
 	private:
 		cutset cuts;  ///< Cuts included in this expression
-	};  // cuts_in
+	}; // cuts_in
+*/	
+	/// Gets the maximum index cut in an expression (returns 1 more than the maximum cut, 0 for no cuts)
+	class cut_end : public iterator {
+	public:
+		cut_end(ptr<node> np) : maxcut(0) { if ( np ) iterator::visit(np); }
+		operator cutind () { return maxcut; }
+		void visit(const cut_node& n) {
+			if ( n.cut >= maxcut ) maxcut = n.cut + 1;
+			iterator::visit(n);
+		}
+	private:
+		cutind maxcut;
+	}; // cut_end
+	
+	/// Disarms all cuts in an expression
+	class disarm_all : public iterator {
+	public:
+		disarm_all(ptr<node> np) { if ( np ) iterator::visit(np); }
+		void visit(const cut_node& n) { const_cast<cut_node&>(n).disarm(); iterator::visit(n); }
+	}; // disarm_all
 
 	/// Clones a nonterminal, repointing its out-arcs to the given node
 	class clone : public visitor {
 		/// Common code for visiting an arc
 		arc clone_of(const arc& a) {
-			return ( a.succ->type() == end_type ) ?
-				arc{out.succ, out.blocking | (a.blocking >> nShift)} :
-			 	arc{clone_of(a.succ), a.blocking >> nShift};
+			// translate blockset
+			cutset blocking;
+			for (cut_node* cn : a.blocking) {
+				blocking.insert(as_ptr<cut_node>(cuts[cn->cut]).get());
+			}
+			
+			// either merge into out-arc or clone successor
+			if ( a.succ->type() == end_type ) {
+				arc r{out.succ, std::move(blocking)};
+				r.block_all(out.blocking);
+				return r;
+			} else return arc{clone_of(a.succ), std::move(blocking)};
+//			return ( a.succ->type() == end_type ) ?
+//				arc{out.succ, out.blocking | (a.blocking >> nShift)} :
+//			 	arc{clone_of(a.succ), a.blocking >> nShift};
 		}
 
 		/// Functional interface for visitor pattern
@@ -69,11 +103,20 @@ namespace dlf {
 			return rVal;
 		}
 	public:
-		clone(nonterminal& nt, const arc& out,
-		      cut_listener* listener = nullptr, cutind nShift = 0)
-		: rVal{out.succ}, out{out}, listener{listener}, nShift{nShift}, visited{} {
+		clone(nonterminal& nt, const arc& out, cutind nShift = 0)
+			: rVal(out.succ), out(out), nShift(nShift), visited(), cuts(nShift) {
+			// initialize cut nodes
+			for (cutind i = 0; i < nShift; ++i) {
+				cuts[i] = node::make<cut_node>(arc{fail_node::make()}, i + nShift);
+			}
+			// perform clone
 			rVal = clone_of(nt.sub);
 		}
+//		clone(nonterminal& nt, const arc& out,
+//		      cut_listener* listener = nullptr, cutind nShift = 0)
+//		: rVal{out.succ}, out{out}, listener{listener}, nShift{nShift}, visited{} {
+//			rVal = clone_of(nt.sub);
+//		}
 		operator ptr<node> () { return rVal; }
 
 		void visit(const match_node&)   { rVal = match_node::make(); }
@@ -86,7 +129,11 @@ namespace dlf {
 		void visit(const str_node& n)   { rVal = node::make<str_node>(clone_of(n.out), n.sp, n.i); }
 		void visit(const rule_node& n)  { rVal = node::make<rule_node>(clone_of(n.out), n.r); }
 		void visit(const cut_node& n)   {
-			rVal = node::make<cut_node>(clone_of(n.out), n.cut + nShift, listener);
+			// Rewrite appropriate cut
+			cut_node& cn = *as_ptr<cut_node>(cuts[n.cut]);
+			cn.out = clone_of(n.out);
+			rVal = cuts[n.cut];
+//			rVal = node::make<cut_node>(clone_of(n.out), n.cut + nShift, listener);
 		}
 		void visit(const alt_node& n)   {
 			arc_set rs;
@@ -97,30 +144,36 @@ namespace dlf {
 	private:
 		ptr<node> rVal;          ///< Return value of last visit
 		const arc out;           ///< Replacement for end nodes
-		cut_listener* listener;  ///< Cut listener to release cloned cuts to
+//		cut_listener* listener;  ///< Cut listener to release cloned cuts to
 		cutind nShift;           ///< Amount to shift restrictions by
 
 		/// Memoizes visited nodes to maintain the structure of the DAG
 		std::unordered_map<ptr<node>, ptr<node>> visited;
+		/// List of cloned cut nodes (need to be built before outgoing arcs)
+		std::vector<ptr<node>> cuts;
 	};  // clone
 
 	/// Implements the derivative computation over a DLF DAG
-	class derivative : public cut_listener {
-		/// Pending cut application, blocked according to some outstanding indices
+	class derivative {
+//	class derivative : public cut_listener {
+/*		/// Pending cut application, blocked according to some outstanding indices
 		struct cut_info {
-			cut_info() : blocking{}, freed{false} {}
-			cut_info(const cutset& blocking) : blocking{blocking}, freed{false} {}
+//			cut_info() : blocking{}, freed{false} {}
+			cut_info(arc&& a) : a(std::move(a)), freed(false) {}
+//			cut_info(const cutset& blocking) : blocking{blocking}, freed{false} {}
 
-			cutset blocking;  ///< Restrictions that can block the cut
-			bool freed;       ///< Have all references to this cut been freed?
-		};  // block_info
-		
+			arc a;       ///< Arc with restrictions blocking this cut; points to a cut node
+//			cutset blocking;  ///< Restrictions that can block the cut
+			bool freed;  ///< Have all references to this cut been freed?
+		};  // cut_info
+*/		
 		/// Information about a nonterminal
 		struct nt_info {
-			nt_info(const cutset& cuts)
-			: cuts{cuts}, nCuts{cuts.empty() ? 0 : cuts.last() + 1}, inDeriv{false} {}
+			nt_info(ptr<nonterminal> nt) : nCuts(cut_end(nt->sub)), inDeriv(false) {}
+//			nt_info(const cutset& cuts)
+//			: cuts{cuts}, nCuts{cuts.empty() ? 0 : cuts.last() + 1}, inDeriv{false} {}
 
-			cutset cuts;   ///< Cuts used by non-terminal
+//			cutset cuts;   ///< Cuts used by non-terminal
 			cutind nCuts;  ///< Number of cuts used by non-terminal
 			bool inDeriv;  ///< Flag used when currently in derivative
 		}; // nt_info
@@ -129,7 +182,8 @@ namespace dlf {
 		nt_info& get_info(ptr<nonterminal> nt) {
 			auto it = nt_state.find(nt);
 			if ( it == nt_state.end() ) {
-				nt_info info(cuts_in(nt->sub));
+				nt_info info(nt);
+//				nt_info info(cuts_in(nt->sub));
 				return nt_state.emplace_hint(it, nt, std::move(info))->second;
 			} else return it->second;
 		}
@@ -138,21 +192,22 @@ namespace dlf {
 		ptr<node> expand(ptr<nonterminal> nt, const arc& out, const nt_info& info) {
 			cutind nShift = next_restrict;
 			next_restrict += info.nCuts;
-			return clone(*nt, out, this, nShift);
+			return clone(*nt, out, nShift);
+//			return clone(*nt, out, this, nShift);
 		}
 
 		inline ptr<node> expand(ptr<nonterminal> nt, const arc& out) {
 			return expand(nt, out, get_info(nt));
 		}
 
-		/// Mark all cut nodes left in the DAG as unfired for end-of-input
+/*		/// Mark all cut nodes left in the DAG as unfired for end-of-input
 		void release_unfired() {
 			new_released = cuts_in(root.succ);
 //DBG("marking ["; for(auto ii : new_released) std::cout << " " << ii; std::cout << " ] released by unfired" << std::endl);
 			if ( ! new_released.empty() ) release_new();
 		}
-
-		/// Called when a set of cuts is applied
+*/
+/*		/// Called when a set of cuts is applied
 		void block_new() {
 //DBG("marking ["; for (auto ii : new_blocked) std::cout << " " << ii; std::cout << " ] blocked" << std::endl);
 			// apply new blocks to root node
@@ -224,8 +279,8 @@ namespace dlf {
 			// recurse with newly released nodes
 			if ( ! new_released.empty() ) { release_new(); }
 		}
-
-		/// Called when a set of cuts will never match
+*/
+/*		/// Called when a set of cuts will never match
 		void release_new() {
 //DBG("marking ["; for (auto ii : new_released) std::cout << " " << ii; std::cout << " ] released" << std::endl);
 			// apply new releases to root node
@@ -270,22 +325,26 @@ namespace dlf {
 			// recurse with newly blocked nodes
 			if ( ! new_blocked.empty() ) { block_new(); }
 		}
-
+*/
 		/// Functionalal interface to actually take the derivative
 		class deriv : public visitor {
 			static inline arc merge(const arc& a, const cutset& blocking) {
-				return arc{a.succ, a.blocking | blocking};
+				arc r{a};
+				r.block_all(blocking);
+				return r;
+//				return arc{a.succ, a.blocking | blocking};
 			}
 
 			static arc traverse(arc&& a, derivative& st) {
-				// Clear released cuts
-				a.blocking -= st.released;
+//				// Clear released cuts
+//				a.blocking -= st.released;
 
 				// Fail on blocked arc
-				if ( a.blocking.intersects(st.blocked) ) {
-					a.succ = fail_node::make();
-					return a;
-				}
+				if ( a.blocked() ) return a;
+//				if ( a.blocking.intersects(st.blocked) ) {
+//					a.succ = fail_node::make();
+//					return a;
+//				}
 
 				switch ( a.succ->type() ) {
 				// Conditionally apply cut node
@@ -293,22 +352,32 @@ namespace dlf {
 					const cut_node& cn = *as_ptr<cut_node>(a.succ);
 					
 					if ( a.blocking.empty() ) {
-						st.new_blocked |= cn.cut;
-//DBG("new " << cn.cut << " blocked by traversal" << std::endl);
+						cn.fire();
+						a = cn.out;
+						return traverse(std::move(a), st);
+//						st.new_blocked |= cn.cut;
+////DBG("new " << cn.cut << " blocked by traversal" << std::endl);
 					} else {
-						st.pending.emplace(cn.cut, a.blocking);
-//DBG("new " << cn.cut << " blocked pending ["; for (auto ii : a.blocking) std::cout << " " << ii; std::cout << " ] by traversal" << std::endl);
+						// save copy of self on pending list, traverse successor
+						arc c{cut_node::make(arc{}, cn.cut, cn.blocked), a.blocking};
+						st.pending.insert(std::move(c));
+						a = merge(cn.out, a.blocking);
+						return traverse(std::move(a), st);
+//						st.pending.emplace(cn.cut, a.blocking);
+////DBG("new " << cn.cut << " blocked pending ["; for (auto ii : a.blocking) std::cout << " " << ii; std::cout << " ] by traversal" << std::endl);
 					}
-					
-					// Merge block-set into successor and traverse
-					a = merge(cn.out, a.blocking);
-					return traverse(std::move(a), st);
+//					
+//					// Merge block-set into successor and traverse
+//					a = merge(cn.out, a.blocking);
+//					return traverse(std::move(a), st);
 				}
 				// Conditionally apply match node
 				case match_type: {
-					st.pending_matches.emplace_back(st.input_index, a.blocking);
-//DBG("new match at " << st.input_index << " blocked pending["; for (auto ii : a.blocking) std::cout << " " << ii; std::cout << " ]" << std::endl);
-					return arc{fail_node::make()};
+					st.pending_matches.emplace(st.input_index, a);
+					return arc{};
+//					st.pending_matches.emplace_back(st.input_index, a.blocking);
+////DBG("new match at " << st.input_index << " blocked pending["; for (auto ii : a.blocking) std::cout << " " << ii; std::cout << " ]" << std::endl);
+//					return arc{fail_node::make()};
 				}
 				// Traverse all branches of an alternation
 				case alt_type: {
@@ -318,8 +387,10 @@ namespace dlf {
 						as.emplace(traverse(merge(aa, a.blocking), st));
 					}
 					switch ( as.size() ) {
-					case 0:  return arc{fail_node::make()};
-					case 1:  return merge(*as.begin(), a.blocking);
+					case 0:  return arc{};
+//					case 0:  return arc{fail_node::make()};
+					case 1:  a = *as.begin(); return a;
+//					case 1:  return merge(*as.begin(), a.blocking);
 					default: a.succ = alt_node::make(std::move(as)); return a;
 					}
 				}
@@ -330,7 +401,8 @@ namespace dlf {
 			inline arc traverse(arc&& a) { return traverse(std::move(a), st); }
 
 			/// Sets a failure arc into rVal
-			inline void fail() { rVal.succ = fail_node::make(); }
+			inline void fail() { rVal.block(); }
+//			inline void fail() { rVal.succ = fail_node::make(); }
 
 			/// Merges the given arc into rVal
 			inline void follow(const arc& a) { rVal = traverse(merge(a, rVal.blocking)); }
@@ -422,22 +494,25 @@ namespace dlf {
 	public:
 		/// Sets up derivative computation for a nonterminal
 		derivative(ptr<nonterminal> nt)
-		: nt_state{}, blocked{}, released{}, pending{}, new_blocked{}, new_released{},
-		  input_index{0}, pending_matches{}, 
-		  next_restrict{0}, match_ptr{}, root{ptr<node>{}} {
+			: nt_state(), pending(), input_index(0), pending_matches(),
+			  next_restrict(0), match_ptr(), root(ptr<node>{}) {
+//		: nt_state{}, blocked{}, released{}, pending{}, new_blocked{}, new_released{},
+//		  input_index{0}, pending_matches{}, 
+//		  next_restrict{0}, match_ptr{}, root{ptr<node>{}} {
 			ptr<node> mp = match_node::make();
 			match_ptr = mp;
 			root.succ = expand(nt, arc{mp});
 		}
 
-		~derivative() {
-			root.succ.reset();  // delete all the arcs before destroying their cut listener
-		}
+//		~derivative() {
+//			root.succ.reset();  // delete all the arcs before destroying their cut listener
+//		}
 
 		/// Checks if the current expression is an unrestricted match
 		bool matched() const {
 			for (const auto& p : pending_matches) {
-				if ( p.second.empty() ) return true;
+				if ( p.second.blocking.empty() ) return true;
+//				if ( p.second.empty() ) return true;
 			}
 			return false;
 		}
@@ -445,7 +520,7 @@ namespace dlf {
 		/// Checks if the current expression cannot match
 		bool failed() const { return pending_matches.empty() && match_ptr.expired(); }
 
-		/// Called when new cuts are added
+/*		/// Called when new cuts are added
 		void acquire_cut(cutind cut) {}
 
 		/// Called when cuts can no longer be applied
@@ -467,35 +542,68 @@ namespace dlf {
 				++rg.first;
 			} while ( rg.first != rg.second );
 		}
-
+*/
 		/// Takes the derviative of the current root node
 		void operator() (char x) {
-			root = d(std::move(root), x);
-//if ( !( new_blocked.empty() && new_released.empty() && x != '\0' ) ) { PRE_DBG("applying block-set changes" << std::endl); 
-			if ( ! new_blocked.empty() ) { block_new(); }
-			else if ( ! new_released.empty() ) { release_new(); }
-			if ( x == '\0' ) { release_unfired(); }
+			root = d(std::move(root), x);  // take derivative
+			
+			// traverse the graph disarming all remaining cuts on end-of-input
+			if ( x == '\0' ) { disarm_all(root); }
+			
+			// check cuts on pending list for blocked or ready to fire; repeat until fixed point
+			bool fired_cut;
+			do {
+				fired_cut = false;
+				auto it = pending.begin();
+				while ( it != pending.end() ) {
+					arc& a = *it;
+					if ( a.blocked() ) {  // erase blocked cut from pending list
+						it = pending.erase(it);
+					} else if ( a.blocking.empty() ) {  // fire unblocked cut
+						as_ptr<cut_node>(a.succ)->fire();
+						fired_cut = true;
+						it = pending.erase(it);
+					} else {  // skip other cuts
+						++it;
+					}
+				}
+			} while ( fired_cut );
+			
+			// remove blocked matches from match pending list
+			auto jt = pending_matches.begin();
+			while ( jt != pending_matches.end() ) {
+				if ( jt->second.blocked() ) { jt = pending_matches.erase(jt); } 
+				else { ++jt; }
+			}
+			
 			++input_index;
-//DBG("new blocked:["; for (auto ii : blocked) std::cout << " " << ii; std::cout << " ]" << std::endl);
-//DBG("new released:["; for (auto ii : released) std::cout << " " << ii; std::cout << " ]" << std::endl);
-//POST_DBG_ARC("changes applied; now ", root); }
+////if ( !( new_blocked.empty() && new_released.empty() && x != '\0' ) ) { PRE_DBG("applying block-set changes" << std::endl); 
+//			if ( ! new_blocked.empty() ) { block_new(); }
+//			else if ( ! new_released.empty() ) { release_new(); }
+//			if ( x == '\0' ) { release_unfired(); }
+//			++input_index;
+////DBG("new blocked:["; for (auto ii : blocked) std::cout << " " << ii; std::cout << " ]" << std::endl);
+////DBG("new released:["; for (auto ii : released) std::cout << " " << ii; std::cout << " ]" << std::endl);
+////POST_DBG_ARC("changes applied; now ", root); }
 		}
 
 	private:
 		/// Stored state for each nonterminal
 		std::unordered_map<ptr<nonterminal>, nt_info> nt_state;
 	public:
-		cutset blocked;                 ///< Blocked indices
-		cutset released;                ///< Safe indices
+//		cutset blocked;                 ///< Blocked indices
+//		cutset released;                ///< Safe indices
 		/// Information about outstanding cut indices
-		std::unordered_multimap<cutind, cut_info> pending;
-	private:
-		cutset new_blocked;             ///< Indices blocked this step
-		cutset new_released;            ///< Indices released this step
-	public:	
+		bag<arc> pending;
+//		std::unordered_multimap<cutind, cut_info> pending;
+//	private:
+//		cutset new_blocked;             ///< Indices blocked this step
+//		cutset new_released;            ///< Indices released this step
+//	public:	
 		unsigned long input_index;      ///< Current index in the input
 		/// Information about possible matches
-		std::vector<std::pair<unsigned long, cutset>> pending_matches;
+		bag<std::pair<unsigned long, arc>> pending_matches;
+//		std::vector<std::pair<unsigned long, cutset>> pending_matches;
 	private:
 		cutind next_restrict;           ///< Index of next available restriction
 		std::weak_ptr<node> match_ptr;  ///< Pointer to match node
@@ -537,9 +645,11 @@ namespace dlf {
 					std::cout << c.first << ":[";
 					if ( ! c.second.blocking.empty() ) {
 						auto ii = c.second.blocking.begin();
-						std::cout << *ii;
+						std::cout << (*ii)->cut;
+//						std::cout << *ii;
 						while ( ++ii != c.second.blocking.end() ) {
-							std::cout << " " << *ii;
+							std::cout << " " << (*ii)->cut;
+//							std::cout << " " << *ii;
 						}
 					}
 					std::cout << "] ";
@@ -549,9 +659,11 @@ namespace dlf {
 					std::cout << "@" << m.first << ":[";
 					if ( ! m.second.empty() ) {
 						auto ii = m.second.begin();
-						std::cout << *ii;
+						std::cout << (*ii)->cut;
+//						std::cout << *ii;
 						while ( ++ii != m.second.end() ) {
-							std::cout << " " << *ii;
+							std::cout << (*ii)->cut;
+//							std::cout << " " << *ii;
 						}
 					}
 					std::cout << "] ";

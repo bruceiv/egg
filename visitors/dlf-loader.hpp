@@ -24,6 +24,7 @@
 
 #include <map>
 #include <string>
+#include <vector>
 
 #include "../ast.hpp"
 #include "../dlf.hpp"
@@ -49,7 +50,9 @@ namespace dlf {
 		void set_nonterminal(const std::string& s, ptr<node> n) { get_nonterminal(s)->sub = n; }
 
 		/// Produces a new arc to the next node
-		arc out(cutset&& blocking = cutset{}) { return arc{next, std::move(blocking)}; }
+		arc out() { return arc{next}; }
+		/// Produces a new arc to the next node with the given cutset
+		arc out(cutset&& blocking) { return arc{next, std::move(blocking)}; }
 
 		/// Makes an anonymous nonterminal for the given many-matcher
 		void make_many(ptr<ast::matcher> mp) {
@@ -59,17 +62,19 @@ namespace dlf {
 			// set rule node for new anonymous non-terminal
 			ptr<nonterminal> R_i = make_ptr<nonterminal>("*" + std::to_string(mi++));
 			ptr<node> nt = rule_node::make(out(), R_i);
-
+			
 			// build anonymous rule
 			cutind ri_bak = ri; ri = 1;          // save ri
 			next = end_node::make();             // make end node for rule
-			arc skip = out(cutset::of(0));       // save arc that skips match
+			arc skip = out();                    // save arc that skips match
+//			arc skip = out(cutset::of(0));       // save arc that skips match
 			next = rule_node::make(out(), R_i);  // build recursive invocation of rule
 			next = cut_node::make(out(), 0);     // set up cut on out-edges of many-expression
+			skip.block(next);                    // block skip arc on match cut
 			mp->accept(this);                    // build many-expression
 			ri = ri_bak;                         // restore ri
 			R_i->sub = alt_node::make(out(),     // reset rule's substitution
-                                                  std::move(skip));
+			                          std::move(skip));
 
 			// reset next to rule reference
 			next = nt;
@@ -87,11 +92,13 @@ namespace dlf {
 			// build anonymous rule
 			cutind ri_bak = ri; ri = 1;          // save ri
 			next = end_node::make();             // make end node for rule
-			arc skip = out(cutset::of(0));       // save arc that skips match
+			arc skip = out();                    // save arc that skips match
+//			arc skip = out(cutset::of(0));       // save arc that skips match
 			next = cut_node::make(out(), 0);     // set up cut for successive match
+			skip.block(next);                    // block skip arc on match cut
 			next = rule_node::make(out(), R_i);  // build recursive invocation of rule
 			next = alt_node::make(out(),         // alternate successor and skip branches
-                                              std::move(skip));
+			                      std::move(skip));
 			mp->accept(this);                    // match subexpression
 			ri = ri_bak;                         // restore ri
 			R_i->sub = next;                     // reset rule's substitution
@@ -147,8 +154,10 @@ namespace dlf {
 		virtual void visit(ast::opt_matcher& m) {
 			// Idea: m.m <i> next | [i] next
 			cutind i = ri++;                  // get a restriction index to use
-			arc skip = out(cutset::of(i));    // save arc that skips the optional
+			arc skip = out();                 // save arc that skips the optional
+//			arc skip = out(cutset::of(i));    // save arc that skips the optional
 			next = cut_node::make(out(), i);  // add blocker for skip branch
+			skip.block(next);                 // block skip branch on blocker
 			m.m->accept(this);                // build opt-expression
 			next = alt_node::make(out(),      // make alternation of two paths
 			                      std::move(skip));
@@ -220,6 +229,7 @@ namespace dlf {
 			if ( m.ms.empty() ) { next = fail_node::make(); return; }
 
 			ptr<node> alt_next = next;  // save next value
+			ptr<cut_node> new_cut;      // to save new cut to add to block set
 			cutset blocking;            // cuts for greedy longest match
 
 			arc_set rs;
@@ -228,10 +238,12 @@ namespace dlf {
 
 				cutind ci = ri++;                   // get a restriction index to use
 				next = cut_node::make(out(), ci);   // flag cut for greedy longest match
+				new_cut = as_ptr<cut_node>(next);   // save cut for later blocking
 				mi->accept(this);                   // build subexpression
 				rs.emplace(out(cutset{blocking}));  // add to list of arcs
 				next = alt_next;                    // restore next values for next iteration
-				blocking |= ci;                     // add index to greedy longest match blocker
+				blocking.insert(new_cut.get());     // add new cut to block set
+//				blocking |= ci;                     // add index to greedy longest match blocker
 			}
 			// Don't put a cut on the last branch
 			m.ms.back()->accept(this);
@@ -248,25 +260,31 @@ namespace dlf {
 			cutind j = ri++;
 			cutind i = ri++;
 			// build continuing branch
-			arc cont = out(cutset::of(i));
+			arc cont = out();
+//			arc cont = out(cutset::of(i));
 			// build cut branch
 			next = fail_node::make();
 			next = cut_node::make(out(), i);
-			arc cut = out(cutset::of(j));
+			cont.block(next);  // block continuing branch on cut
+			arc cut = out();
+//			arc cut = out(cutset::of(j));
 			// build matching branch
 			next = fail_node::make();
 			next = cut_node::make(out(), j);
+			cut.block(next);  // block cut branch on match
 			m.m->accept(this);
 			// set alternate paths
-			next = alt_node::make(out(), std::move(cont), std::move(cut));
+			next = alt_node::make(out(), std::move(cut), std::move(cont));
 		}
 
 		virtual void visit(ast::not_matcher& m) {
 			// Idea - match both paths, failing if the not path matches: m.m <i> fail | [i] next
 			cutind i = ri++;                  // get a restriction index to use
-			arc cont = out(cutset::of(i));    // build continuing branch
+			arc cont = out();                 // build continuing branch
+//			arc cont = out(cutset::of(i));    // build continuing branch
 			next = fail_node::make();         // terminate blocking branch
-			next = cut_node::make(out(), i);  // with a cut on the match index
+			next = cut_node::make(out(), i);  // ... with a cut on the match index
+			cont.block(next);                 // ... which blocks the continuing branch
 			m.m->accept(this);                // build blocking branch
 			next = alt_node::make(out(),      // alternate continuing and blocking branches
 			                      std::move(cont));

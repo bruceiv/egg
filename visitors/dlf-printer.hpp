@@ -67,9 +67,11 @@ namespace dlf {
 			if ( ! a.blocking.empty() ) {
 				out << "[";
 				auto ii = a.blocking.begin();
-				out << *ii;
+				out << (*ii)->cut;
+//				out << *ii;
 				while ( ++ii != a.blocking.end() ) {
-					out << " " << *ii;
+					out << " " << (*ii)->cut;
+//					out << " " << *ii;
 				}
 				out << "]";
 				if ( do_follow || follow_override ) out << " ";
