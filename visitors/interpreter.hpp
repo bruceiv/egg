@@ -349,7 +349,7 @@ namespace dlf {
 				switch ( a.succ->type() ) {
 				// Conditionally apply cut node
 				case cut_type: { 
-					const cut_node& cn = *as_ptr<cut_node>(a.succ);
+					cut_node& cn = *as_ptr<cut_node>(a.succ);
 					
 					if ( a.blocking.empty() ) {
 						cn.fire();
@@ -471,7 +471,8 @@ namespace dlf {
 			void visit(const alt_node& n) {
 				arc_set as;
 				for (arc o : n.out) {
-					o.blocking |= rVal.blocking;
+					o.block_all(rVal.blocking);
+//					o.blocking |= rVal.blocking;
 					as.emplace(d(std::move(o)));
 				}
 
@@ -548,7 +549,7 @@ namespace dlf {
 			root = d(std::move(root), x);  // take derivative
 			
 			// traverse the graph disarming all remaining cuts on end-of-input
-			if ( x == '\0' ) { disarm_all(root); }
+			if ( x == '\0' ) { disarm_all(root.succ); }
 			
 			// check cuts on pending list for blocked or ready to fire; repeat until fixed point
 			bool fired_cut;
@@ -642,12 +643,16 @@ namespace dlf {
 			if ( dbg == full_dbg ) {
 				// print pending cuts
 				for (auto c : d.pending) {
-					std::cout << c.first << ":[";
-					if ( ! c.second.blocking.empty() ) {
-						auto ii = c.second.blocking.begin();
+					std::cout << as_ptr<cut_node>(c.succ)->cut << ":[";
+//					std::cout << c.first << ":[";
+					if ( ! c.blocking.empty() ) {
+//					if ( ! c.second.blocking.empty() ) {
+						auto ii = c.blocking.begin();
+//						auto ii = c.second.blocking.begin();
 						std::cout << (*ii)->cut;
 //						std::cout << *ii;
-						while ( ++ii != c.second.blocking.end() ) {
+						while ( ++ii != c.blocking.end() ) {
+//						while ( ++ii != c.second.blocking.end() ) {
 							std::cout << " " << (*ii)->cut;
 //							std::cout << " " << *ii;
 						}
@@ -657,11 +662,14 @@ namespace dlf {
 				// print pending matches
 				for (auto m : d.pending_matches) {
 					std::cout << "@" << m.first << ":[";
-					if ( ! m.second.empty() ) {
-						auto ii = m.second.begin();
+					if ( ! m.second.blocking.empty() ) {
+//					if ( ! m.second.empty() ) {
+						auto ii = m.second.blocking.begin();
+//						auto ii = m.second.begin();
 						std::cout << (*ii)->cut;
 //						std::cout << *ii;
-						while ( ++ii != m.second.end() ) {
+						while ( ++ii != m.second.blocking.end() ) {
+//						while ( ++ii != m.second.end() ) {
 							std::cout << (*ii)->cut;
 //							std::cout << " " << *ii;
 						}

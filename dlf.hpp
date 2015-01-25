@@ -197,7 +197,7 @@ namespace dlf {
 */
 	/// Directed arc linking two nodes
 	struct arc {
-		arc() : succ(fail_node::make()), blocking() {}
+		arc();
 		arc(ptr<node> succ);
 		arc(ptr<node> succ, const cutset& blocking);
 		arc(ptr<node> succ, cutset&& blocking);
@@ -208,9 +208,9 @@ namespace dlf {
 		~arc();
 		
 		/// Checks if this arc is blocked
-		bool blocked() const { return succ->type() == fail_type; }
+		bool blocked() const;
 		/// Blocks this node
-		void block() { succ = fail_node::make(); clear_blocks(); }
+		void block();
 		
 		/// Adds a single cut to the arc's cutset
 		void block(cut_node* cn);
@@ -600,6 +600,7 @@ namespace dlf {
 	};  // cut_node
 	
 	// Implementation of arc; needs cut_node defined to work
+	arc::arc() : succ(fail_node::make()), blocking() {}
 	arc::arc(ptr<node> succ) : succ(succ), blocking() {}
 	arc::arc(ptr<node> succ, const cutset& blocking) : succ(succ), blocking(blocking) {
 		for (cut_node* cn : blocking) { cn->blocked.insert(this); }
@@ -644,6 +645,9 @@ namespace dlf {
 	arc::~arc() {
 		for (cut_node* cn : blocking) { cn->blocked.erase(this); }
 	}
+	
+	bool arc::blocked() const { return succ->type() == fail_type; }
+	void arc::block() { succ = fail_node::make(); clear_blocks(); }
 	
 	void arc::block(cut_node* cn) {
 		if ( blocking.insert(cn).second ) { cn->blocked.insert(this); }
