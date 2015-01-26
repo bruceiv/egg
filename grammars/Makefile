@@ -160,21 +160,28 @@ test-interpret: egg
 	@echo
 	../egg match-lines abc.egg g1 tests/abc.in.txt > tests/abc.test.txt
 	diff tests/abc.dout.txt tests/abc.test.txt
+	rm tests/abc.test.txt
 	../egg match-lines anbncn.egg G tests/anbncn.in.txt > tests/anbncn.test.txt
 	diff tests/anbncn.dout.txt tests/anbncn.test.txt
+	rm tests/anbncn.test.txt
 	../egg match-lines calc.egg expr tests/calc.in.txt > tests/calc.test.txt
 	diff tests/calc.dout.txt tests/calc.test.txt
+	rm tests/calc.test.txt
 	../egg match-lines nested.egg String tests/nested.in.txt > tests/nested.test.txt
 	diff tests/nested.dout.txt tests/nested.test.txt
+	rm tests/nested.test.txt
 	../egg match-lines eggr.egg grammar tests/egg.in.txt > tests/egg.test.txt
 	diff tests/egg.dout.txt tests/egg.test.txt
+	rm tests/egg.test.txt
 	../egg match eggr.egg grammar eggr.egg > tests/eggr.test.txt
 	diff tests/eggr.dout.txt tests/eggr.test.txt
+	rm tests/eggr.test.txt
 	../egg match ../perf_test/JSON.egg JSON ../perf_test/input/json-ijs-elan2.0/kuca-xx.tei.json > tests/json.test.txt
 	diff tests/json.dout.txt tests/json.test.txt
+	rm tests/json.test.txt
 	../egg match ../perf_test/XML.egg Document ../perf_test/input/ijs-elan2.0/kuca-xx.tei > tests/xml.test.txt
 	diff tests/xml.dout.txt tests/xml.test.txt
-	rm tests/*.test.txt
+	rm tests/xml.test.txt
 	@echo
 	@echo INTERPRETED TESTS PASSED
 
