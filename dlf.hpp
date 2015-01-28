@@ -483,9 +483,10 @@ namespace dlf {
 
 	/// Node representing a cut in the graph
 	class cut_node : public node {
+	public:
 //		using blockset = std::unordered_set<arc*, std::hash<arc*>, std::equal_to<arc*>, plalloc<arc*>>;
 		using blockset = std::unordered_set<arc*>;
-	public:
+		
 		cut_node(arc&& out, cutind cut) : out(std::move(out)), cut(cut), blocked() {}
 		cut_node(arc&& out, cutind cut, blockset&& s)
 			: out(std::move(out)), cut(cut), blocked(std::move(s)) {
