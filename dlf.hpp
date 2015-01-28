@@ -34,6 +34,8 @@
 
 #include "utils/plalloc.hpp"
 
+#include <iostream>
+
 /**
 * Implements dynamic left-factoring parsing for parsing expression grammars, according to the
 * algorithm described by Aaron Moss in 2014 (http://arxiv.org/abs/1405.4841).
@@ -485,8 +487,8 @@ namespace dlf {
 		using blockset = std::unordered_set<arc*>;
 	public:
 		cut_node(arc&& out, cutind cut) : out(std::move(out)), cut(cut), blocked() {}
-		cut_node(arc&& out, cutind cut, blockset&& blocked)
-			: out(std::move(out)), cut(cut), blocked(std::move(blocked)) {
+		cut_node(arc&& out, cutind cut, blockset&& s)
+			: out(std::move(out)), cut(cut), blocked(std::move(s)) {
 			for (arc* a : blocked) { a->blocking.insert(this); }
 		}
 		cut_node(const cut_node& o) : out(o.out), cut(o.cut), blocked(o.blocked) {
@@ -607,12 +609,12 @@ namespace dlf {
 	// Implementation of arc; needs cut_node defined to work
 	arc::arc() : succ(fail_node::make()), blocking(), is_blocked(true) {}
 	arc::arc(ptr<node> succ) : succ(succ), blocking(), is_blocked(false) {}
-	arc::arc(ptr<node> succ, const cutset& blocking, bool is_blocked) 
-		: succ(succ), blocking(blocking), is_blocked(is_blocked) {
+	arc::arc(ptr<node> succ, const cutset& s, bool is_blocked) 
+		: succ(succ), blocking(s), is_blocked(is_blocked) {
 		for (cut_node* cn : blocking) { cn->blocked.insert(this); }
 	}
-	arc::arc(ptr<node> succ, cutset&& blocking, bool is_blocked) 
-		: succ(succ), blocking(std::move(blocking)), is_blocked(is_blocked) {
+	arc::arc(ptr<node> succ, cutset&& s, bool is_blocked) 
+		: succ(succ), blocking(std::move(s)), is_blocked(is_blocked) {
 		for (cut_node* cn : blocking) { cn->blocked.insert(this); }
 	}
 	arc::arc(const arc& o) : succ(o.succ), blocking(o.blocking), is_blocked(false) {

@@ -22,10 +22,13 @@
  * THE SOFTWARE.
  */
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <initializer_list>
 #include <sstream>
 #include <string>
+#include <vector>
 
 struct tester {
 	int total_passed;
@@ -109,6 +112,16 @@ struct tester {
 		}
 
 		++passed;
+	}
+
+	/// Check unsorted collections are equal (with optional description)
+	template<typename C, typename D>
+	void equal_set(C c, D d, const char* err = "") {
+		std::vector<typename C::value_type> cv(c.begin(), c.end());
+		std::vector<typename D::value_type> dv(d.begin(), d.end());
+		std::sort(cv.begin(), cv.end());
+		std::sort(dv.begin(), dv.end());
+		equal_range(cv, dv, err);
 	}
 
 }; /* struct tester */
