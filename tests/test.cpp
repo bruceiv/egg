@@ -23,6 +23,7 @@
 /** Tests for DLF code. Returns 0 for all passed, 1 otherwise */
 
 #include <initializer_list>
+#include <utility>
 #include <vector>
 
 #include "../dlf.hpp"
@@ -76,6 +77,42 @@ void test_arc(tester& test) {
 	}
 	test.equal_set(as_cut(n)->blocked, list<arc*>({}), "~c, n.blocked");
 	test.equal_set(as_cut(m)->blocked, list({&a}), "~c, m.blocked");
+
+	arc d{a};
+	test.equal_set(d.blocking, list({as_cut(m)}), "copy d, d.blocking");
+	test.equal_set(as_cut(m)->blocked, list({&a, &d}), "copy d, m.blocked");
+
+	arc e{std::move(d)};
+	test.equal_set(e.blocking, list({as_cut(m)}), "move e, e.blocking");
+	test.equal_set(as_cut(m)->blocked, list({&a, &e}), "move e, m.blocked");
+
+	b.block(n);
+	b = e;
+	test.equal_set(b.blocking, list({as_cut(m)}), "copy assign b, b.blocking");
+	test.equal_set(as_cut(m)->blocked, list({&a, &b, &e}), "copy assign b, m.blocked");
+	test.equal_set(as_cut(n)->blocked, list<arc*>({}), "copy assign b, n.blocked");
+
+	b.clear_blocks();
+	test.equal_set(b.blocking, list<cut_node*>({}), "b.clear_blocks(), b.blocking");
+	test.equal_set(as_cut(m)->blocked, list({&a, &e}), "b.clear_blocks(), m.blocked");
+
+	e.block(n);
+	b = std::move(e);
+	test.equal_set(b.blocking, list({as_cut(n), as_cut(m)}), "move assign b, b.blocking");
+	test.equal_set(as_cut(m)->blocked, list({&a, &b}), "move assign b, m.blocked");
+	test.equal_set(as_cut(n)->blocked, list({&b}), "move assign b, n.blocked");
+
+	a.swap(b);
+	test.equal_set(a.blocking, list({as_cut(n), as_cut(m)}), "a.swap(b), a.blocking");
+	test.equal_set(b.blocking, list({as_cut(m)}), "a.swap(b), b.blocking");
+	test.equal_set(as_cut(n)->blocked, list({&a}), "a.swap(b), n.blocked");
+	test.equal_set(as_cut(m)->blocked, list({&a, &b}), "a.swap(b), m.blocked");
+	
+	std::swap(a, b);
+	test.equal_set(a.blocking, list({as_cut(m)}), "std::swap(a, b), a.blocking");
+	test.equal_set(b.blocking, list({as_cut(n), as_cut(m)}), "std::swap(a, b), b.blocking");
+	test.equal_set(as_cut(n)->blocked, list({&b}), "std::swap(a, b), n.blocked");
+	test.equal_set(as_cut(m)->blocked, list({&a, &b}), "std::swap(a, b), m.blocked");
 
 	test.cleanup();
 }

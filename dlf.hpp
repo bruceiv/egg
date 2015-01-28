@@ -662,12 +662,12 @@ namespace dlf {
 		succ.swap(o.succ);
 		std::swap(is_blocked, o.is_blocked);
 		blocking.swap(o.blocking);
-
-		for (cut_node* cn : blocking) {
+		
+		for (cut_node* cn : blocking) if ( o.blocking.count(cn) == 0 ) {
 			cn->blocked.erase(&o);
 			cn->blocked.insert(this);
 		}
-		for (cut_node* cn : o.blocking) {
+		for (cut_node* cn : o.blocking) if ( blocking.count(cn) == 0 ) {
 			cn->blocked.erase(this);
 			cn->blocked.insert(&o);
 		}
