@@ -84,9 +84,10 @@ namespace dlf {
 	using cutind = unsigned long;
 	
 	/// Set of arc restrictions
-	using cutset = std::unordered_set<cut_node*, 
-	                                  std::hash<cut_node*>, std::equal_to<cut_node*>, 
-	                                  plalloc<cut_node*>>;
+//	using cutset = std::unordered_set<cut_node*, 
+//	                                  std::hash<cut_node*>, std::equal_to<cut_node*>, 
+//	                                  plalloc<cut_node*>>;
+	using cutset = std::unordered_set<cut_node*>;
 
 	/// Forward declaration of arc type
 	class arc;
@@ -199,13 +200,14 @@ namespace dlf {
 	struct arc {
 		arc();
 		arc(ptr<node> succ);
-		arc(ptr<node> succ, const cutset& blocking);
-		arc(ptr<node> succ, cutset&& blocking);
+		arc(ptr<node> succ, const cutset& blocking, bool is_blocked = false);
+		arc(ptr<node> succ, cutset&& blocking, bool is_blocked = false);
 		arc(const arc& o);
 		arc(arc&& o);
 		arc& operator= (const arc& o);
 		arc& operator= (arc&& o);
 		~arc();
+		void swap(arc& o);
 		
 		/// Checks if this arc is blocked
 		bool blocked() const;
@@ -225,7 +227,9 @@ namespace dlf {
 		
 		ptr<node> succ;   ///< Successor pointer
 		cutset blocking;  ///< Restrictions blocking this arc
+		bool is_blocked;  ///< Is this arc blocked?
 	};
+	void swap(arc& a, arc& b) { a.swap(b); }
 
 	/// Terminal node representing a match
 	class match_node : public node {
@@ -477,7 +481,8 @@ namespace dlf {
 
 	/// Node representing a cut in the graph
 	class cut_node : public node {
-		using blockset = std::unordered_set<arc*, std::hash<arc*>, std::equal_to<arc*>, plalloc<arc*>>;
+//		using blockset = std::unordered_set<arc*, std::hash<arc*>, std::equal_to<arc*>, plalloc<arc*>>;
+		using blockset = std::unordered_set<arc*>;
 	public:
 		cut_node(arc&& out, cutind cut) : out(std::move(out)), cut(cut), blocked() {}
 		cut_node(arc&& out, cutind cut, blockset&& blocked)
@@ -600,18 +605,21 @@ namespace dlf {
 	};  // cut_node
 	
 	// Implementation of arc; needs cut_node defined to work
-	arc::arc() : succ(fail_node::make()), blocking() {}
-	arc::arc(ptr<node> succ) : succ(succ), blocking() {}
-	arc::arc(ptr<node> succ, const cutset& blocking) : succ(succ), blocking(blocking) {
+	arc::arc() : succ(fail_node::make()), blocking(), is_blocked(true) {}
+	arc::arc(ptr<node> succ) : succ(succ), blocking(), is_blocked(false) {}
+	arc::arc(ptr<node> succ, const cutset& blocking, bool is_blocked) 
+		: succ(succ), blocking(blocking), is_blocked(is_blocked) {
 		for (cut_node* cn : blocking) { cn->blocked.insert(this); }
 	}
-	arc::arc(ptr<node> succ, cutset&& blocking) : succ(succ), blocking(std::move(blocking)) {
+	arc::arc(ptr<node> succ, cutset&& blocking, bool is_blocked) 
+		: succ(succ), blocking(std::move(blocking)), is_blocked(is_blocked) {
 		for (cut_node* cn : blocking) { cn->blocked.insert(this); }
 	}
-	arc::arc(const arc& o) : succ(o.succ), blocking(o.blocking) {
+	arc::arc(const arc& o) : succ(o.succ), blocking(o.blocking), is_blocked(false) {
 		for (cut_node* cn : blocking) { cn->blocked.insert(this); }
 	}
-	arc::arc(arc&& o) : succ(std::move(o.succ)), blocking(std::move(o.blocking)) {
+	arc::arc(arc&& o) 
+		: succ(std::move(o.succ)), blocking(std::move(o.blocking)), is_blocked(false) {
 		for (cut_node* cn : blocking) {
 			cn->blocked.erase(&o);
 			cn->blocked.insert(this);
@@ -623,6 +631,7 @@ namespace dlf {
 		
 		succ = o.succ;
 		blocking = o.blocking;
+		is_blocked = o.is_blocked;
 		
 		for (cut_node* cn : blocking) { cn->blocked.insert(this); }
 		
@@ -633,6 +642,7 @@ namespace dlf {
 		
 		succ = std::move(o.succ);
 		blocking = std::move(o.blocking);
+		is_blocked = o.is_blocked;
 		
 		for (cut_node* cn : blocking) {
 			cn->blocked.erase(&o);
@@ -645,9 +655,24 @@ namespace dlf {
 	arc::~arc() {
 		for (cut_node* cn : blocking) { cn->blocked.erase(this); }
 	}
+
+	void arc::swap(arc& o) {
+		succ.swap(o.succ);
+		std::swap(is_blocked, o.is_blocked);
+		blocking.swap(o.blocking);
+
+		for (cut_node* cn : blocking) {
+			cn->blocked.erase(&o);
+			cn->blocked.insert(this);
+		}
+		for (cut_node* cn : o.blocking) {
+			cn->blocked.erase(this);
+			cn->blocked.insert(&o);
+		}
+	}
 	
-	bool arc::blocked() const { return succ->type() == fail_type; }
-	void arc::block() { succ = fail_node::make(); clear_blocks(); }
+	bool arc::blocked() const { return is_blocked; }
+	void arc::block() { is_blocked = true; }
 	
 	void arc::block(cut_node* cn) {
 		if ( blocking.insert(cn).second ) { cn->blocked.insert(this); }
@@ -685,7 +710,8 @@ namespace dlf {
 		};
 
 		/// Underlying set type
-		using impl_set = std::unordered_set<arc, succ_hash, succ_equiv, plalloc<arc>>;
+//		using impl_set = std::unordered_set<arc, succ_hash, succ_equiv, plalloc<arc>>;
+		using impl_set = std::unordered_set<arc, succ_hash, succ_equiv>;
 
 		// STL defines
 		using value_type = impl_set::value_type;
@@ -787,6 +813,8 @@ namespace dlf {
 	}; // alt_node
 	
 	void arc_set::emplace_invar(arc&& a) {
+		if ( a.blocked() ) return;		
+
 		node_type ty = a.succ->type();
 
 		// skip added fail nodes

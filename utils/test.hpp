@@ -74,6 +74,12 @@ struct tester {
 		else printf("\t\tFAILED %s %016llx != %016llx\n", err, a, b);
 	}
 
+	/// Check pointers are equal (with optional description)
+	template<typename T>
+	inline void equal(T* a, T* b, const char* err = "") {
+		equal(reinterpret_cast<uint64_t>(a), reinterpret_cast<uint64_t>(b), err);
+	}
+
 	/// Check collections are equal (with optional description)
 	template<typename C, typename D>
 	void equal_range(C c, D d, const char* err = "") {

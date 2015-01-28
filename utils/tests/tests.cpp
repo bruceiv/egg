@@ -25,7 +25,7 @@
 #include <cstdint>
 #include <vector>
 
-#include "test.hpp"
+#include "../test.hpp"
 
 #include "../flags.hpp"
 #include "../flagtrie.hpp"

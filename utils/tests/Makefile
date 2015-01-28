@@ -29,7 +29,7 @@ OBJS = flagtrie.o
 flagtrie.o: ../flagtrie.hpp ../flagtrie.cpp ../flags.hpp
 	@$(CXX) $(CXXFLAGS) -c ../flagtrie.cpp
 
-test: test.hpp tests.cpp $(OBJS) ../flags.hpp
+test: ../test.hpp tests.cpp $(OBJS) ../flags.hpp
 	@$(CXX) $(CXXFLAGS) -o tests tests.cpp $(OBJS) $(LDFLAGS)
 	@-./tests
-	@rm tests
+	@rm tests $(OBJS)
