@@ -686,7 +686,10 @@ namespace dlf {
 	}
 	
 	bool arc::blocked() const { return is_blocked; }
-	void arc::block() { is_blocked = true; }
+	void arc::block() {
+		is_blocked = true;
+		succ = fail_node::make();
+	}
 	
 	void arc::block(cut_node* cn) {
 		if ( blocking.insert(cn).second ) { cn->blocked.insert(this); }

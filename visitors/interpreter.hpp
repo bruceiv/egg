@@ -40,7 +40,7 @@
 #include "dlf-loader.hpp"
 #include "dlf-printer.hpp"
 
-//#include "../utils/DBG_MSG.hpp"
+#include "../utils/DBG_MSG.hpp"
 
 namespace dlf {
 /*	/// Gets all the cuts in an expression
@@ -566,8 +566,10 @@ namespace dlf {
 //				rVal = d(std::move(rVal));
 //				rVal = d(rVal);
 //				take_deriv();
-				arc ex{st.expand(n.r, n.out, info), pVal.blocking, pVal.is_blocked};
-				reset(d(ex));
+				pVal.succ = st.expand(n.r, n.out, info);
+//PRE_DBG_ARC("expanded rule node ", pVal);
+				take_deriv();
+//POST_DBG_ARC("took derivative ", rVal);
 				info.inDeriv = false;
 			}
 
@@ -593,11 +595,18 @@ namespace dlf {
 //					reset(succ_bak, blocking_bak);
 //				}
 				
+//PRE_DBG_ARC("deriving alt ", pVal);
 				arc_set as;
 				for (arc o : n.out) {
+//PRE_DBG_ARC("deriving sub ", o);
 					o.block_all(pVal.blocking);
+//DBG_ARC("blocked sub ", o);
 					as.insert(d(o));
+//arc od = d(o);
+//POST_DBG_ARC("derivative ", od);
+//as.insert(od);
 				}
+//POST_DBG("derived with " << as.size() << " branches" << std::endl);
 
 				switch ( as.size() ) {
 				case 0: fail(); return;  // no following node
