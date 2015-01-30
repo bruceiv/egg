@@ -347,22 +347,27 @@ namespace dlf {
 				// Fail on blocked arc
 //				if ( a.blocked() ) return a;
 //				if ( a.blocked() ) return arc{};
-				if ( is_blocked ) return;
+//				if ( is_blocked ) return;
+				if ( pVal.blocked() ) return;
 //				if ( a.blocking.intersects(st.blocked) ) {
 //					a.succ = fail_node::make();
 //					return a;
 //				}
 
 //				switch ( a.succ->type() ) {
-				switch ( succ->type() ) {
+//				switch ( succ->type() ) {
+				switch ( pVal.succ->type() ) {
 				// Conditionally apply cut node
 				case cut_type: { 
 //					cut_node& cn = *as_ptr<cut_node>(a.succ);
-					cut_node& cn = *as_ptr<cut_node>(succ);
-					assert(blocking.count(&cn) == 0 && "cut cannot block itself");
+//					cut_node& cn = *as_ptr<cut_node>(succ);
+					cut_node& cn = *as_ptr<cut_node>(pVal.succ);
+//					assert(blocking.count(&cn) == 0 && "cut cannot block itself");
+					assert(pVal.blocking.count(&cn) == 0 && "cut cannot block itself");
 					
 //					if ( a.blocking.empty() ) {
-					if ( blocking.empty() ) {
+//					if ( blocking.empty() ) {
+					if ( pVal.blocking.empty() ) {
 						cn.fire();
 //						a = cn.out;
 //						return traverse(std::move(a), st);
@@ -372,7 +377,8 @@ namespace dlf {
 					} else {
 						// save copy of self on pending list, traverse successor
 //						arc c{cut_node::make(arc{}, cn.cut, cn.blocked), a.blocking};
-						arc c{cut_node::make(arc{}, cn.cut, cn.blocked), blocking};
+//						arc c{cut_node::make(arc{}, cn.cut, cn.blocked), blocking};
+						arc c{cut_node::make(arc{}, cn.cut, cn.blocked), pVal.blocking};
 						st.pending.insert(std::move(c));
 //						a = merge(cn.out, a.blocking);
 //						return traverse(std::move(a), st);
@@ -385,13 +391,17 @@ namespace dlf {
 //					a = merge(cn.out, a.blocking);
 //					return traverse(std::move(a), st);
 					follow(cn.out);
+					return;
 				}
 				// Conditionally apply match node
 				case match_type: {
 //					st.pending_matches.emplace(st.input_index, a);
 //					return arc{};
-					st.pending_matches.emplace(st.input_index, arc{succ, blocking});
-					fail();
+//					st.pending_matches.emplace(st.input_index, arc{succ, blocking});
+					st.pending_matches.emplace(st.input_index, arc{pVal});
+					pVal.block();
+//					fail();
+					return;
 //					st.pending_matches.emplace_back(st.input_index, a.blocking);
 ////DBG("new match at " << st.input_index << " blocked pending["; for (auto ii : a.blocking) std::cout << " " << ii; std::cout << " ]" << std::endl);
 //					return arc{fail_node::make()};
@@ -399,78 +409,93 @@ namespace dlf {
 				// Traverse all branches of an alternation
 				case alt_type: {
 //					const alt_node& an = *as_ptr<alt_node>(a.succ);
-					const alt_node& an = *as_ptr<alt_node>(succ);
+//					const alt_node& an = *as_ptr<alt_node>(succ);
+					const alt_node& an = *as_ptr<alt_node>(pVal.succ);
 
-					ptr<node> succ_bak{succ};
-					cutset blocking_bak{blocking};
+//					ptr<node> succ_bak{succ};
+//					cutset blocking_bak{blocking};
+					arc bak{pVal};
 
 					arc_set as;
 					for (const arc& aa : an.out) {
 //						as.insert(traverse(merge(aa, a.blocking), st));
 						follow(aa);
-						as.insert(arc{succ, blocking, is_blocked});
-						reset(succ_bak, blocking_bak);
+//						as.insert(arc{succ, blocking, is_blocked});
+						as.insert(arc{pVal});
+//						reset(succ_bak, blocking_bak);
+						pVal = bak;
 					}
 
 					switch ( as.size() ) {
 //					case 0:  return arc{};
 //					case 0:  return arc{fail_node::make()};
-					case 0:  fail(); return;
+//					case 0:  fail(); return;
+					case 0:  pVal.block(); return;
 //					case 1:  a = *as.begin(); return a;
 //					case 1:  return arc{*as.begin()};
 //					case 1:  return merge(*as.begin(), a.blocking);
-					case 1:  reset(*as.begin()); return;
+//					case 1:  reset(*as.begin()); return;
+					case 1:  pVal = *as.begin(); return;
 //					default: a.succ = alt_node::make(std::move(as)); return a;
 //					default: return arc{alt_node::make(std::move(as))};
-					default: reset(alt_node::make(std::move(as)), cutset{}); return;
+//					default: reset(alt_node::make(std::move(as)), cutset{}); return;
+					default: pVal = arc{alt_node::make(std::move(as))}; return;
 					}
 				}
 				// Return non-mutator node
 //				default: return a;
 //				default: return arc{a};
-				default: pass();
+				default: return;
 				}
 			}
 //			inline arc traverse(arc&& a) { return traverse(std::move(a), st); }
 //			inline arc traverse(const arc& a) { return traverse(a, st); }
 
 			/// Sets a failure arc into rVal
-//			inline void fail() { rVal.block(); }
+			inline void fail() { rVal.block(); }
 //			inline void fail() { rVal.succ = fail_node::make(); }
-			inline void fail() {
-				succ = fail_node::make();
-				blocking.clear();
-				is_blocked = true;
-			}
+//			inline void fail() {
+//				succ = fail_node::make();
+//				blocking.clear();
+//				is_blocked = true;
+//			}
 
 			/// Merges the given arc into rVal
 //			inline void follow(const arc& a) { rVal = traverse(merge(a, rVal.blocking)); }
+//			inline void follow(const arc& a) {
+//				if ( a.blocked() ) {
+//					is_blocked = true;
+//				} else {
+//					succ = a.succ;
+//					blocking.insert(a.blocking.begin(), a.blocking.end());
+//					traverse();
+//				}
+//			}
 			inline void follow(const arc& a) {
-				if ( a.blocked() ) {
-					is_blocked = true;
-				} else {
-					succ = a.succ;
-					blocking.insert(a.blocking.begin(), a.blocking.end());
-					traverse();
-				}
+				pVal = a;
+				traverse();
+				rVal = pVal;
 			}
 
 			/// Resets rVal to the given node
 //			inline void reset(ptr<node> np) { rVal.succ = np; }
-			inline void reset(ptr<node> np) { succ = np; }
-			inline void reset(ptr<node> np, const cutset& s, bool is_b = false) {
-				if ( is_b ) {
-					is_blocked = true;
-				} else {
-					succ = np;
-					blocking = s;
-					is_blocked = false;
-				}
-			}
-			inline void reset(const arc& a) { reset(a.succ, a.blocking, a.is_blocked); }
+//			inline void reset(ptr<node> np) { succ = np; }
+//			inline void reset(ptr<node> np, const cutset& s, bool is_b = false) {
+//				if ( is_b ) {
+//					is_blocked = true;
+//				} else {
+//					succ = np;
+//					blocking = s;
+//					is_blocked = false;
+//				}
+//			}
+//			inline void reset(const arc& a) { reset(a.succ, a.blocking, a.is_blocked); }
+			
+			inline void reset(ptr<node> np) { rVal.succ = np; }
+			inline void reset(const arc& a) { rVal = a; }
 
-			/// Repoints the successor to the given node
-			inline void repoint(ptr<node> np) { succ = np; }
+//			/// Repoints the successor to the given node
+//			inline void repoint(ptr<node> np) { succ = np; }
 
 			/// Does nothing to rVal
 			inline void pass() {}
@@ -481,7 +506,8 @@ namespace dlf {
 			inline arc d(const arc& a) { return deriv(a, x, st); }
 			inline void take_deriv() {
 				traverse();
-				if ( ! is_blocked ) succ->accept(this);
+//				if ( ! is_blocked ) succ->accept(this);
+				if ( ! pVal.is_blocked ) pVal.succ->accept(this);
 			}
 		
 		public:	
@@ -496,10 +522,13 @@ namespace dlf {
 //operator arc() { POST_DBG_ARC("deriv result is ", rVal); return rVal; }
 */
 			deriv(const arc& a, char x, derivative& st)
+				: st(st), pVal(a), rVal(fail_node::make()), x(x) { take_deriv(); }
+			operator arc() { return rVal; }
+/*			deriv(const arc& a, char x, derivative& st)
 				: st(st), succ(a.succ), blocking(a.blocking), 
 				  is_blocked(a.is_blocked), x(x) { take_deriv(); }
 			operator arc() { return arc{succ, blocking, is_blocked}; }
-
+*/
 			void visit(const match_node&)   {
 				assert(false && "Should never take derivative of match node");
 			}
@@ -528,16 +557,17 @@ namespace dlf {
 				// return infinite loop on left-recursion
 				if ( info.inDeriv ) {
 					reset(inf_node::make());
-					succ = inf_node::make();
 					return;
 				}
 
 				// take derivative of expanded rule under left-recursion flag
 				info.inDeriv = true;
-				reset(st.expand(n.r, n.out, info));
+//				reset(st.expand(n.r, n.out, info));
 //				rVal = d(std::move(rVal));
 //				rVal = d(rVal);
-				take_deriv();
+//				take_deriv();
+				arc ex{st.expand(n.r, n.out, info), pVal.blocking, pVal.is_blocked};
+				reset(d(ex));
 				info.inDeriv = false;
 			}
 
@@ -552,15 +582,21 @@ namespace dlf {
 //					o.blocking |= rVal.blocking;
 //					as.emplace(d(std::move(o)));
 //				}
-				ptr<node> succ_bak{succ};
-				cutset blocking_bak{blocking};
 
+//				ptr<node> succ_bak{succ};
+//				cutset blocking_bak{blocking};
+//				arc_set as;
+//				for (const arc& o : n.out) {
+//					follow(o);
+//					succ->accept(this);
+//					as.insert(arc{succ, blocking, is_blocked});
+//					reset(succ_bak, blocking_bak);
+//				}
+				
 				arc_set as;
-				for (const arc& o : n.out) {
-					follow(o);
-					succ->accept(this);
-					as.insert(arc{succ, blocking, is_blocked});
-					reset(succ_bak, blocking_bak);
+				for (arc o : n.out) {
+					o.block_all(pVal.blocking);
+					as.insert(d(o));
 				}
 
 				switch ( as.size() ) {
@@ -569,16 +605,17 @@ namespace dlf {
 //				case 1: rVal = arc{*as.begin()}; return; // replace with single node
 				case 1: reset(*as.begin()); return;  // replace with single node
 //				default: reset(node::make<alt_node>(std::move(as))); return; // replace alt
-				default: reset(node::make<alt_node>(std::move(as)), cutset{}); return;  // replace alt
+				default: reset(arc{node::make<alt_node>(std::move(as)), cutset{}}); return;  // replace alt
 				}
 			}
 
 		private:
 			derivative& st;   ///< Derivative state
-//			arc rVal;         ///< Return value
-			ptr<node> succ;   ///< Successor of this derivative
-			cutset blocking;  ///< Cuts blocking traversal
-			bool is_blocked;  ///< Is the output arc blocked?
+			arc pVal;         ///< Parameter value
+			arc rVal;         ///< Return value
+//			ptr<node> succ;   ///< Successor of this derivative
+//			cutset blocking;  ///< Cuts blocking traversal
+//			bool is_blocked;  ///< Is the output arc blocked?
 			char x;           ///< Character to take derivative with respect to
 		};  // deriv
 
