@@ -170,6 +170,32 @@ void test_cut(tester& test) {
 	}
 	test.equal_set(a.blocking, list({as_cut(n)}), "delete cuts, remove from blockset");
 
+	as_cut(n)->fire();
+	test.check(a.blocked(), "fire n");
+	
+	ptr<node> m = cut_node::make(arc{}, 3, cut_node::blockset{&b});
+	as_cut(m)->disarm();
+	test.equal_set(as_cut(m)->blocked, list<arc*>({}), "disarm m, m.blocked");
+	test.equal_set(b.blocking, list<cut_node*>({}), "disarm m, b.blocking");
+
+	a = arc{char_node::make(arc{}, 'a')};
+	n = cut_node::make(arc{}, 4, cut_node::blockset{&a});
+	m = n->clone_with_succ(arc{char_node::make(arc{}, 'c')});
+	test.equal_set(as_cut(n)->blocked, list({&a}), "clone_with_succ n, n.blocked");
+	test.equal_set(as_cut(m)->blocked, list({&a}), "clone_with_succ n, m.blocked");
+	test.equal_set(a.blocking, list({as_cut(n), as_cut(m)}), "clone_with_succ n, a.blocking");
+
+	test.cleanup();
+}
+
+void test_arcset(tester& test) {
+	using namespace dlf;
+	test.setup("arc_set");
+
+	
+
+	// TODO test arc set with two distinct cuts with the same index
+
 	test.cleanup();
 }
 
@@ -178,6 +204,7 @@ int main(int argc, char** argv) {
 
 	test_arc(test);
 	test_cut(test);
+	test_arcset(test);
 	
 	return test.success() ? 0 : 1;
 }

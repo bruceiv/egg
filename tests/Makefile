@@ -26,7 +26,14 @@ CXXFLAGS = -O0 -ggdb --std=c++0x -Wno-format
 
 OBJS =
 
-test: ../utils/test.hpp test.cpp $(OBJS) ../dlf.hpp
+tests: ../utils/test.hpp test.cpp $(OBJS) ../dlf.hpp
 	@$(CXX) $(CXXFLAGS) -o tests test.cpp $(OBJS) $(LDFLAGS)
+
+test: tests
 	@-./tests
 	@rm tests $(OBJS)
+
+test-mem: tests
+	@-valgrind ./tests
+	@rm tests $(OBJS)
+

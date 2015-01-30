@@ -136,7 +136,7 @@ namespace dlf {
 		virtual void visit(ast::range_matcher& m) {
 			arc_set rs;
 			for (const ast::char_range& r : m.rs) {
-				rs.emplace(arc{range_node::make(out(), r.from, r.to)});
+				rs.insert(arc{range_node::make(out(), r.from, r.to)});
 			}
 			next = alt_node::make(std::move(rs));
 		}
@@ -236,18 +236,18 @@ namespace dlf {
 			for (unsigned long i = 0; i < m.ms.size() - 1; ++i) {
 				auto& mi = m.ms[i];
 
-				cutind ci = ri++;                   // get a restriction index to use
-				next = cut_node::make(out(), ci);   // flag cut for greedy longest match
-				new_cut = as_ptr<cut_node>(next);   // save cut for later blocking
-				mi->accept(this);                   // build subexpression
-				rs.emplace(out(cutset{blocking}));  // add to list of arcs
-				next = alt_next;                    // restore next values for next iteration
-				blocking.insert(new_cut.get());     // add new cut to block set
-//				blocking |= ci;                     // add index to greedy longest match blocker
+				cutind ci = ri++;                  // get a restriction index to use
+				next = cut_node::make(out(), ci);  // flag cut for greedy longest match
+				new_cut = as_ptr<cut_node>(next);  // save cut for later blocking
+				mi->accept(this);                  // build subexpression
+				rs.insert(out(cutset{blocking}));  // add to list of arcs
+				next = alt_next;                   // restore next values for next iteration
+				blocking.insert(new_cut.get());    // add new cut to block set
+//				blocking |= ci;                    // add index to greedy longest match blocker
 			}
 			// Don't put a cut on the last branch
 			m.ms.back()->accept(this);
-			rs.emplace(out(std::move(blocking)));
+			rs.insert(out(std::move(blocking)));
 
 			next = alt_node::make(std::move(rs));
 		}

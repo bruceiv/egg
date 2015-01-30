@@ -113,6 +113,17 @@ namespace dlf {
 	inline constexpr std::size_t tag_with(node_type ty, std::size_t x = 0x0) {
 		return (x << 4) | static_cast<std::size_t>(ty);
 	}
+	
+	/// Tags `p` with the given node type; useful for hashing
+	template<typename T>
+	inline constexpr std::size_t tag_with(node_type ty, T* p) {
+		return (reinterpret_cast<std::size_t>(p)
+		        << (alignof(T) >= 16 ? 0 
+		            : alignof(T) >= 8 ? 1
+		            : alignof(T) >= 4 ? 2
+		            : alignof(T) >= 2 ? 3 : 4))
+		       | static_cast<std::size_t>(ty);		
+	}
 
 	/// Prints node type
 	std::ostream& operator<< (std::ostream& out, node_type ty) {
@@ -472,7 +483,7 @@ namespace dlf {
 			return node::make<rule_node>(std::move(succ), r);
 		}
 		virtual node_type   type() const { return rule_type; }
-		virtual std::size_t hash() const { return tag_with(rule_type, std::size_t(r.get())); }
+		virtual std::size_t hash() const { return tag_with(rule_type, r.get()); }
 		virtual bool        equiv(ptr<node> o) const {
 			return o->type() == rule_type && as_ptr<rule_node>(o)->r == r;
 		}
@@ -728,21 +739,26 @@ namespace dlf {
 		using const_iterator = impl_set::const_iterator;
 
 	private:
-		/// Emplace a new arc into the set, maintaining the invariants that no fail nodes 
+		/// Insert a new arc into the set, maintaining the invariants that no fail nodes 
 		/// are allowed, all alt nodes are flattened, equal nodes are blocked by the 
 		/// intersection of their blocking sets, and equivalent nodes have the alternation 
 		/// factored past them
-		void emplace_invar(arc&& a);
+//		void emplace_invar(arc&& a);
+		void insert_invar(const arc& a);
 
 	public:
 		arc_set() = default;
-		template<typename It> arc_set(It first, It last) : s(first, last) {}
+		template<typename It> arc_set(It first, It last) : s() { insert(first, last); }
 		arc_set(const arc_set&) = default;
 		arc_set(arc_set&&) = default;
-		arc_set(std::initializer_list<arc> s) : s{s} {}
+		arc_set(std::initializer_list<arc> sn) : s() { insert(sn); }
 		arc_set& operator= (const arc_set&) = default;
 		arc_set& operator= (arc_set&&) = default;
-		arc_set& operator= (std::initializer_list<arc> sn) { s = sn; return *this; }
+		arc_set& operator= (std::initializer_list<arc> sn) {
+			clear();
+			insert(sn);
+			return *this;
+		}
 		void swap(arc_set& o) { s.swap(o.s); }
 		~arc_set() = default;
 
@@ -757,13 +773,14 @@ namespace dlf {
 		size_type size() const { return s.size(); }
 
 		void clear() { s.clear(); }
-		void insert(const arc& a) { emplace_invar(arc{a}); }
-		void insert(arc&& a) { emplace_invar(std::move(a)); }
+//		void insert(const arc& a) { emplace_invar(arc{a}); }
+		void insert(const arc& a) { insert_invar(arc{a}); }
+//		void insert(arc&& a) { emplace_invar(std::move(a)); }
 		template<typename It> void insert(It first, It last) {
 			while ( first != last ) { insert(*first); ++first; }
 		}
 		void insert(std::initializer_list<arc> sn) { for (const arc& a : sn) insert(a); }
-		void emplace(arc&& a) { emplace_invar(std::move(a)); }
+//		void emplace(arc&& a) { emplace_invar(std::move(a)); }
 		iterator erase(iterator pos) { return s.erase(pos); }
 		size_type erase(const arc& a) { return s.erase(a); }
 
@@ -792,15 +809,17 @@ namespace dlf {
 		}
 		static  ptr<node>   make(arc&& a, arc&& b) {
 			arc_set as;
-			as.emplace(std::move(a));
-			as.emplace(std::move(b));
+			as.insert(a); as.insert(b);
+//			as.emplace(std::move(a));
+//			as.emplace(std::move(b));
 			return make(std::move(as));
 		}
 		static  ptr<node>   make(arc&& a, arc&& b, arc&& c) {
 			arc_set as;
-			as.emplace(std::move(a));
-			as.emplace(std::move(b));
-			as.emplace(std::move(c));
+			as.insert(a); as.insert(b); as.insert(c);
+//			as.emplace(std::move(a));
+//			as.emplace(std::move(b));
+//			as.emplace(std::move(c));
 			return make(std::move(as));
 		}
 
@@ -815,7 +834,8 @@ namespace dlf {
 		arc_set out;
 	}; // alt_node
 	
-	void arc_set::emplace_invar(arc&& a) {
+//	void arc_set::emplace_invar(arc&& a) {
+	void arc_set::insert_invar(const arc& a) {
 		if ( a.blocked() ) return;		
 
 		node_type ty = a.succ->type();
@@ -830,7 +850,8 @@ namespace dlf {
 			for (arc aa : an.out) {
 				aa.block_all(a.blocking);
 //				aa.blocking |= a.blocking;
-				emplace_invar(std::move(aa));
+				insert_invar(aa);
+//				emplace_invar(std::move(aa));
 			}
 
 			return;
@@ -839,7 +860,8 @@ namespace dlf {
 		auto ai = s.find(a);
 		// add nodes that don't yet exist
 		if ( ai == s.end() ) {
-			s.insert(std::move(a));
+			s.insert(a);
+//			s.insert(std::move(a));
 //			s.emplace(std::move(a));
 			return;
 		}

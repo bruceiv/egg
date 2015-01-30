@@ -140,7 +140,7 @@ namespace dlf {
 		}
 		void visit(const alt_node& n)   {
 			arc_set rs;
-			for (const arc& a : n.out) { rs.emplace(clone_of(a)); }
+			for (const arc& a : n.out) { rs.insert(clone_of(a)); }
 			rVal = node::make<alt_node>(std::move(rs));
 		}
 
