@@ -67,7 +67,6 @@ namespace dlf {
 			cutind ri_bak = ri; ri = 1;          // save ri
 			next = end_node::make();             // make end node for rule
 			arc skip = out();                    // save arc that skips match
-//			arc skip = out(cutset::of(0));       // save arc that skips match
 			next = rule_node::make(out(), R_i);  // build recursive invocation of rule
 			next = cut_node::make(out(), 0);     // set up cut on out-edges of many-expression
 			skip.block(next);                    // block skip arc on match cut
@@ -93,7 +92,6 @@ namespace dlf {
 			cutind ri_bak = ri; ri = 1;          // save ri
 			next = end_node::make();             // make end node for rule
 			arc skip = out();                    // save arc that skips match
-//			arc skip = out(cutset::of(0));       // save arc that skips match
 			next = cut_node::make(out(), 0);     // set up cut for successive match
 			skip.block(next);                    // block skip arc on match cut
 			next = rule_node::make(out(), R_i);  // build recursive invocation of rule
@@ -155,7 +153,6 @@ namespace dlf {
 			// Idea: m.m <i> next | [i] next
 			cutind i = ri++;                  // get a restriction index to use
 			arc skip = out();                 // save arc that skips the optional
-//			arc skip = out(cutset::of(i));    // save arc that skips the optional
 			next = cut_node::make(out(), i);  // add blocker for skip branch
 			skip.block(next);                 // block skip branch on blocker
 			m.m->accept(this);                // build opt-expression
@@ -243,7 +240,6 @@ namespace dlf {
 				rs.insert(out(cutset{blocking}));  // add to list of arcs
 				next = alt_next;                   // restore next values for next iteration
 				blocking.insert(new_cut.get());    // add new cut to block set
-//				blocking |= ci;                    // add index to greedy longest match blocker
 			}
 			// Don't put a cut on the last branch
 			m.ms.back()->accept(this);
@@ -261,13 +257,11 @@ namespace dlf {
 			cutind i = ri++;
 			// build continuing branch
 			arc cont = out();
-//			arc cont = out(cutset::of(i));
 			// build cut branch
 			next = fail_node::make();
 			next = cut_node::make(out(), i);
 			cont.block(next);  // block continuing branch on cut
 			arc cut = out();
-//			arc cut = out(cutset::of(j));
 			// build matching branch
 			next = fail_node::make();
 			next = cut_node::make(out(), j);
@@ -281,7 +275,6 @@ namespace dlf {
 			// Idea - match both paths, failing if the not path matches: m.m <i> fail | [i] next
 			cutind i = ri++;                  // get a restriction index to use
 			arc cont = out();                 // build continuing branch
-//			arc cont = out(cutset::of(i));    // build continuing branch
 			next = fail_node::make();         // terminate blocking branch
 			next = cut_node::make(out(), i);  // ... with a cut on the match index
 			cont.block(next);                 // ... which blocks the continuing branch

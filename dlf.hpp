@@ -46,12 +46,6 @@
 * original expression which start with the given prefix.
 */
 namespace dlf {
-//	/// Restriction index
-//	using cutind = flags::index;
-
-//	/// Set of restriction indices
-//	using cutset = flags::trie;
-	
 	/// Shorthand for shared_ptr
 	template <typename T>
 	using ptr = std::shared_ptr<T>;
@@ -195,20 +189,6 @@ namespace dlf {
 		virtual bool equiv(ptr<node> o) const = 0;
 	};  // node
 
-/*	/// Interface for arc destruction listeners
-	class cut_listener {
-	protected:
-		cut_listener() = default;
-	public:
-		virtual ~cut_listener() = default;
-
-		/// State that these cuts can newly be acquired
-		virtual void acquire_cut(cutind cut) = 0;
-
-		/// State that these cuts can no longer be acquired
-		virtual void release_cut(cutind cut) = 0;
-	}; // cut listener
-*/
 	/// Directed arc linking two nodes
 	struct arc {
 		arc();
@@ -513,20 +493,6 @@ namespace dlf {
 			}
 		}
 
-/*		cut_node(arc&& out, cutind cut) : out{std::move(out)}, cut{cut}, listener{nullptr} {}
-		cut_node(arc&& out, cutind cut, cut_listener& _listener)
-		: out{std::move(out)}, cut{cut}, listener{&_listener} { _listener.acquire_cut(cut); }
-		cut_node(arc&& out, cutind cut, cut_listener* listener)
-		: out{std::move(out)}, cut{cut}, listener{listener} {
-			if ( listener ) { listener->acquire_cut(cut); }
-		}
-		cut_node(const cut_node& o) : out{o.out}, cut{o.cut}, listener{o.listener} {
-			if ( listener ) { listener->acquire_cut(cut); }
-		}
-		cut_node(cut_node&& o) : out{std::move(o.out)}, cut{o.cut}, listener{o.listener} {
-			o.listener = nullptr;  // release responsibility moved to this node
-		}
-*/		
 		cut_node& operator= (const cut_node& o) {
 			for (arc* a : blocked) { a->blocking.erase(this); }
 			
@@ -536,14 +502,6 @@ namespace dlf {
 			
 			for (arc* a : blocked) { a->blocking.insert(this); }
 			
-/*			// Acquire new cut THEN release current one
-			if ( o.listener ) { o.listener->acquire_cut(o.cut); }
-			if ( listener ) { listener->release_cut(cut); }
-
-			out = o.out;
-			cut = o.cut;
-			listener = o.listener;
-*/
 			return *this;
 		}
 		cut_node& operator= (cut_node&& o) {
@@ -558,23 +516,12 @@ namespace dlf {
 				a->blocking.insert(this);
 			}
 			
-/*			// Rely on o to have acquired new cut, just release old one
-			if ( listener ) { listener->release_cut(cut); }
-
-			out = std::move(o.out);
-			cut = o.cut;
-			listener = o.listener;
-
-			// make sure o doesn't release the cut
-			o.listener = nullptr;
-*/
 			return *this;
 		}
 
 		virtual ~cut_node() {
 			for (arc* a : blocked) { a->blocking.erase(this); }
 		}
-//		virtual ~cut_node() { if ( listener ) listener->release_cut(cut); }
 
 		static  ptr<node>   make(arc&& out, cutind cut) {
 			return node::make<cut_node>(std::move(out), cut);
@@ -582,9 +529,6 @@ namespace dlf {
 		static  ptr<node>   make(arc&& out, cutind cut, const blockset& blocked) {
 			return node::make<cut_node>(std::move(out), cut, blockset{blocked});
 		}
-//		static  ptr<node>   make(arc&& out, cutind cut, cut_listener& listener) {
-//			return node::make<cut_node>(std::move(out), cut, listener);
-//		}
 		
 		/// Applies this cut
 		void fire() { for (arc* a : blocked) a->block(); }
@@ -600,24 +544,14 @@ namespace dlf {
 		virtual arc         get_succ() const { return out; }
 		virtual ptr<node>   clone_with_succ(arc&& succ) const {
 			return node::make<cut_node>(std::move(succ), cut, blockset{blocked});
-/*			ptr<node> r = node::make<cut_node>(std::move(succ), cut);
-			// silently transfer listenership to new node WARNING this is horrific
-			as_ptr<cut_node>(r)->listener = listener;
-			const_cast<cut_node*>(this)->listener = nullptr;
-			return r;
-*/		}
+		}
 		virtual node_type   type() const { return cut_type; }
 		virtual std::size_t hash() const { return tag_with(cut_type, this); }
 		virtual bool        equiv(ptr<node> o) const { return this == o.get(); }
-/*		virtual std::size_t hash() const { return tag_with(cut_type, cut); }
-		virtual bool        equiv(ptr<node> o) const {
-			return o->type() == cut_type && as_ptr<cut_node>(o)->cut == cut;
-		}
-*/
+
 		arc out;           ///< Successor node
 		cutind cut;        ///< Index to block
 		blockset blocked;  ///< Set of blocked arcs
-//		cut_listener* listener;  ///< Listener to alert of changes in the cut state
 	};  // cut_node
 	
 	// Implementation of arc; needs cut_node defined to work
@@ -748,7 +682,6 @@ namespace dlf {
 		/// are allowed, all alt nodes are flattened, equal nodes are blocked by the 
 		/// intersection of their blocking sets, and equivalent nodes have the alternation 
 		/// factored past them
-//		void emplace_invar(arc&& a);
 		void insert_invar(const arc& a);
 
 	public:
@@ -778,14 +711,11 @@ namespace dlf {
 		size_type size() const { return s.size(); }
 
 		void clear() { s.clear(); }
-//		void insert(const arc& a) { emplace_invar(arc{a}); }
 		void insert(const arc& a) { insert_invar(arc{a}); }
-//		void insert(arc&& a) { emplace_invar(std::move(a)); }
 		template<typename It> void insert(It first, It last) {
 			while ( first != last ) { insert(*first); ++first; }
 		}
 		void insert(std::initializer_list<arc> sn) { for (const arc& a : sn) insert(a); }
-//		void emplace(arc&& a) { emplace_invar(std::move(a)); }
 		iterator erase(iterator pos) { return s.erase(pos); }
 		size_type erase(const arc& a) { return s.erase(a); }
 
@@ -815,16 +745,11 @@ namespace dlf {
 		static  ptr<node>   make(arc&& a, arc&& b) {
 			arc_set as;
 			as.insert(a); as.insert(b);
-//			as.emplace(std::move(a));
-//			as.emplace(std::move(b));
 			return make(std::move(as));
 		}
 		static  ptr<node>   make(arc&& a, arc&& b, arc&& c) {
 			arc_set as;
 			as.insert(a); as.insert(b); as.insert(c);
-//			as.emplace(std::move(a));
-//			as.emplace(std::move(b));
-//			as.emplace(std::move(c));
 			return make(std::move(as));
 		}
 
@@ -839,7 +764,6 @@ namespace dlf {
 		arc_set out;
 	}; // alt_node
 	
-//	void arc_set::emplace_invar(arc&& a) {
 	void arc_set::insert_invar(const arc& a) {
 		if ( a.blocked() ) return;		
 
@@ -854,9 +778,7 @@ namespace dlf {
 
 			for (arc aa : an.out) {
 				aa.block_all(a.blocking);
-//				aa.blocking |= a.blocking;
 				insert_invar(aa);
-//				emplace_invar(std::move(aa));
 			}
 
 			return;
@@ -866,8 +788,6 @@ namespace dlf {
 		// add nodes that don't yet exist
 		if ( ai == s.end() ) {
 			s.insert(a);
-//			s.insert(std::move(a));
-//			s.emplace(std::move(a));
 			return;
 		}
 
@@ -876,7 +796,6 @@ namespace dlf {
 		if ( e.succ == a.succ || ! e.succ->has_succ() ) {
 			/// same node or unfollowed, merge blocking sets
 			e.block_only(a.blocking);
-//			e.blocking &= a.blocking;
 		} else {
 			/// distinct node, merge blocking sets and alternate successors
 			arc ee = e.succ->get_succ(), aa = a.succ->get_succ();
@@ -896,9 +815,6 @@ namespace dlf {
 			ee.block_all(es);
 			aa.block_all(as);
 			e.block_only(a.blocking);
-//			ee.blocking |= (e.blocking - a.blocking);
-//			aa.blocking |= (a.blocking - e.blocking);
-//			e.blocking &= a.blocking;
 			e.succ = e.succ->clone_with_succ(alt_node::make(std::move(ee), std::move(aa)));
 		}
 	}
