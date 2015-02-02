@@ -23,6 +23,7 @@
  */
 
 #include <iostream>
+#include "../visitors/printer.hpp"
 #include "../visitors/dlf-printer.hpp"
 
 static int _DBG_IDENT = 0;
@@ -35,3 +36,6 @@ static int _DBG_IDENT = 0;
 #define PRE_DBG_ARC(msg, arc) PRE_DBG(msg; dlf::printer::next(arc))
 #define POST_DBG_ARC(msg, arc) POST_DBG(msg; dlf::printer::next(arc))
 
+#define DBG_MATCHER(msg, matcher) DBG(msg; ::visitor::printer::print_single(matcher, std::cout, (_DBG_IDENT+3)/4); std::cout << std::endl)
+#define PRE_DBG_MATCHER(msg, matcher) PRE_DBG(msg; ::visitor::printer::print_single(matcher, std::cout, (_DBG_IDENT+3)/4); std::cout << std::endl)
+#define POST_DBG_MATCHER(msg, matcher) POST_DBG(msg; ::visitor::printer::print_single(matcher, std::cout, (_DBG_IDENT+3)/4); std::cout << std::endl)

@@ -607,11 +607,13 @@ namespace dlf {
 			return r;
 */		}
 		virtual node_type   type() const { return cut_type; }
-		virtual std::size_t hash() const { return tag_with(cut_type, cut); }
+		virtual std::size_t hash() const { return tag_with(cut_type, this); }
+		virtual bool        equiv(ptr<node> o) const { return this == o.get(); }
+/*		virtual std::size_t hash() const { return tag_with(cut_type, cut); }
 		virtual bool        equiv(ptr<node> o) const {
 			return o->type() == cut_type && as_ptr<cut_node>(o)->cut == cut;
 		}
-
+*/
 		arc out;           ///< Successor node
 		cutind cut;        ///< Index to block
 		blockset blocked;  ///< Set of blocked arcs
@@ -880,8 +882,16 @@ namespace dlf {
 			arc ee = e.succ->get_succ(), aa = a.succ->get_succ();
 
 			cutset es{e.blocking}, as{a.blocking};
-			es.erase(a.blocking.begin(), a.blocking.end());
-			as.erase(e.blocking.begin(), e.blocking.end());
+			auto et = es.begin();
+			while ( et != es.end() ) {
+				if ( a.blocking.count(*et) ) { et = es.erase(et); }
+				else { ++et; }
+			}
+			auto at = as.begin();
+			while ( at != as.end() ) {
+				if ( e.blocking.count(*at) ) { at = as.erase(at); }
+				else { ++at; }
+			}
 
 			ee.block_all(es);
 			aa.block_all(as);

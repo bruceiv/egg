@@ -34,7 +34,7 @@ namespace visitor {
 	class printer : ast::visitor {
 	public:
 		printer(std::ostream& out = std::cout, int tabs = 0) 
-			: out(out), tabs(tabs) {}
+			: out(out), tabs(tabs), single_level(false) {}
 
 		void visit(ast::char_matcher& m) {
 			out << "\'" << strings::escape(m.c) << "\'";
@@ -101,6 +101,17 @@ namespace visitor {
 		}
 
 		void visit(ast::seq_matcher& m) {
+			if ( single_level ) {
+				if ( m.ms.empty() ) {
+					out << "(  )";
+					return;
+				}
+				
+				m.ms.front()->accept(this);
+				
+				return;
+			}
+			
 			if ( m.ms.size() != 1 ) { out << "( "; }
 			if ( ! m.ms.empty() ) {
 				std::string indent((4 * ++tabs), ' ');
@@ -186,9 +197,21 @@ namespace visitor {
 			}
 		}
 		
+		void print_single(ast::matcher_ptr p) {
+			single_level = true;
+			p->accept(this);
+			single_level = false;
+		}
+		
+		static void print_single(ast::matcher_ptr p, std::ostream& out, int tabs = 0) {
+			printer pr(out, tabs);
+			pr.print_single(p);
+		}
+		
 	private:
-		std::ostream& out;	/**< output stream */
-		int tabs;			/**< current number of tab stops */
+		std::ostream& out;	///< output stream
+		int tabs;			///< current number of tab stops
+		bool single_level;  ///< Should we only print a single level of sequence
 	};
 } /* namespace visitor */
 
