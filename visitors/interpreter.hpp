@@ -472,7 +472,9 @@ namespace dlf {
 //				}
 //			}
 			inline void follow(const arc& a) {
-				pVal = a;
+				arc f{a};
+				f.block_all(pVal.blocking);
+				pVal = std::move(f);
 				traverse();
 				rVal = pVal;
 			}
@@ -491,7 +493,7 @@ namespace dlf {
 //			}
 //			inline void reset(const arc& a) { reset(a.succ, a.blocking, a.is_blocked); }
 			
-			inline void reset(ptr<node> np) { rVal.succ = np; }
+			inline void reset(ptr<node> np) { rVal = arc{np, pVal.blocking}; }
 			inline void reset(const arc& a) { rVal = a; }
 
 //			/// Repoints the successor to the given node
@@ -523,7 +525,12 @@ namespace dlf {
 */
 			deriv(const arc& a, char x, derivative& st)
 				: st(st), pVal(a), rVal(fail_node::make()), x(x) { take_deriv(); }
-			operator arc() { return rVal; }
+/*				: st(st), pVal(a), rVal(fail_node::make()), x(x) {
+PRE_DBG_ARC("take deriv of ", pVal);
+				take_deriv();
+POST_DBG_ARC("deriv is ", rVal);
+			}
+*/			operator arc() { return rVal; }
 /*			deriv(const arc& a, char x, derivative& st)
 				: st(st), succ(a.succ), blocking(a.blocking), 
 				  is_blocked(a.is_blocked), x(x) { take_deriv(); }
