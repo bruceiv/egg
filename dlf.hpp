@@ -415,6 +415,14 @@ namespace dlf {
 			}
 		}
 
+		static  ptr<node>   make(arc&& out, ptr<std::string> sp) {
+			switch ( sp->size() ) {
+			case 0:  return out.succ;
+			case 1:  return char_node::make(std::move(out), (*sp)[0]);
+			default: return node::make<str_node>(std::move(out), sp, 0);
+			}
+		}
+
 		virtual void        accept(visitor* v) const { v->visit(*this); }
 		virtual bool        has_succ() const { return true; }
 		virtual arc         get_succ() const { return out; }

@@ -41,13 +41,21 @@ namespace dlf {
 				ptr<nonterminal> nt = make_ptr<nonterminal>(s);
 				nts.emplace(s, nt);
 				return nt;
-			} else {
-				return it->second;
-			}
+			} else return it->second;
 		}
 
 		/// Sets unique nonterminal for each name
 		void set_nonterminal(const std::string& s, ptr<node> n) { get_nonterminal(s)->sub = n; }
+
+		/// Gets a unique string pointer for each string literal in the grammar
+		ptr<std::string> get_str(const std::string& s) {
+			auto it = strs.find(s);
+			if ( it == strs.end() ) {
+				ptr<std::string> sp = make_ptr<std::string>(s);
+				strs.emplace(s, sp);
+				return sp;
+			} else return it->second;
+		}
 
 		/// Produces a new arc to the next node
 		arc out() { return arc{next}; }
@@ -107,7 +115,7 @@ namespace dlf {
 
 	public:
 		/// Builds a DLF parse DAG from the given PEG grammar
-		loader(ast::grammar& g, bool dbg = false) : nts{}, next{}, ri{0}, mi{0} {
+		loader(ast::grammar& g, bool dbg = false) : nts(), strs(), next(), ri(0), mi(0) {
 			// Read in rules
 			for (auto r : g.rs) {
 				next = end_node::make();
@@ -129,7 +137,7 @@ namespace dlf {
 
 		virtual void visit(ast::char_matcher& m) { next = char_node::make(out(), m.c); }
 
-		virtual void visit(ast::str_matcher& m) { next = str_node::make(out(), m.s); }
+		virtual void visit(ast::str_matcher& m) { next = str_node::make(out(), get_str(m.s)); }
 
 		virtual void visit(ast::range_matcher& m) {
 			arc_set rs;
@@ -267,6 +275,8 @@ namespace dlf {
 
 	private:
 		std::map<std::string, ptr<nonterminal>> nts;  ///< List of non-terminals
+		/// Set of pointers to string literals
+		std::unordered_map<std::string, ptr<std::string>> strs;
 		ptr<node> next;                               ///< Next node
 		cutind ri;                                    ///< Current restriction index
 		unsigned long mi;                             ///< Index to uniquely name many-nodes
