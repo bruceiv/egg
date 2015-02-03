@@ -23,7 +23,7 @@ CXX = g++
 
 # Development
 #CXXFLAGS = -O0 -ggdb --std=c++0x
-CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=10 -fdiagnostics-color=auto -ftemplate-backtrace-limit=0
+#CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=10 -fdiagnostics-color=auto -ftemplate-backtrace-limit=0
 
 # Profiling
 #CXXFLAGS = -O0 -ggdb --std=c++0x -DNDEBUG
@@ -31,18 +31,21 @@ CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=10 -fdiagnostics-color=auto -ftemp
 
 # Release
 #CXXFLAGS = -O2 --std=c++0x -DNDEBUG
-#CXXFLAGS = -O3 --std=c++0x -DNDEBUG
+CXXFLAGS = -O3 --std=c++0x -DNDEBUG
 
-OBJS = flagtrie.o
-
-flagtrie.o: utils/flagtrie.hpp utils/flagtrie.cpp utils/flags.hpp
-	$(CXX) $(CXXFLAGS) -c utils/flagtrie.cpp
+OBJS = 
 
 egg:  main.cpp $(OBJS) egg.hpp parser.hpp \
       dlf.hpp visitors/dlf-loader.hpp \
       visitors/compiler.hpp visitors/normalizer.hpp visitors/interpreter.hpp \
       visitors/printer.hpp visitors/dlf-printer.hpp
 	$(CXX) $(CXXFLAGS) -o egg main.cpp $(OBJS) $(LDFLAGS)
+
+egg-nn:  main.cpp $(OBJS) egg.hpp parser.hpp \
+      dlf.hpp visitors/dlf-loader.hpp \
+      visitors/compiler.hpp visitors/normalizer.hpp visitors/interpreter.hpp \
+      visitors/printer.hpp visitors/dlf-printer.hpp
+	$(CXX) $(CXXFLAGS) -DDLF_NN -o egg-nn main.cpp $(OBJS) $(LDFLAGS)
 
 clean:  
 	-rm egg
