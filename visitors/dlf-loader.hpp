@@ -23,15 +23,60 @@
 */
 
 #include <map>
+#include <sstream>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "../ast.hpp"
 #include "../dlf.hpp"
 
+#include "../utils/strings.hpp"
+
 #include "dlf-printer.hpp"
 
 namespace dlf {
+	/// Generates a name for a many-rule; if equivalent names are returned the rules are equivalent
+	class many_name : public ast::visitor {
+	public:
+		many_name(ast::matcher_ptr p, char suffix, unsigned long& anon_index)
+			: ss(), mi(anon_index) { p->accept(this); ss << suffix; }
+		operator std::string () { return ss.str(); }
+		
+		virtual void visit(ast::char_matcher& m) { ss << "\'" << strings::escape(m.c) << "\'"; }
+		virtual void visit(ast::str_matcher& m) { ss << "\"" << strings::escape(m.s) << "\""; }
+		virtual void visit(ast::range_matcher& m) {
+			ss << "[";
+
+			for (auto iter = m.rs.begin(); iter != m.rs.end(); ++iter) {
+				ast::char_range& r = *iter;
+				ss << strings::escape(r.from);
+				if ( r.from != r.to ) {
+					ss << "-" << strings::escape(r.to);
+				}
+			}
+			
+			ss << "]";
+		}
+		virtual void visit(ast::rule_matcher& m) { ss << m.rule; }
+		virtual void visit(ast::any_matcher& m) { ss << '.'; }
+		virtual void visit(ast::empty_matcher& m) { ss << '~'; }
+		virtual void visit(ast::action_matcher& m) { ss << '~'; }
+		virtual void visit(ast::opt_matcher& m) { ss << '~'; }
+		virtual void visit(ast::many_matcher& m) { ss << '~'; }
+		virtual void visit(ast::some_matcher& m) { m.m->accept(this); }
+		virtual void visit(ast::seq_matcher& m) { ss << mi++; }
+		virtual void visit(ast::alt_matcher& m) { ss << mi++; }
+		virtual void visit(ast::look_matcher& m) { ss << '~'; }
+		virtual void visit(ast::not_matcher& m) { ss << '~'; }
+		virtual void visit(ast::capt_matcher& m) { m.m->accept(this); }
+		virtual void visit(ast::named_matcher& m) { m.m->accept(this); }
+		virtual void visit(ast::fail_matcher& m) { ss << ';'; }
+	private:
+		std::stringstream ss;
+		unsigned long& mi;
+	}; // many_name
+	
 	/// Loads a set of derivatives from the grammar AST
 	class loader : public ast::visitor {
 		/// Gets unique nonterminal for each name
@@ -63,12 +108,20 @@ namespace dlf {
 		arc out(cutset&& blocking) { return arc{next, std::move(blocking)}; }
 
 		/// Makes an anonymous nonterminal for the given many-matcher
-		void make_many(ptr<ast::matcher> mp) {
+		void make_many(ast::matcher_ptr mp) {
+			// attempt to retrieve rule from cache
+			std::string name = many_name(mp, '*', mi);
+			auto it = nts.find(name);
+			if ( it != nts.end() ) {
+				next = rule_node::make(out(), it->second);
+				return;
+			}
+			
 			// idea is to set up a new anonymous non-terminal R_i and set next to R_i
 			// R_i = mp <0> R_i end | [0] end
 
 			// set rule node for new anonymous non-terminal
-			ptr<nonterminal> R_i = make_ptr<nonterminal>("*" + std::to_string(mi++));
+			ptr<nonterminal> R_i = make_ptr<nonterminal>(name);
 			ptr<node> nt = rule_node::make(out(), R_i);
 			
 			// build anonymous rule
@@ -83,12 +136,21 @@ namespace dlf {
 			R_i->sub = alt_node::make(out(),     // reset rule's substitution
 			                          std::move(skip));
 
-			// reset next to rule reference
+			// cache new rule and reset next to rule reference
+			nts.emplace(name, R_i);
 			next = nt;
 		}
 
 		/// Makes an anonymous nonterminal for the given some-matcher
-		void make_some(ptr<ast::matcher> mp) {
+		void make_some(ast::matcher_ptr mp) {
+			// attempt to retrieve rule from cache
+			std::string name = many_name(mp, '+', mi);
+			auto it = nts.find(name);
+			if ( it != nts.end() ) {
+				next = rule_node::make(out(), it->second);
+				return;
+			}
+			
 			// idea is to set up a new anonymous non-terminal R_i and set next to R_i
 			// R_i = mp (R_i <0> end | [0] end)
 
@@ -109,7 +171,8 @@ namespace dlf {
 			ri = ri_bak;                         // restore ri
 			R_i->sub = next;                     // reset rule's substitution
 
-			// reset next to rule reference
+			// cache new rule and reset next to rule reference
+			nts.emplace(name, R_i);
 			next = nt;
 		}
 
