@@ -11,11 +11,8 @@ EncodingDecl   = S "encoding" Eq ("\'" EncName "\'"
                  | "\"" EncName "\""
                  )
 EncName 	     = [A-Za-z] ([A-Za-z0-9._] | "-")*
-S              = (" " | "\t" | "\r" | "\n")+
-LETTER         = [a-zA-Z]
-DIGIT          = [0-9]
-NAME_CHAR      = LETTER | DIGIT | "." | "-" | "_" | ":"
-NAME           = (LETTER | "_" | ":") NAME_CHAR*
+S              = [ \t\r\n]+
+NAME           = [a-zA-Z_:] ([a-zA-Z0-9._:] | "-")*
 ENTITY_REF     = "&" NAME ";"
 CHAR_REF 	   = "&#x" [0-9a-fA-F]+ ";" | "&#" [0-9]+ ";"
 REFERENCE 	   = ENTITY_REF | CHAR_REF
