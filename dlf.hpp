@@ -739,91 +739,9 @@ namespace dlf {
 		}
 		void insert(std::initializer_list<arc> sn) { for (const arc& a : sn) insert(a); }
 
-//		size_type count(const arc& a) const { return s.get<1>().count(a); }
-//		iterator find(const arc& a) { return s.get<1>().find(a); }
-//		const_iterator find(const arc& a) const { return s.get<1>().find(a); }
-
 	private:
 		impl_set s;
 	}; // arc_set
-/*	/// Set of arcs which pushes alternation through its successor nodes.
-	class arc_set {
-	public:
-		/// Hashes arcs by their pointed-to nodes
-		struct succ_hash {
-			std::size_t operator() (const arc& a) const { return a.succ->hash(); }
-		};
-
-		/// Puts arcs into equivalence classes by the structure of their pointed-to nodes
-		struct succ_equiv {
-			bool operator() (const arc& a, const arc& b) const { return a.succ->equiv(b.succ); }
-		};
-
-		/// Underlying set type
-//		using impl_set = std::unordered_set<arc, succ_hash, succ_equiv, plalloc<arc>>;
-		using impl_set = std::unordered_set<arc, succ_hash, succ_equiv>;
-
-		// STL defines
-		using value_type = impl_set::value_type;
-		using size_type = impl_set::size_type;
-		using difference_type = impl_set::difference_type;
-		using reference = impl_set::reference;
-		using const_reference = impl_set::const_reference;
-		using pointer = impl_set::pointer;
-		using const_pointer = impl_set::const_pointer;
-		using iterator = impl_set::iterator;
-		using const_iterator = impl_set::const_iterator;
-
-	private:
-		/// Insert a new arc into the set, maintaining the invariants that no fail nodes 
-		/// are allowed, all alt nodes are flattened, equal nodes are blocked by the 
-		/// intersection of their blocking sets, and equivalent nodes have the alternation 
-		/// factored past them
-		void insert_invar(const arc& a);
-
-	public:
-		arc_set() = default;
-		template<typename It> arc_set(It first, It last) : s() { insert(first, last); }
-		arc_set(const arc_set&) = default;
-		arc_set(arc_set&&) = default;
-		arc_set(std::initializer_list<arc> sn) : s() { insert(sn); }
-		arc_set& operator= (const arc_set&) = default;
-		arc_set& operator= (arc_set&&) = default;
-		arc_set& operator= (std::initializer_list<arc> sn) {
-			clear();
-			insert(sn);
-			return *this;
-		}
-		void swap(arc_set& o) { s.swap(o.s); }
-		~arc_set() = default;
-
-		iterator begin() { return s.begin(); }
-		const_iterator begin() const { return s.cbegin(); }
-		const_iterator cbegin() const { return s.cbegin(); }
-		iterator end() { return s.end(); }
-		const_iterator end() const { return s.cend(); }
-		const_iterator cend() const { return s.cend(); }
-
-		bool empty() const { return s.empty(); }
-		size_type size() const { return s.size(); }
-
-		void clear() { s.clear(); }
-		void insert(const arc& a) { insert_invar(a); }
-		template<typename It> void insert(It first, It last) {
-			while ( first != last ) { insert(*first); ++first; }
-		}
-		void insert(std::initializer_list<arc> sn) { for (const arc& a : sn) insert(a); }
-		iterator erase(iterator pos) { return s.erase(pos); }
-		size_type erase(const arc& a) { return s.erase(a); }
-
-		size_type count(const arc& a) const { return s.count(a); }
-		iterator find(const arc& a) { return s.find(a); }
-		const_iterator find(const arc& a) const { return s.find(a); }
-
-	private:
-		impl_set s;
-	}; // arc_set
-*/
 
 	/// Node containing a number of subexpressions to parse concurrently
 	class alt_node : public node {
@@ -888,61 +806,13 @@ namespace dlf {
 			s.push_back(a);
 			return;
 		}
-
-		// merge nodes that are already present
-		arc& e = const_cast<arc&>(*ai);
-		if ( e.succ == a.succ || ! e.succ->has_succ() ) {
-			/// same node or unfollowed, merge blocking sets
-			e.block_only(a.blocking);
-		} else {
-			/// distinct node, merge blocking sets and alternate successors
-			arc ee = e.succ->get_succ(), aa = a.succ->get_succ();
-
-			cutset es{e.blocking}, as{a.blocking};
-			auto et = es.begin();
-			while ( et != es.end() ) {
-				if ( a.blocking.count(*et) ) { et = es.erase(et); }
-				else { ++et; }
-			}
-			auto at = as.begin();
-			while ( at != as.end() ) {
-				if ( e.blocking.count(*at) ) { at = as.erase(at); }
-				else { ++at; }
-			}
-
-			ee.block_all(es);
-			aa.block_all(as);
-			e.block_only(a.blocking);
-			e.succ = e.succ->clone_with_succ(alt_node::make(std::move(ee), std::move(aa)));
-		}
-	}
-/*	void arc_set::insert_invar(const arc& a) {
-		if ( a.blocked() ) return;		
-
-		node_type ty = a.succ->type();
-
-		// skip added fail nodes
-		if ( ty == fail_type ) return;
-
-		// flatten added alt nodes
-		if ( ty == alt_type ) {
-			alt_node& an = *as_ptr<alt_node>(a.succ);
-
-			for (arc aa : an.out) {
-				aa.block_all(a.blocking);
-				insert_invar(aa);
-			}
-
-			return;
-		}
-
-		auto ai = s.find(a);
+/*		auto ai = s.find(a);
 		// add nodes that don't yet exist
 		if ( ai == s.end() ) {
 			s.insert(a);
 			return;
 		}
-
+*/
 		// merge nodes that are already present
 		arc& e = const_cast<arc&>(*ai);
 		if ( e.succ == a.succ || ! e.succ->has_succ() ) {
@@ -970,7 +840,6 @@ namespace dlf {
 			e.succ = e.succ->clone_with_succ(alt_node::make(std::move(ee), std::move(aa)));
 		}
 	}
-*/
 
 	/// Default visitor that just visits all the nodes; override individual methods to add
 	/// functionality. Stores visited nodes so that they're not re-visited.
