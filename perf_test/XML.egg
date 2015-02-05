@@ -1,6 +1,6 @@
 Document       = prolog Element COMMENT_S EOT
 prolog 	       = (XMLDecl ^| ;) COMMENT_S
-XMLDecl 	   = "<?xml" VersionInfo (EncodingDecl ^| ;) (S ^| ;) "?>"
+XMLDecl 	   = "<?xml" VersionInfo (EncodingDecl ^| ;) SS "?>"
 VersionInfo    = S "version" Eq ("\'" VersionNum "\'" ^| "\"" VersionNum "\"" )
 VersionNum 	   = ([a-zA-Z0-9_.:] ^| "-") (VersionNum ^| ;)
 EncodingDecl   = S "encoding" Eq ("\'" EncName "\'" ^| "\"" EncName "\"" )
@@ -14,10 +14,9 @@ HEXP           = [0-9a-fA-F] (HEXP ^| ;)
 DECP           = [0-9] (DECP ^| ;)
 REFERENCE 	   = ENTITY_REF ^| CHAR_REF
 
-Attribute      = NAME (S ^| ;) "=" (S ^| ;) ATT_VALUE
+Attribute      = NAME SS "=" SS ATT_VALUE
 Attributes     = S Attribute Attributes ^| ;
-Element        = "<" NAME Attributes (S ^| ;)
-                 ( ">" Content  "</" NAME (S ^| ;) ">" ^| "/>" )
+Element        = "<" NAME Attributes SS ( ">" Content  "</" NAME SS ">" ^| "/>" )
 
 CHAR_DATA 	   = ![<&] . (CHAR_DATA ^| ;)
 
@@ -29,8 +28,9 @@ ATT_VALUE 	   = "\"" ATT_VALUE1R ^| "\'" ATT_VALUE2R
 ATT_VALUE1R    = "\"" | (![<&] . ^| REFERENCE) ATT_VALUE1R
 ATT_VALUE2R    = "\'" | (![<&] . ^| REFERENCE) ATT_VALUE2R
 
+Eq             = SS "=" SS
 COMMENT 	   = "<!--" COMMENTR ">"
 COMMENTR       = "--" | . COMMENTR
-S              = [ \t\r\n]+
-Eq             = (S ^| ;) "=" (S ^| ;)
+S              = [ \t\r\n] (S ^| ;)
+SS             = [ \t\r\n] SS ^| ;
 EOT            = !.

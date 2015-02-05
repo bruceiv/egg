@@ -34,6 +34,6 @@ RBRACE = "}" S
 LBRACKET = "[" S
 RBRACKET = "]" S
 
-S = ( [ \t\r\n] ^| "/*" S1R ^| "//" S2R )*
+S = ( [ \t\r\n] ^| "/*" S1R ^| "//" S2R ) S ^| ;
 S1R = "*/" | . S1R
 S2R = [\r\n] | . S2R
