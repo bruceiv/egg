@@ -73,6 +73,7 @@ namespace ast {
 	class some_matcher;
 	class seq_matcher;
 	class alt_matcher;
+	class ualt_matcher;
 	class look_matcher;
 	class not_matcher;
 	class capt_matcher;
@@ -93,6 +94,7 @@ namespace ast {
 		some_type,
 		seq_type,
 		alt_type,
+		ualt_type,
 		look_type,
 		not_type,
 		capt_type,
@@ -116,6 +118,7 @@ namespace ast {
 		virtual void visit(some_matcher&) = 0;
 		virtual void visit(seq_matcher&) = 0;
 		virtual void visit(alt_matcher&) = 0;
+		virtual void visit(ualt_matcher&) = 0;
 		virtual void visit(look_matcher&) = 0;
 		virtual void visit(not_matcher&) = 0;
 		virtual void visit(capt_matcher&) = 0;
@@ -296,6 +299,20 @@ namespace ast {
 		vector<shared_ptr<matcher>> ms; /**< The alternate matchers */
 	}; /* class alt_matcher */
 	typedef shared_ptr<alt_matcher> alt_matcher_ptr;
+	
+	/** Unordered alternation matcher. */
+	class ualt_matcher : public matcher {
+	public:
+		ualt_matcher() {}
+
+		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return ualt_type; }
+
+		ualt_matcher& operator += (shared_ptr<matcher> m) { ms.push_back(m); return *this; }
+
+		vector<shared_ptr<matcher>> ms; /**< The alternate matchers */
+	}; /* class alt_matcher */
+	typedef shared_ptr<ualt_matcher> ualt_matcher_ptr;
 
 	/** Lookahead matcher. */
 	class look_matcher : public matcher {
@@ -381,6 +398,7 @@ namespace ast {
 		virtual void visit(some_matcher& m) {}
 		virtual void visit(seq_matcher& m) {}
 		virtual void visit(alt_matcher& m) {}
+		virtual void visit(ualt_matcher& m) {}
 		virtual void visit(look_matcher& m) {}
 		virtual void visit(not_matcher& m) {}
 		virtual void visit(capt_matcher& m) {}
@@ -399,6 +417,11 @@ namespace ast {
 			}
 		}
 		virtual void visit(alt_matcher& m) {
+			for (auto it = m.ms.begin(); it != m.ms.end(); ++it) {
+				(*it)->accept(this);
+			}
+		}
+		virtual void visit(ualt_matcher& m) {
 			for (auto it = m.ms.begin(); it != m.ms.end(); ++it) {
 				(*it)->accept(this);
 			}

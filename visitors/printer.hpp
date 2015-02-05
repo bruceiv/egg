@@ -144,6 +144,23 @@ namespace visitor {
 			}
 			if ( m.ms.size() != 1 ) { out << " )"; }
 		}
+		
+		void visit(ast::ualt_matcher& m) {
+			if ( m.ms.size() != 1 ) { out << "( "; }
+			if ( ! m.ms.empty() ) {
+				std::string indent((4 * ++tabs), ' ');
+
+				auto iter = m.ms.begin();
+				(*iter)->accept(this);
+				while ( ++iter != m.ms.end() ) {
+					out << "\n" << indent << "^| ";
+					(*iter)->accept(this);
+				}
+				
+				--tabs;
+			}
+			if ( m.ms.size() != 1 ) { out << " )"; }
+		}
 
 		void visit(ast::look_matcher& m) {
 			out << "&";

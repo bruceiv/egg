@@ -62,8 +62,12 @@ err_string: std::string `error string` =
 			{ psVal = strings::unescape_error(s); }
 
 choice: ast::alt_matcher_ptr =
-		sequence : m { psVal = ast::make_ptr<ast::alt_matcher>(); *psVal += m; } 
-			( PIPE sequence : m { *psVal += m; } )*
+		un_choice : m { psVal = ast::make_ptr<ast::alt_matcher>(); *psVal += m; } 
+			( PIPE un_choice : m { *psVal += m; } )*
+
+un_choice: ast::ualt_matcher_ptr = 
+		sequence : m { psVal = ast::make_ptr<ast::ualt_matcher>(); *psVal += m; }
+			( UN_PIPE sequence : m { *psVal += m; } )*
 
 sequence: ast::seq_matcher_ptr =
 		{ psVal = ast::make_ptr<ast::seq_matcher>(); }
@@ -131,6 +135,7 @@ OUT_END =		@"%}"
 BIND =			@':' _
 EQUAL =			@'=' _
 PIPE =			@'|' _
+UN_PIPE =       @"^|" _
 AND =			@'&' _
 NOT =			@'!' _
 OPT =			@'?' _

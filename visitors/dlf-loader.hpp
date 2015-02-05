@@ -67,6 +67,7 @@ namespace dlf {
 		virtual void visit(ast::some_matcher& m) { m.m->accept(this); }
 		virtual void visit(ast::seq_matcher& m) { ss << mi++; }
 		virtual void visit(ast::alt_matcher& m) { ss << mi++; }
+		virtual void visit(ast::ualt_matcher& m) { ss << mi++; }
 		virtual void visit(ast::look_matcher& m) { ss << '~'; }
 		virtual void visit(ast::not_matcher& m) { ss << '~'; }
 		virtual void visit(ast::capt_matcher& m) { m.m->accept(this); }
@@ -283,6 +284,21 @@ namespace dlf {
 			m.ms.back()->accept(this);
 			rs.insert(out(std::move(blocking)));
 
+			next = alt_node::make(std::move(rs));
+		}
+		
+		virtual void visit(ast::ualt_matcher& m) {
+			// Idea: m0 next | m1 next | ... | mn next
+			if ( m.ms.empty() ) { next = fail_node::make(); return; }
+			
+			ptr<node> alt_next = next;
+			
+			arc_set rs;
+			for (unsigned long i = 0; i < m.ms.size(); ++i) {
+				m.ms[i]->accept(this);
+				rs.insert(out());
+				next = alt_next;
+			}
 			next = alt_node::make(std::move(rs));
 		}
 
