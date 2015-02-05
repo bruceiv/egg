@@ -1,23 +1,31 @@
 JSON = S Object EOT
-Object = LBRACE RBRACE ^| LBRACE Members RBRACE
-Members = Pair (COMMA Pair)*
+
+Object = LBRACE (Members ^| ;) RBRACE
+Members = Pair MembersR
+MembersR = COMMA Pair MembersR ^| ;
 Pair = String COLON Value
-Array = LBRACKET RBRACKET ^| LBRACKET Elements RBRACKET
-Elements = Value (COMMA Value)*
+
+Array = LBRACKET (Elements ^| ;) RBRACKET
+Elements = Value ElementsR
+ElementsR = COMMA Value ElementsR ^| ;
 Value = String ^| Number ^| Object ^| Array ^| TRUE ^| FALSE ^| NUL
 
 String = '\"' StringR S
-StringR = '\"' | '\\' ([\\\"/bfnrt] ^| "u" HEX HEX HEX HEX) StringR | . StringR
-
+StringR = '\"' | (!'\\' . ^| '\\' ([\\\"/bfnrt] ^| "u" HEX HEX HEX HEX)) StringR
 HEX = [0-9a-fA-F]
-Number = (INT FRAC EXP | INT EXP | INT FRAC | INT) S
-INT = ("-")? ([1-9] [0-9]* ^| "0")
-FRAC = "." [0-9]+
-EXP = E [0-9]+
-E = "e+" ^| "e-" ^| "E+" ^| "E-" | "e" ^| "E"
+
+Number = INT (FRAC ^| ;) (EXP ^| ;) S
+INT = ("-" ^| ;) ([1-9] DIGITS ^| "0")
+FRAC = "." DIGITP
+EXP = E DIGITP
+DIGITS = [0-9] DIGITS ^| ;
+DIGITP = [0-9] (DIGITP ^| ;)
+E = [eE] ('+' ^| '-' ^| ;)
+
 TRUE = "true" S
 FALSE = "false" S
 NUL = "null" S
+
 EOT = !.
 COMMA = "," S
 COLON = ":" S
