@@ -1,4 +1,4 @@
-Document       = prolog Element COMMENT_S EOT
+Document       = prolog Element COMMENT_S $
 prolog 	       = (XMLDecl ^| ;) COMMENT_S
 XMLDecl 	   = "<?xml" VersionInfo (EncodingDecl ^| ;) SS "?>"
 VersionInfo    = S "version" Eq ("\'" VersionNum "\'" ^| "\"" VersionNum "\"" )
@@ -33,4 +33,3 @@ COMMENT 	   = "<!--" COMMENTR ">"
 COMMENTR       = "--" | . COMMENTR
 S              = [ \t\r\n] (S ^| ;)
 SS             = [ \t\r\n] SS ^| ;
-EOT            = !.

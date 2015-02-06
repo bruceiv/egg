@@ -1,34 +1,35 @@
-Document       = prolog? Element Misc* !.
-prolog         = XMLDecl Misc* | Misc+
-XMLDecl 	   = "<?xml" VersionInfo EncodingDecl? S? "?>"
-VersionInfo    = S "version" Eq ("\'" VersionNum "\'" 
-                 | "\"" VersionNum "\""
-                 )
+Document       = (prolog ^| ;) Element (COMMENT_S ^| ;) $
+prolog         = XMLDecl (COMMENT_S ^| ;) ^| COMMENT_S
+XMLDecl 	   = "<?xml" VersionInfo (EncodingDecl ^| ;) (S ^| ;) "?>"
+VersionInfo    = S "version" Eq ("\'" VersionNum "\'" ^| "\"" VersionNum "\"" )
+VersionNum 	   = ([a-zA-Z0-9_.:] ^| "-") (VersionNum ^| ;)
+EncodingDecl   = S "encoding" Eq ("\'" EncName "\'" ^| "\"" EncName "\"" )
+EncName 	   = [A-Za-z] (EncNameR ^| ;)
+EncNameR       = ([A-Za-z0-9._] ^| "-") (EncNameR ^| ;)
+COMMENT_S      = (COMMENT ^| S) (COMMENT_S ^| ;)
 
-Eq             = S? "=" S?
-VersionNum 	   = ([a-zA-Z0-9_.:] | "-")+
-Misc 	       = COMMENT | S
-EncodingDecl   = S "encoding" Eq ("\'" EncName "\'" 
-                 | "\"" EncName "\""
-                 )
-EncName 	     = [A-Za-z] ([A-Za-z0-9._] | "-")*
-
-CHAR_DATA 	   = (![<&] .)+
-S              = (" " | "\t" | "\r" | "\n")+
-LETTER         = [a-zA-Z]
-DIGIT          = [0-9]
-NAME_CHAR      = LETTER | DIGIT | "." | "-" | "_" | ":"
-NAME           = (LETTER | "_" | ":") NAME_CHAR*
 ENTITY_REF     = "&" NAME ";"
-CHAR_REF 	   = "&#x" [0-9a-fA-F]+ ";" | "&#" [0-9]+ ";"
-REFERENCE 	   = ENTITY_REF | CHAR_REF
-COMMENT 	   = "<!--" (!'-' . | "-" !'-' .)* "-->"
-ATT_VALUE 	   = "\"" (![<&\"] . | REFERENCE)* "\""
-			         | "\'"  (![<&\'] . | REFERENCE)* "\'"
+CHAR_REF 	   = "&#x" HEXP ";" ^| "&#" DECP ";"
+HEXP           = [0-9a-fA-F] (HEXP ^| ;)
+DECP           = [0-9] (DECP ^| ;)
+REFERENCE 	   = ENTITY_REF ^| CHAR_REF
 
-Attribute      = NAME S? "=" S? ATT_VALUE
-Element        = "<" NAME (S Attribute)* S? (
-                   ">" Content* "</" NAME S? ">" 
-                 | "/>"
-                 )
-Content        = COMMENT | Element | REFERENCE | CHAR_DATA
+Attribute      = NAME (S ^| ;) "=" (S ^| ;) ATT_VALUE
+Attributes     = S Attribute (Attributes ^| ;)
+Element        = "<" NAME (Attributes ^| ;) (S ^| ;) 
+                 ( ">" (Content ^| ;)  "</" NAME (S ^| ;) ">" ^| "/>" )
+
+CHAR_DATA 	   = ![<&] . (CHAR_DATA ^| ;)
+
+Content        = (COMMENT ^| Element ^| REFERENCE ^| CHAR_DATA) (Content ^| ;)
+
+NAME           = [a-zA-Z_:] (NAMER ^| ;)
+NAMER          = ([a-zA-Z0-9._:] ^| "-") (NAMER ^| ;)
+ATT_VALUE 	   = "\"" ATT_VALUE1R ^| "\'" ATT_VALUE2R
+ATT_VALUE1R    = "\"" | (![<&] . ^| REFERENCE) ATT_VALUE1R
+ATT_VALUE2R    = "\'" | (![<&] . ^| REFERENCE) ATT_VALUE2R
+
+Eq             = (S ^| ;) "=" (S ^| ;)
+COMMENT 	   = "<!--" COMMENTR ">"
+COMMENTR       = "--" | . COMMENTR
+S              = [ \t\r\n] (S ^| ;)
