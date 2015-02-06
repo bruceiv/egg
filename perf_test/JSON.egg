@@ -1,4 +1,4 @@
-JSON = S Object EOT
+JSON = S Object $
 
 Object = LBRACE (Members ^| ;) RBRACE
 Members = Pair MembersR
@@ -26,7 +26,6 @@ TRUE = "true" S
 FALSE = "false" S
 NUL = "null" S
 
-EOT = !.
 COMMA = "," S
 COLON = ":" S
 LBRACE = "{" S
