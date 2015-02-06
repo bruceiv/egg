@@ -72,6 +72,7 @@ namespace egg {
 	bool CLOSE(parser::state&);
 	bool ANY(parser::state&);
 	bool EMPTY(parser::state&);
+	bool NONE(parser::state&);
 	bool BEGIN(parser::state&);
 	bool END(parser::state&);
 	bool EXPECT(parser::state&);
@@ -362,6 +363,10 @@ namespace egg {
 					parser::sequence({
 						EMPTY,
 						[&](parser::state& ps) { psVal = ast::make_ptr<ast::empty_matcher>();  return true; }}),
+				
+					parser::sequence({
+						NONE,
+						[&](parser::state& ps) { psVal = ast::make_ptr<ast::none_matcher>();  return true; }}),
 				parser::named("capturing expression", 
 					parser::sequence({
 						BEGIN,
@@ -594,43 +599,50 @@ namespace egg {
 				_}))(ps);
 	}
 
-	bool BEGIN(parser::state& ps) {
+	bool NONE(parser::state& ps) {
 		return parser::memoize(38, 
+			parser::sequence({
+				parser::named("\'$\'", parser::literal('$')),
+				_}))(ps);
+	}
+
+	bool BEGIN(parser::state& ps) {
+		return parser::memoize(39, 
 			parser::sequence({
 				parser::named("\'<\'", parser::literal('<')),
 				_}))(ps);
 	}
 
 	bool END(parser::state& ps) {
-		return parser::memoize(39, 
+		return parser::memoize(40, 
 			parser::sequence({
 				parser::named("\'>\'", parser::literal('>')),
 				_}))(ps);
 	}
 
 	bool EXPECT(parser::state& ps) {
-		return parser::memoize(40, 
+		return parser::memoize(41, 
 			parser::sequence({
 				parser::named("\'@\'", parser::literal('@')),
 				_}))(ps);
 	}
 
 	bool FAIL(parser::state& ps) {
-		return parser::memoize(41, 
+		return parser::memoize(42, 
 			parser::sequence({
 				parser::named("\'~\'", parser::literal('~')),
 				_}))(ps);
 	}
 
 	bool _(parser::state& ps) {
-		return parser::memoize(42, parser::memoize_many(43, 
+		return parser::memoize(43, parser::memoize_many(44, 
 			parser::choice({
 				space,
 				comment})))(ps);
 	}
 
 	bool space(parser::state& ps) {
-		return parser::memoize(44, 
+		return parser::memoize(45, 
 			parser::choice({
 				parser::literal(' '),
 				parser::literal('\t'),
@@ -638,10 +650,10 @@ namespace egg {
 	}
 
 	bool comment(parser::state& ps) {
-		return parser::memoize(45, 
+		return parser::memoize(46, 
 			parser::sequence({
 				parser::literal('#'),
-				parser::memoize_many(46, 
+				parser::memoize_many(47, 
 					parser::sequence({
 						parser::look_not(end_of_line),
 						parser::any()})),
@@ -649,7 +661,7 @@ namespace egg {
 	}
 
 	bool end_of_line(parser::state& ps) {
-		return parser::memoize(47, 
+		return parser::memoize(48, 
 			parser::choice({
 				parser::literal("\r\n"),
 				parser::literal('\n'),
@@ -657,7 +669,7 @@ namespace egg {
 	}
 
 	bool end_of_file(parser::state& ps) {
-		return parser::memoize(48, parser::named("end of input", parser::look_not(parser::any())))(ps);
+		return parser::memoize(49, parser::named("end of input", parser::look_not(parser::any())))(ps);
 	}
 
 } // namespace egg

@@ -156,7 +156,7 @@ namespace visitor {
 
 		void visit(ast::not_matcher& m) {
 			m.m->accept(this);
-			if ( rVal->type() == any_type ) {
+			if ( rVal->type() == ast::any_type ) {
 				// replace !. by $ for end-of-input
 				rVal = ast::make_ptr<ast::none_matcher>();
 			} else {
