@@ -97,6 +97,7 @@ primary: ast::matcher_ptr =
 		    ( BIND identifier : s 
 		        { ast::as_ptr<ast::any_matcher>(psVal)->var = s; } )?
 		| EMPTY { psVal = ast::make_ptr<ast::empty_matcher>(); }
+		| NONE { psVal = ast::make_ptr<ast::none_matcher>(); }
 		| ( BEGIN sequence : bm END BIND identifier : s 
 		    { psVal = ast::make_ptr<ast::capt_matcher>(bm, s); } )@`capturing expression`
 		| EXPECT ( 
@@ -145,6 +146,7 @@ OPEN =			@'(' _
 CLOSE =			@')' _
 ANY =			@'.' _
 EMPTY =			@';' _
+NONE =          @'$' _
 BEGIN =			@'<' _
 END =			@'>' _
 EXPECT =		@'@' _

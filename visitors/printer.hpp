@@ -80,6 +80,10 @@ namespace visitor {
 		void visit(ast::empty_matcher& m) {
 			out << ";";
 		}
+		
+		void visit(ast::none_matcher& m) {
+			out << "$";
+		}
 
 		void visit(ast::action_matcher& m) {
 			out << "{" << strings::single_line(m.a) << "}";

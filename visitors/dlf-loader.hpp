@@ -61,6 +61,7 @@ namespace dlf {
 		virtual void visit(ast::rule_matcher& m) { ss << m.rule; }
 		virtual void visit(ast::any_matcher& m) { ss << '.'; }
 		virtual void visit(ast::empty_matcher& m) { ss << '~'; }
+		virtual void visit(ast::none_matcher& m) { ss << '$'; }
 		virtual void visit(ast::action_matcher& m) { ss << '~'; }
 		virtual void visit(ast::opt_matcher& m) { ss << '~'; }
 		virtual void visit(ast::many_matcher& m) { ss << '~'; }
@@ -218,6 +219,8 @@ namespace dlf {
 		virtual void visit(ast::any_matcher& m) { next = any_node::make(out()); }
 
 		virtual void visit(ast::empty_matcher& m) { /* do nothing; next remains next */ }
+		
+		virtual void visit(ast::none_matcher& m) { next = eoi_node::make(out()); }
 
 		virtual void visit(ast::action_matcher& m) { /* TODO implement; for now no-op */ }
 

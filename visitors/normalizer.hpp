@@ -56,6 +56,10 @@ namespace visitor {
 		void visit(ast::empty_matcher& m) {
 			rVal = ast::make_ptr<ast::empty_matcher>();
 		}
+		
+		void visit(ast::none_matcher& m) {
+			rVal = ast::make_ptr<ast::none_matcher>();
+		}
 
 		void visit(ast::action_matcher& m) {
 			rVal = ast::as_ptr<ast::matcher>(
@@ -152,9 +156,14 @@ namespace visitor {
 
 		void visit(ast::not_matcher& m) {
 			m.m->accept(this);
-			m.m = rVal;
-			rVal = ast::as_ptr<ast::matcher>(
-					ast::make_ptr<ast::not_matcher>(m));
+			if ( rVal->type() == any_type ) {
+				// replace !. by $ for end-of-input
+				rVal = ast::make_ptr<ast::none_matcher>();
+			} else {
+				m.m = rVal;
+				rVal = ast::as_ptr<ast::matcher>(
+						ast::make_ptr<ast::not_matcher>(m));
+			}
 		}
 
 		void visit(ast::capt_matcher& m) {

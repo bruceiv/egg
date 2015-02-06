@@ -76,6 +76,7 @@ namespace dlf {
 	class char_node;
 	class range_node;
 	class any_node;
+	class eoi_node;
 	class str_node;
 	class rule_node;
 	class cut_node;
@@ -102,10 +103,11 @@ namespace dlf {
 		char_type  = 0x4,
 		range_type = 0x5,
 		any_type   = 0x6,
-		str_type   = 0x7,
-		rule_type  = 0x8,
-		cut_type   = 0x9,
-		alt_type   = 0xA,
+		eoi_type   = 0x7,
+		str_type   = 0x8,
+		rule_type  = 0x9,
+		cut_type   = 0xA,
+		alt_type   = 0xB
 	};
 
 	/// Tags `x` with the given node type; useful for hashing
@@ -134,6 +136,7 @@ namespace dlf {
 		case char_type:  out << "CHAR";  break;
 		case range_type: out << "RANGE"; break;
 		case any_type:   out << "ANY";   break;
+		case eoi_type:   out << "EOI";   break;
 		case str_type:   out << "STR";   break;
 		case rule_type:  out << "RULE";  break;
 		case cut_type:   out << "CUT";   break;
@@ -152,6 +155,7 @@ namespace dlf {
 		virtual void visit(const char_node&)  = 0;
 		virtual void visit(const range_node&) = 0;
 		virtual void visit(const any_node&)   = 0;
+		virtual void visit(const eoi_node&)   = 0;
 		virtual void visit(const str_node&)   = 0;
 		virtual void visit(const rule_node&)  = 0;
 		virtual void visit(const cut_node&)   = 0;
@@ -401,6 +405,27 @@ namespace dlf {
 
 		arc out;  ///< Successor node
 	}; // any_node
+	
+	/// Node representing an end-of-input literal
+	class eoi_node : public node {
+	public:
+		eoi_node(arc&& out) : out{std::move(out)} {}
+		virtual ~eoi_node() = default;
+
+		static  ptr<node>   make(arc&& out) { return node::make<eoi_node>(std::move(out)); }
+
+		virtual void        accept(visitor* v) const { v->visit(*this); }
+		virtual bool        has_succ() const { return true; }
+		virtual arc         get_succ() const { return out; }
+		virtual ptr<node>   clone_with_succ(arc&& succ) const {
+			return node::make<eoi_node>(std::move(succ));
+		}
+		virtual node_type   type() const { return eoi_type; }
+		virtual std::size_t hash() const { return tag_with(eoi_type); }
+		virtual bool        equiv(ptr<node> o) const { return o->type() == eoi_type; }
+
+		arc out;  ///< Successor node
+	}; // eoi_node
 
 	/// Node representing a string literal
 	class str_node : public node {
@@ -864,6 +889,7 @@ namespace dlf {
 		virtual void visit(const char_node& n)  { visit(n.out); }
 		virtual void visit(const range_node& n) { visit(n.out); }
 		virtual void visit(const any_node& n)   { visit(n.out); }
+		virtual void visit(const eoi_node& n)   { visit(n.out); }
 		virtual void visit(const str_node& n)   { visit(n.out); }
 		virtual void visit(const rule_node& n)  { visit(n.out); }
 		virtual void visit(const cut_node& n)   { visit(n.out); }

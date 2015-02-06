@@ -537,6 +537,9 @@ namespace parser {
 			return true;
 		}
 		
+		/** Attempts to match end-of-input at the current position */
+		bool matches_none() { return (*this)() == '\0'; }
+		
 		/** Attempts to match a character in the given range at the current 
 		 *  position.
 		 *  @param s        The start of the range
@@ -623,6 +626,7 @@ namespace parser {
 	combinator any() {
 		return [](state& ps) {
 			if ( ps.matches_any() ) { return true; }
+
 			ps.fail();
 			return false;
 		};
@@ -635,6 +639,16 @@ namespace parser {
 		return [&psVal](state& ps) {
 			if ( ps.matches_any(psVal) ) { return true; }
 			
+			ps.fail();
+			return false;
+		};
+	}
+	
+	/** End-of-input parser */
+	combinator none() {
+		return [](state& ps) {
+			if ( ps.matches_none() ) { return true; }
+
 			ps.fail();
 			return false;
 		};

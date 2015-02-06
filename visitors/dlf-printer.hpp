@@ -177,6 +177,11 @@ namespace dlf {
 			out << ". ";
 			print_arc(n.out);
 		}
+		
+		virtual void visit(const eoi_node& n) {
+			out << "$ ";
+			print_arc(n.out);
+		}
 
 		virtual void visit(const str_node& n) {
 			out << "\"" << strings::escape(n.str()) << "\" ";

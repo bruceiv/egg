@@ -67,6 +67,7 @@ namespace ast {
 	class rule_matcher;
 	class any_matcher;
 	class empty_matcher;
+	class none_matcher;
 	class action_matcher;
 	class opt_matcher;
 	class many_matcher;
@@ -88,6 +89,7 @@ namespace ast {
 		rule_type,
 		any_type,
 		empty_type,
+		none_type,
 		action_type,
 		opt_type,
 		many_type,
@@ -112,6 +114,7 @@ namespace ast {
 		virtual void visit(rule_matcher&) = 0;
 		virtual void visit(any_matcher&) = 0;
 		virtual void visit(empty_matcher&) = 0;
+		virtual void visit(none_matcher&) = 0;
 		virtual void visit(action_matcher&) = 0;
 		virtual void visit(opt_matcher&) = 0;
 		virtual void visit(many_matcher&) = 0;
@@ -219,6 +222,16 @@ namespace ast {
 		matcher_type type() { return empty_type; }
 	}; /* class empty_matcher */
 	typedef shared_ptr<empty_matcher> empty_matcher_ptr;
+	
+	/** Only matches on end-of-input */
+	class none_matcher : public matcher {
+	public:
+		none_matcher() {}
+		
+		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return none_type; }
+	}; /* class none_matcher */
+	typedef shared_ptr<none_matcher> none_matcher_ptr;
 
 	/** Semantic action; not actually a matcher. */
 	class action_matcher : public matcher {
@@ -392,6 +405,7 @@ namespace ast {
 		virtual void visit(rule_matcher& m) {}
 		virtual void visit(any_matcher& m) {}
 		virtual void visit(empty_matcher& m) {}
+		virtual void visit(none_matcher& m) {}
 		virtual void visit(action_matcher& m) {}
 		virtual void visit(opt_matcher& m) {}
 		virtual void visit(many_matcher& m) {}

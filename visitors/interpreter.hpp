@@ -109,6 +109,7 @@ namespace dlf {
 		void visit(const char_node& n)  { rVal = node::make<char_node>(clone_of(n.out), n.c); }
 		void visit(const range_node& n) { rVal = node::make<range_node>(clone_of(n.out), n.b, n.e); }
 		void visit(const any_node& n)   { rVal = node::make<any_node>(clone_of(n.out)); }
+		void visit(const eoi_node& n)   { rVal = node::make<eoi_node>(clone_of(n.out)); }
 		void visit(const str_node& n)   { rVal = node::make<str_node>(clone_of(n.out), n.sp, n.i); }
 		void visit(const rule_node& n)  { rVal = node::make<rule_node>(clone_of(n.out), n.r); }
 		void visit(const cut_node& n)   {
@@ -263,6 +264,8 @@ namespace dlf {
 			void visit(const range_node& n) { n.b <= x && x <= n.e ? follow(n.out) : fail(); }
 
 			void visit(const any_node& n)   { x != '\0' ? follow(n.out) : fail(); }
+			
+			void visit(const eoi_node& n)   { x == '\0' ? follow(n.out) : fail(); }
 
 			void visit(const str_node& n) {
 				if ( x == (*n.sp)[n.i] ) {
