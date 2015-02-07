@@ -115,7 +115,7 @@ LocalVariableDeclarationStatement
     = (FINAL ^| ;) Type VariableDeclarator VariableDeclaratorTR SEMI
 
 VariableDeclarator
-    = Identifier Dim* (EQU VariableInitializer)?
+    = Identifier DimS (EQU VariableInitializer ^| ;)
 VariableDeclaratorTR
     = COMMA VariableDeclarator VariableDeclaratorTR ^| ;
 
@@ -195,20 +195,17 @@ ForUpdate
 #  Expressions
 #-------------------------------------------------------------
 
-StatementExpression
-    = Expression
+StatementExpression = Expression
 StatementExpressionTR = COMMA StatementExpression StatementExpressionTR ^| ;
 
     # This is more generous than definition in section 14.8, 
     # which allows only specific forms of Expression.
     
 
-ConstantExpression
-    = Expression
+ConstantExpression = Expression
 
-Expression
-    = ConditionalExpression 
-      (AssignmentOperator ConditionalExpression)*
+Expression = ConditionalExpression ExpressionR
+ExpressionR = AssignmentOperator ConditionalExpression ExpressionR ^| ;
 ExpressionTR = COMMA Expression ExpressionTR ^| ;
     
     # This definition is part of the modification 
@@ -236,51 +233,44 @@ AssignmentOperator
    ^| SR_EQU
    ^| BSR_EQU
 
-ConditionalExpression
-    = ConditionalOrExpression 
-      (QUERY Expression COLON ConditionalOrExpression)*
+ConditionalExpression = ConditionalOrExpression ConditionalExpressionR
+ConditionalExpressionR = QUERY Expression COLON ConditionalOrExpression ConditionalExpressionR ^| ;
 
-ConditionalOrExpression
-    = ConditionalAndExpression (OR_OR ConditionalAndExpression)*
+ConditionalOrExpression = ConditionalAndExpression ConditionalOrExpressionR 
+ConditionalOrExpressionR = OR_OR ConditionalAndExpression ConditionalOrExpressionR ^| ;
 
-ConditionalAndExpression
-    = InclusiveOrExpression (AND_AND InclusiveOrExpression)*
+ConditionalAndExpression = InclusiveOrExpression ConditionalAndExpressionR
+ConditionalAndExpressionR = AND_AND InclusiveOrExpression ConditionalAndExpressionR ^| ;
 
-InclusiveOrExpression
-    = ExclusiveOrExpression (OR ExclusiveOrExpression)*
+InclusiveOrExpression = ExclusiveOrExpression InclusiveOrExpressionR
+InclusiveOrExpressionR = OR ExclusiveOrExpression InclusiveOrExpressionR ^| ;
 
-ExclusiveOrExpression
-    = AndExpression (HAT AndExpression)*
+ExclusiveOrExpression = AndExpression ExclusiveOrExpressionR
+ExclusiveOrExpressionR = HAT AndExpression ExclusiveOrExpressionR ^| ;
 
-AndExpression
-    = EqualityExpression (AND EqualityExpression)*
+AndExpression = EqualityExpression AndExpressionR
+AndExpressionR = AND EqualityExpression AndExpressionR ^| ;
 
-EqualityExpression
-    = RelationalExpression (
-        (EQUAL ^|  NOT_EQUAL) RelationalExpression
-      )*
+EqualityExpression = RelationalExpression EqualityExpressionR
+EqualityExpressionR = (EQUAL ^|  NOT_EQUAL) RelationalExpression EqualityExpressionR ^| ;
 
-RelationalExpression
-    = ShiftExpression (
-        (LE ^| GE ^| LT ^| GT) ShiftExpression 
-        ^| INSTANCEOF ReferenceType
-      )*
+RelationalExpression = ShiftExpression RelationalExpressionR
+RelationalExpressionR 
+    = ((LE ^| GE ^| LT ^| GT) ShiftExpression ^| INSTANCEOF ReferenceType) RelationalExpressionR ^| ;
 
-ShiftExpression
-    = AdditiveExpression ((SL ^| SR ^| BSR) AdditiveExpression)*
+ShiftExpression = AdditiveExpression ShiftExpressionR
+ShiftExpressionR = (SL ^| SR ^| BSR) AdditiveExpression ShiftExpressionR ^| ;
 
-AdditiveExpression
-    = MultiplicativeExpression (
-        (PLUS ^| MINUS) MultiplicativeExpression
-      )*
+AdditiveExpression = MultiplicativeExpression AdditiveExpressionR
+AdditiveExpressionR = (PLUS ^| MINUS) MultiplicativeExpression AdditiveExpressionR ^| ;
 
-MultiplicativeExpression
-    = UnaryExpression ((STAR ^| DIV ^| MOD) UnaryExpression)*
+MultiplicativeExpression = UnaryExpression MultiplicativeExpressionR
+MultiplicativeExpressionR = (STAR ^| DIV ^| MOD) UnaryExpression MultiplicativeExpressionR ^| ;
 
 UnaryExpression
     = PrefixOp UnaryExpression
    ^| LPAR Type RPAR UnaryExpression
-    | Primary (Selector)* (PostfixOp)*
+    | Primary SelectorS PostfixOpS
 
 Primary
     = ParExpression
@@ -313,6 +303,7 @@ PrefixOp
 PostfixOp
     = INC
    ^| DEC
+PostfixOpS = PostfixOp PostfixOpS ^| ;
 
 Selector
     = DOT Identifier Arguments?
@@ -320,6 +311,7 @@ Selector
    ^| DOT SUPER SuperSuffix
    ^| DOT NEW InnerCreator
    ^| DimExpr
+SelectorS = Selector SelectorS ^| ;
 
 SuperSuffix
     = Arguments
@@ -376,10 +368,11 @@ ParExpression
     = LPAR Expression RPAR
 
 QualifiedIdentifier 
-    = Identifier (DOT Identifier)*
+    = Identifier IdentifierQR
 
 Dim = LBRK RBRK
 DimS = Dim DimS ^| ;
+DimP = Dim (DimP ^| ;)
 
 DimExpr
     = LBRK Expression RBRK
@@ -389,14 +382,14 @@ DimExpr
 #-------------------------------------------------------------
 
 Type
-    = (BasicType ^| ClassType) Dim*
+    = (BasicType ^| ClassType) DimS
 
 ReferenceType
-    = BasicType Dim+
-   ^| ClassType Dim*
+    = BasicType DimP
+   ^| ClassType DimS
 
 ClassType
-    = Identifier (DOT Identifier)*
+    = Identifier IdentifierQR
 ClassTypeTR = COMMA ClassType ClassTypeTR ^| ;
 
 ClassTypeList
@@ -432,7 +425,7 @@ ModifierS = Modifier ModifierS ^| ;
 _   = ( [ \t\r\n]  # WhiteSpace
      ^| "/*" _R1   # TraditionalComment
      ^| "//" _R2   # EndOfLineComment
-      )*
+      ) _ ^| ;
 _R1 = "*/" | . _R1
 _R2 = [\r\n] | . _R2
 
@@ -440,12 +433,13 @@ _R2 = [\r\n] | . _R2
 #  JLS 3.8  Identifiers
 #-------------------------------------------------------------
 
-Identifier  = !Keyword Letter LetterOrDigit* _   
+Identifier  = !Keyword Letter LetterOrDigitS _   
 IdentifierQR = DOT Identifier IdentifierQR ^| ; 
     
 Letter = [a-zA-Z_$]
 
 LetterOrDigit = [a-zA-Z0-9_$]
+LetterOrDigitS = LetterOrDigit LetterOrDigitS ^| ;
 
     # These are traditional definitions of letters and digits.
     # JLS defines letters and digits as Unicode characters 
@@ -564,43 +558,46 @@ IntegerLiteral
       ) [lL]?
     
 DecimalNumeral
-    = "0" ^| [1-9]Digit*         
+    = "0" ^| [1-9] DigitS       
       
 HexNumeral
-    = ("0x" ^| "0X") HexDigit+ 
+    = ("0x" ^| "0X") HexDigitP
     
 HexDigit
     = [a-fA-F0-9]
 HexDigitS = HexDigit HexDigitS ^| ;
+HexDigitP = HexDigit (HexDigitP ^| ;)
       
 OctalNumeral
-    = "0" [0-7]+ 
+    = "0" OctalNumeralP
+OctalNumeralP = [0-7] (OctalNumeral ^| ;)
       
 FloatLiteral 
     = HexFloat
     | DecimalFloat 
 
 DecimalFloat
-    = DigitP "." Digit*  Exponent? [fFdD]?
-    | "." Digit+ Exponent? [fFdD]?
-    | DigitP Exponent [fFdD]?
-    | Digit+ Exponent? [fFdD]
+    = DigitP "." DigitS  (Exponent ^| ;) ([fFdD] ^| ;)
+    | "." DigitP (Exponent ^| ;) ([fFdD] ^| ;)
+    | DigitP Exponent ([fFdD] ^| ;)
+    | DigitP (Exponent ^| ;) [fFdD]
     
 Exponent 
-    = [eE] ('+' ^| '-' ^| ;) Digit+ 
+    = [eE] ('+' ^| '-' ^| ;) DigitP
 
 Digit  = [0-9]
+DigitS = Digit DigitS ^| ;
 DigitP = Digit (DigitP ^| ;)
     
 HexFloat
-    = HexSignificand BinaryExponent [fFdD]?
+    = HexSignificand BinaryExponent ([fFdD] ^| ;)
 
 HexSignificand
-    = HexNumeral "."?
-    | ("0x" ^| "0X") HexDigitS "." HexDigit+
+    = HexNumeral ("." ^| ;)
+    | ("0x" ^| "0X") HexDigitS "." HexDigitP
 
 BinaryExponent
-     = [pP] ('+' ^| '-')? Digit+
+     = [pP] ('+' ^| '-' ^| ;) DigitP
 
 CharLiteral 
     = "\'" (Escape ^| ![\'\\] .) "\'"
