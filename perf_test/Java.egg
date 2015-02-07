@@ -21,20 +21,17 @@
 #-------------------------------------------------------------
 
 CompilationUnit
-    = Spacing? PackageDeclaration? ImportDeclaration*
-      ( SEMI
-      | Modifier* 
-        ( ClassDeclaration
-        | InterfaceDeclaration
-        )
-      )*
-      EOT
+    = _ (PackageDeclaration ^| ;) ImportDeclarationS DeclarationS $
+DeclarationS
+    = (SEMI ^| ModifierS (ClassDeclaration ^| InterfaceDeclaration)) DeclarationS ^| ;
     
 PackageDeclaration
     = PACKAGE QualifiedIdentifier SEMI
 
 ImportDeclaration
-    = IMPORT STATIC? QualifiedIdentifier (DOT STAR)? SEMI
+    = IMPORT (STATIC ^| ;) QualifiedIdentifier (DOT STAR ^| ;) SEMI
+ImportDeclarationS
+    = ImportDeclaration ImportDeclarationS ^| ;
 
 #-------------------------------------------------------------
 #  Class Declaration
@@ -42,179 +39,174 @@ ImportDeclaration
 
 ClassDeclaration
     = CLASS Identifier 
-      (EXTENDS ClassType)? (IMPLEMENTS ClassTypeList)? 
+      (EXTENDS ClassType ^| ;) (IMPLEMENTS ClassTypeList ^| ;)
       ClassBody
 
 ClassBody
-    = LWING ClassBodyDeclaration* RWING
+    = LWING ClassBodyDeclarationS RWING
 
 ClassBodyDeclaration
     = SEMI
-    | STATIC? Block  # Static or Instance Initializer
-    | Modifier* MemberDecl   # ClassMemberDeclaration    
+   ^| (STATIC ^| ;) Block    # Static or Instance Initializer
+   ^| ModifierS MemberDecl   # ClassMemberDeclaration 
+ClassBodyDeclarationS = ClassBodyDeclaration ClassBodyDeclarationS ^| ;   
 
 MemberDecl
-    = Type Identifier FormalParameters  Dim* 
-      (THROWS ClassTypeList)? (SEMI | MethodBody) # Method
-    | VOID Identifier FormalParameters  (THROWS ClassTypeList)?
-      (SEMI | MethodBody)   # Void method
-    | Identifier FormalParameters  (THROWS ClassTypeList)? 
-      MethodBody            # Constructor
-    | InterfaceDeclaration  # Interface
-    | ClassDeclaration      # Class
-    | Type VariableDeclarator (COMMA  VariableDeclarator)* # Field
-
-MethodBody
-    = Block
+    = Type Identifier FormalParameters Dim* 
+      (THROWS ClassTypeList ^| ;) (SEMI ^| Block)   # Method
+   ^| VOID Identifier FormalParameters
+      (THROWS ClassTypeList ^| ;) (SEMI ^| Block)   # Void method
+    | Identifier FormalParameters 
+      (THROWS ClassTypeList ^| ;) Block             # Constructor
+   ^| InterfaceDeclaration                          # Interface
+   ^| ClassDeclaration                              # Class
+    | Type VariableDeclarator VariableDeclaratorTR  # Field
 
 #-------------------------------------------------------------
 #  Interface Declaration
 #-------------------------------------------------------------
 
 InterfaceDeclaration
-    = INTERFACE Identifier (EXTENDS ClassTypeList)? 
-      InterfaceBody
+    = INTERFACE Identifier (EXTENDS ClassTypeList ^| ;) InterfaceBody
 
 InterfaceBody
-    = LWING InterfaceBodyDeclaration* RWING
+    = LWING InterfaceBodyDeclarationS RWING
 
 InterfaceBodyDeclaration
-    = Modifier* InterfaceMemberDecl
-    | SEMI
+    = ModifierS InterfaceMemberDecl 
+   ^| SEMI
+InterfaceBodyDeclarationS = InterfaceBodyDeclaration InterfaceBodyDeclarationS ^| ;
 
 InterfaceMemberDecl
     = InterfaceMethodOrFieldDecl
-    | VOID Identifier VoidInterfaceMethodDeclaratorRest
-    | InterfaceDeclaration
-    | ClassDeclaration
+   ^| VOID Identifier VoidInterfaceMethodDeclaratorRest
+   ^| InterfaceDeclaration
+   ^| ClassDeclaration
 
 InterfaceMethodOrFieldDecl
     = Type Identifier InterfaceMethodOrFieldRest
 
 InterfaceMethodOrFieldRest
     = ConstantDeclaratorsRest SEMI
-    | InterfaceMethodDeclaratorRest
+   ^| InterfaceMethodDeclaratorRest
 
 InterfaceMethodDeclaratorRest
-    = FormalParameters Dim* (THROWS ClassTypeList)? SEMI
+    = FormalParameters DimS (THROWS ClassTypeList ^| ;) SEMI
 
 VoidInterfaceMethodDeclaratorRest
-    = FormalParameters (THROWS ClassTypeList)? SEMI
+    = FormalParameters (THROWS ClassTypeList ^| ;) SEMI
 
 ConstantDeclaratorsRest
-    = ConstantDeclaratorRest (COMMA ConstantDeclarator)*
+    = ConstantDeclaratorRest ConstantDeclaratorTR
 
 ConstantDeclarator
     = Identifier ConstantDeclaratorRest
+ConstantDeclaratorTR
+    = COMMA ConstantDeclarator ConstantDeclaratorTR ^| ;
 
 ConstantDeclaratorRest
-    = Dim* EQU VariableInitializer
+    = DimS EQU VariableInitializer
 
 #-------------------------------------------------------------
 #  Variable Declarations
 #-------------------------------------------------------------
 
 LocalVariableDeclarationStatement
-    = FINAL? Type VariableDeclarator 
-      (COMMA  VariableDeclarator)* SEMI
+    = (FINAL ^| ;) Type VariableDeclarator VariableDeclaratorTR SEMI
 
 VariableDeclarator
-    = Identifier Dim* (EQU  VariableInitializer)?
+    = Identifier DimS (EQU VariableInitializer ^| ;)
+VariableDeclaratorTR
+    = COMMA VariableDeclarator VariableDeclaratorTR ^| ;
 
 #-------------------------------------------------------------
 #  Formal Parameters
 #-------------------------------------------------------------
 
 FormalParameters
-    = LPAR FormalParameterDecls? RPAR
+    = LPAR (FormalParameterDecls ^| ;) RPAR
 
 FormalParameter
-    = FINAL? Type VariableDeclaratorId
+    = (FINAL ^| ;) Type VariableDeclaratorId
  
 FormalParameterDecls
-    = FINAL? Type FormalParameterDeclsRest
+    = (FINAL ^| ;) Type FormalParameterDeclsRest
 
 FormalParameterDeclsRest
-    = VariableDeclaratorId (COMMA FormalParameterDecls)?
+    = VariableDeclaratorId (COMMA FormalParameterDecls ^| ;)
 
 VariableDeclaratorId
-    = Identifier Dim*
+    = Identifier DimS
 
 #-------------------------------------------------------------
 #  Statements
 #-------------------------------------------------------------
 
 Block
-    = LWING BlockStatement* RWING
-
-BlockStatements
-    = (BlockStatement )*
+    = LWING BlockStatementS RWING
 
 BlockStatement 
     = LocalVariableDeclarationStatement
-    | Modifier* ClassDeclaration
+    | ModifierS ClassDeclaration
     | Statement
+BlockStatementS = BlockStatement BlockStatementS ^| ;
 
 Statement
     = Block
-    | ASSERT Expression (COLON Expression)? SEMI
-    | IF ParExpression Statement (ELSE Statement)?
-    | FOR LPAR ForInit? SEMI Expression? SEMI ForUpdate? RPAR
-      Statement
-    | WHILE ParExpression Statement
-    | DO Statement WHILE ParExpression SEMI
-    | TRY Block (Catch+ Finally? | Finally)
-    | SWITCH ParExpression 
-      LWING SwitchBlockStatementGroups RWING
-    | SYNCHRONIZED ParExpression Block
-    | RETURN Expression? SEMI
-    | THROW Expression   SEMI
-    | BREAK Identifier? SEMI
-    | CONTINUE Identifier? SEMI
-    | SEMI
-    | StatementExpression SEMI
-    | Identifier COLON Statement
+   ^| ASSERT Expression (COLON Expression ^| ;) SEMI
+   ^| IF ParExpression Statement (ELSE Statement)?
+   ^| FOR LPAR (ForInit ^| ;) SEMI (Expression ^| ;) SEMI (ForUpdate ^| ;) RPAR Statement
+   ^| WHILE ParExpression Statement
+   ^| DO Statement WHILE ParExpression SEMI
+   ^| TRY Block (CatchP (Finally ^| ;) ^| Finally)
+   ^| SWITCH ParExpression LWING SwitchBlockStatementGroupS RWING
+   ^| SYNCHRONIZED ParExpression Block
+   ^| RETURN (Expression ^| ;) SEMI
+   ^| THROW Expression SEMI
+   ^| BREAK (Identifier ^| ;) SEMI
+   ^| CONTINUE (Identifier ^| ;) SEMI
+   ^| SEMI
+   ^| ( StatementExpression SEMI 
+      | Identifier COLON Statement )
 
 Catch
     = CATCH LPAR FormalParameter RPAR Block
+CatchP = Catch (CatchP ^| ;)
     
 Finally
     = FINALLY Block
 
-SwitchBlockStatementGroups
-    = SwitchBlockStatementGroup*
-
 SwitchBlockStatementGroup
-    = SwitchLabel BlockStatements
+    = SwitchLabel BlockStatementS
+SwitchBlockStatementGroupS = SwitchBlockStatementGroup SwitchBlockStatementGroupS ^| ;
 
 SwitchLabel
     = CASE ConstantExpression COLON
-    | DEFAULT COLON
+   ^| DEFAULT COLON
 
 ForInit
-    = FINAL? Type VariableDeclarator (COMMA VariableDeclarator)*
-    | StatementExpression (COMMA StatementExpression)*  
+    = (FINAL ^| ;) Type VariableDeclarator VariableDeclaratorTR
+    | StatementExpression StatementExpressionTR  
 
 ForUpdate 
-    = StatementExpression (COMMA StatementExpression)*
+    = StatementExpression StatementExpressionTR
     
 #-------------------------------------------------------------
 #  Expressions
 #-------------------------------------------------------------
 
-StatementExpression
-    = Expression
+StatementExpression = Expression
+StatementExpressionTR = COMMA StatementExpression StatementExpressionTR ^| ;
 
     # This is more generous than definition in section 14.8, 
     # which allows only specific forms of Expression.
     
 
-ConstantExpression
-    = Expression
+ConstantExpression = Expression
 
-Expression
-    = ConditionalExpression 
-      (AssignmentOperator ConditionalExpression)*
+Expression = ConditionalExpression ExpressionR
+ExpressionR = AssignmentOperator ConditionalExpression ExpressionR ^| ;
+ExpressionTR = COMMA Expression ExpressionTR ^| ;
     
     # This definition is part of the modification 
     # in JLS Chapter 18
@@ -229,135 +221,130 @@ Expression
 
 AssignmentOperator 
     = EQU
-    | PLUS_EQU
-    | MINUS_EQU
-    | STAR_EQU
-    | DIV_EQU
-    | AND_EQU
-    | OR_EQU
-    | HAT_EQU
-    | MOD_EQU
-    | SL_EQU
-    | SR_EQU
-    | BSR_EQU
+   ^| PLUS_EQU
+   ^| MINUS_EQU
+   ^| STAR_EQU
+   ^| DIV_EQU
+   ^| AND_EQU
+   ^| OR_EQU
+   ^| HAT_EQU
+   ^| MOD_EQU
+   ^| SL_EQU
+   ^| SR_EQU
+   ^| BSR_EQU
 
-ConditionalExpression
-    = ConditionalOrExpression 
-      (QUERY Expression COLON ConditionalOrExpression)*
+ConditionalExpression = ConditionalOrExpression ConditionalExpressionR
+ConditionalExpressionR = QUERY Expression COLON ConditionalOrExpression ConditionalExpressionR ^| ;
 
-ConditionalOrExpression
-    = ConditionalAndExpression (OR_OR ConditionalAndExpression)*
+ConditionalOrExpression = ConditionalAndExpression ConditionalOrExpressionR 
+ConditionalOrExpressionR = OR_OR ConditionalAndExpression ConditionalOrExpressionR ^| ;
 
-ConditionalAndExpression
-    = InclusiveOrExpression (AND_AND InclusiveOrExpression)*
+ConditionalAndExpression = InclusiveOrExpression ConditionalAndExpressionR
+ConditionalAndExpressionR = AND_AND InclusiveOrExpression ConditionalAndExpressionR ^| ;
 
-InclusiveOrExpression
-    = ExclusiveOrExpression (OR ExclusiveOrExpression)*
+InclusiveOrExpression = ExclusiveOrExpression InclusiveOrExpressionR
+InclusiveOrExpressionR = OR ExclusiveOrExpression InclusiveOrExpressionR ^| ;
 
-ExclusiveOrExpression
-    = AndExpression (HAT AndExpression)*
+ExclusiveOrExpression = AndExpression ExclusiveOrExpressionR
+ExclusiveOrExpressionR = HAT AndExpression ExclusiveOrExpressionR ^| ;
 
-AndExpression
-    = EqualityExpression (AND EqualityExpression)*
+AndExpression = EqualityExpression AndExpressionR
+AndExpressionR = AND EqualityExpression AndExpressionR ^| ;
 
-EqualityExpression
-    = RelationalExpression (
-        (EQUAL |  NOT_EQUAL) RelationalExpression
-      )*
+EqualityExpression = RelationalExpression EqualityExpressionR
+EqualityExpressionR = (EQUAL ^|  NOT_EQUAL) RelationalExpression EqualityExpressionR ^| ;
 
-RelationalExpression
-    = ShiftExpression (
-        (LE | GE | LT | GT) ShiftExpression 
-      | INSTANCEOF ReferenceType
-      )*
+RelationalExpression = ShiftExpression RelationalExpressionR
+RelationalExpressionR 
+    = ((LE ^| GE ^| LT ^| GT) ShiftExpression ^| INSTANCEOF ReferenceType) RelationalExpressionR ^| ;
 
-ShiftExpression
-    = AdditiveExpression ((SL | SR | BSR) AdditiveExpression)*
+ShiftExpression = AdditiveExpression ShiftExpressionR
+ShiftExpressionR = (SL ^| SR ^| BSR) AdditiveExpression ShiftExpressionR ^| ;
 
-AdditiveExpression
-    = MultiplicativeExpression (
-        (PLUS | MINUS) MultiplicativeExpression
-      )*
+AdditiveExpression = MultiplicativeExpression AdditiveExpressionR
+AdditiveExpressionR = (PLUS ^| MINUS) MultiplicativeExpression AdditiveExpressionR ^| ;
 
-MultiplicativeExpression
-    = UnaryExpression ((STAR | DIV | MOD) UnaryExpression)*
+MultiplicativeExpression = UnaryExpression MultiplicativeExpressionR
+MultiplicativeExpressionR = (STAR ^| DIV ^| MOD) UnaryExpression MultiplicativeExpressionR ^| ;
 
 UnaryExpression
     = PrefixOp UnaryExpression
-    | LPAR Type RPAR UnaryExpression
-    | Primary (Selector)* (PostfixOp)*
+   ^| LPAR Type RPAR UnaryExpression
+    | Primary SelectorS PostfixOpS
 
 Primary
     = ParExpression
-    | THIS Arguments?
-    | SUPER SuperSuffix
-    | Literal
-    | NEW Creator
-    | QualifiedIdentifier IdentifierSuffix?
-    | BasicType Dim* DOT CLASS
-    | VOID DOT CLASS
+   ^| THIS Arguments?
+   ^| SUPER SuperSuffix
+   ^| Literal
+   ^| NEW Creator
+   ^| QualifiedIdentifier IdentifierSuffix?
+   ^| BasicType DimS DOT CLASS
+   ^| VOID DOT CLASS
 
 IdentifierSuffix
-    = LBRK ( RBRK Dim* DOT CLASS | Expression RBRK)
-    | Arguments
-    | DOT 
+    = LBRK ( RBRK DimS DOT CLASS ^| Expression RBRK)
+   ^| Arguments
+   ^| DOT 
       ( CLASS
-      | THIS 
-      | SUPER Arguments 
-      | NEW InnerCreator 
+     ^| THIS 
+     ^| SUPER Arguments 
+     ^| NEW InnerCreator 
       )
 
 PrefixOp
     = INC
-    | DEC
-    | BANG
-    | TILDA
-    | PLUS
-    | MINUS
+   ^| DEC
+   ^| BANG
+   ^| TILDA
+   ^| PLUS
+   ^| MINUS
 
 PostfixOp
     = INC
-    | DEC
+   ^| DEC
+PostfixOpS = PostfixOp PostfixOpS ^| ;
 
 Selector
     = DOT Identifier Arguments?
-    | DOT THIS
-    | DOT SUPER SuperSuffix
-    | DOT NEW InnerCreator
-    | DimExpr
+   ^| DOT THIS
+   ^| DOT SUPER SuperSuffix
+   ^| DOT NEW InnerCreator
+   ^| DimExpr
+SelectorS = Selector SelectorS ^| ;
 
 SuperSuffix
     = Arguments
-    | DOT Identifier Arguments?
+   ^| DOT Identifier Arguments?
 
 BasicType
     = ( "byte"
-      | "short"
-      | "char"
-      | "int"
-      | "long"
-      | "float"
-      | "double"
-      | "boolean"
-      ) !LetterOrDigit Spacing?
+     ^| "short"
+     ^| "char"
+     ^| "int"
+     ^| "long"
+     ^| "float"
+     ^| "double"
+     ^| "boolean"
+      ) !LetterOrDigit _
 
 Arguments
-    = LPAR (Expression (COMMA Expression)*)? RPAR
+    = LPAR (Expression ExpressionTR ^| ;) RPAR
 
 Creator
     = CreatedName ClassCreatorRest
-    | (ClassType | BasicType) ArrayCreatorRest
+    | (ClassType ^| BasicType) ArrayCreatorRest
 
 CreatedName
-    = Identifier (DOT Identifier)*
+    = Identifier IdentifierQR
 
 InnerCreator
     = Identifier ClassCreatorRest
 
 ArrayCreatorRest
     = LBRK ( 
-        RBRK Dim* ArrayInitializer 
-      | Expression RBRK DimExpr* Dim* 
+        RBRK DimS ArrayInitializer 
+     ^| Expression RBRK DimExpr* Dim* 
       )
     
     # This is more generous than JLS 15.10. According to that 
@@ -369,21 +356,23 @@ ClassCreatorRest
 
 ArrayInitializer
     = LWING 
-      (VariableInitializer (COMMA  VariableInitializer)* COMMA?)? 
+      (VariableInitializer VariableInitializerTR (COMMA ^| ;) ^| ;) 
       RWING
 
 VariableInitializer
     = ArrayInitializer
-    | Expression
+   ^| Expression
+VariableInitializerTR = COMMA VariableInitializer VariableInitializerTR ^| ;
 
 ParExpression
     = LPAR Expression RPAR
 
 QualifiedIdentifier 
-    = Identifier (DOT Identifier)*
+    = Identifier IdentifierQR
 
-Dim 
-    = LBRK RBRK
+Dim = LBRK RBRK
+DimS = Dim DimS ^| ;
+DimP = Dim (DimP ^| ;)
 
 DimExpr
     = LBRK Expression RBRK
@@ -393,31 +382,33 @@ DimExpr
 #-------------------------------------------------------------
 
 Type
-    = (BasicType | ClassType) Dim*
+    = (BasicType ^| ClassType) DimS
 
 ReferenceType
-    = BasicType Dim+
-    | ClassType Dim*
+    = BasicType DimP
+   ^| ClassType DimS
 
 ClassType
-    = Identifier (DOT Identifier)*
+    = Identifier IdentifierQR
+ClassTypeTR = COMMA ClassType ClassTypeTR ^| ;
 
 ClassTypeList
-    = ClassType (COMMA ClassType)*
+    = ClassType ClassTypeTR
 
 Modifier
     = ( "public"
-      | "protected"
-      | "private"
-      | "static"
-      | "abstract"
-      | "final"
-      | "native"
-      | "synchronized"
-      | "transient"
-      | "volatile"
-      | "strictfp"
-      ) !LetterOrDigit Spacing?
+     ^| "protected"
+     ^| "private"
+     ^| "static"
+     ^| "abstract"
+     ^| "final"
+     ^| "native"
+     ^| "synchronized"
+     ^| "transient"
+     ^| "volatile"
+     ^| "strictfp"
+      ) !LetterOrDigit _
+ModifierS = Modifier ModifierS ^| ;
     
     # This common definition of Modifier is part of the 
     # modification in JLS Chapter 18 to minimize look ahead. 
@@ -431,21 +422,24 @@ Modifier
 #  JLS 3.6-7  Spacing
 #-------------------------------------------------------------
 
-Spacing         
-    = ( [ \t\r\n]+              # WhiteSpace
-      | "/*" (!"*/" .)* "*/"      # TraditionalComment
-      | "//" (![\r\n] .)* [\r\n]  # EndOfLineComment
-      )*
+_   = ( [ \t\r\n]  # WhiteSpace
+     ^| "/*" _R1   # TraditionalComment
+     ^| "//" _R2   # EndOfLineComment
+      ) _ ^| ;
+_R1 = "*/" | . _R1
+_R2 = [\r\n] | . _R2
 
 #-------------------------------------------------------------
 #  JLS 3.8  Identifiers
 #-------------------------------------------------------------
 
-Identifier  = !Keyword Letter LetterOrDigit* Spacing?    
+Identifier  = !Keyword Letter LetterOrDigitS _   
+IdentifierQR = DOT Identifier IdentifierQR ^| ; 
     
-Letter = [a-z] | [A-Z] | [_$]
+Letter = [a-zA-Z_$]
 
-LetterOrDigit = [a-z] | [A-Z] | [0-9] | [_$]
+LetterOrDigit = [a-zA-Z0-9_$]
+LetterOrDigitS = LetterOrDigit LetterOrDigitS ^| ;
 
     # These are traditional definitions of letters and digits.
     # JLS defines letters and digits as Unicode characters 
@@ -459,104 +453,103 @@ LetterOrDigit = [a-z] | [A-Z] | [0-9] | [_$]
 Keyword
 
     = ( "abstract" 
-      | "assert"   
-      | "boolean"  
-      | "break"    
-      | "byte"     
-      | "case"     
-      | "catch"    
-      | "char"     
-      | "class"    
-      | "continue" 
-      | "default"  
-      | "double"   
-      | "do"       
-      | "else"     
-      | "enum"     
-      | "extends"  
-      | "false"    
-      | "finally"  
-      | "final"    
-      | "float"    
-      | "for"      
-      | "if"       
-      | "implements"
-      | "import"   
-      | "interface"
-      | "int"      
-      | "instanceof"
-      | "long"     
-      | "native"   
-      | "new"      
-      | "null"     
-      | "package"  
-      | "private"  
-      | "protected"
-      | "public"   
-      | "return"   
-      | "short"    
-      | "static"   
-      | "strictfp" 
-      | "super"    
-      | "switch"   
-      | "synchronized"
-      | "this"
-      | "throws"   
-      | "throw"    
-      | "transient"
-      | "true"     
-      | "try"      
-      | "void"     
-      | "volatile" 
-      | "while"        
+     ^| "assert"   
+     ^| "boolean"  
+     ^| "break"    
+     ^| "byte"     
+     ^| "case"     
+     ^| "catch"    
+     ^| "char"     
+     ^| "class"    
+     ^| "continue" 
+     ^| "default"  
+     ^| "double"   
+     ^| "do"       
+     ^| "else"     
+     ^| "enum"     
+     ^| "extends"  
+     ^| "false"    
+     ^| "finally"  
+     ^| "final"    
+     ^| "float"    
+     ^| "for"      
+     ^| "if"       
+     ^| "implements"
+     ^| "import"   
+     ^| "interface"
+     ^| "int"      
+     ^| "instanceof"
+     ^| "long"     
+     ^| "native"   
+     ^| "new"      
+     ^| "null"     
+     ^| "package"  
+     ^| "private"  
+     ^| "protected"
+     ^| "public"   
+     ^| "return"   
+     ^| "short"    
+     ^| "static"   
+     ^| "strictfp" 
+     ^| "super"    
+     ^| "switch"   
+     ^| "synchronized"
+     ^| "this"
+     ^| "throws"   
+     ^| "throw"    
+     ^| "transient"
+     ^| "true"     
+     ^| "try"      
+     ^| "void"     
+     ^| "volatile" 
+     ^| "while"        
       ) !LetterOrDigit  
 
-ASSERT       = "assert"       !LetterOrDigit Spacing?
-BREAK        = "break"        !LetterOrDigit Spacing?
-CASE         = "case"         !LetterOrDigit Spacing?
-CATCH        = "catch"        !LetterOrDigit Spacing?
-CLASS        = "class"        !LetterOrDigit Spacing?
-CONTINUE     = "continue"     !LetterOrDigit Spacing?
-DEFAULT      = "default"      !LetterOrDigit Spacing?
-DO           = "do"           !LetterOrDigit Spacing?
-ELSE         = "else"         !LetterOrDigit Spacing?
-ENUM         = "enum"         !LetterOrDigit Spacing?
-EXTENDS      = "extends"      !LetterOrDigit Spacing?
-FINALLY      = "finally"      !LetterOrDigit Spacing?
-FINAL        = "final"        !LetterOrDigit Spacing?
-FOR          = "for"          !LetterOrDigit Spacing?
-IF           = "if"           !LetterOrDigit Spacing?
-IMPLEMENTS   = "implements"   !LetterOrDigit Spacing?
-IMPORT       = "import"       !LetterOrDigit Spacing?
-INTERFACE    = "interface"    !LetterOrDigit Spacing?
-INSTANCEOF   = "instanceof"   !LetterOrDigit Spacing?
-NEW          = "new"          !LetterOrDigit Spacing?
-PACKAGE      = "package"      !LetterOrDigit Spacing?
-RETURN       = "return"       !LetterOrDigit Spacing?
-STATIC       = "static"       !LetterOrDigit Spacing?
-SUPER        = "super"        !LetterOrDigit Spacing?
-SWITCH       = "switch"       !LetterOrDigit Spacing?
-SYNCHRONIZED = "synchronized" !LetterOrDigit Spacing?
-THIS         = "this"         !LetterOrDigit Spacing?
-THROWS       = "throws"       !LetterOrDigit Spacing?
-THROW        = "throw"        !LetterOrDigit Spacing?
-TRY          = "try"          !LetterOrDigit Spacing?
-VOID         = "void"         !LetterOrDigit Spacing?
-WHILE        = "while"        !LetterOrDigit Spacing?
+ASSERT       = "assert"       !LetterOrDigit _
+BREAK        = "break"        !LetterOrDigit _
+CASE         = "case"         !LetterOrDigit _
+CATCH        = "catch"        !LetterOrDigit _
+CLASS        = "class"        !LetterOrDigit _
+CONTINUE     = "continue"     !LetterOrDigit _
+DEFAULT      = "default"      !LetterOrDigit _
+DO           = "do"           !LetterOrDigit _
+ELSE         = "else"         !LetterOrDigit _
+ENUM         = "enum"         !LetterOrDigit _
+EXTENDS      = "extends"      !LetterOrDigit _
+FINALLY      = "finally"      !LetterOrDigit _
+FINAL        = "final"        !LetterOrDigit _
+FOR          = "for"          !LetterOrDigit _
+IF           = "if"           !LetterOrDigit _
+IMPLEMENTS   = "implements"   !LetterOrDigit _
+IMPORT       = "import"       !LetterOrDigit _
+INTERFACE    = "interface"    !LetterOrDigit _
+INSTANCEOF   = "instanceof"   !LetterOrDigit _
+NEW          = "new"          !LetterOrDigit _
+PACKAGE      = "package"      !LetterOrDigit _
+RETURN       = "return"       !LetterOrDigit _
+STATIC       = "static"       !LetterOrDigit _
+SUPER        = "super"        !LetterOrDigit _
+SWITCH       = "switch"       !LetterOrDigit _
+SYNCHRONIZED = "synchronized" !LetterOrDigit _
+THIS         = "this"         !LetterOrDigit _
+THROWS       = "throws"       !LetterOrDigit _
+THROW        = "throw"        !LetterOrDigit _
+TRY          = "try"          !LetterOrDigit _
+VOID         = "void"         !LetterOrDigit _
+WHILE        = "while"        !LetterOrDigit _
 
 #-------------------------------------------------------------
 #  JLS 3.10  Literals
 #-------------------------------------------------------------
 
 Literal
-    = ( FloatLiteral
-      | IntegerLiteral # May be a prefix of FloatLiteral
-      | CharLiteral
-      | StringLiteral
-      | "true"  !LetterOrDigit
-      | "false" !LetterOrDigit
-      | "null"  !LetterOrDigit
-      ) Spacing?
+    = ( (FloatLiteral | IntegerLiteral) # IntegerLiteral may be a prefix of FloatLiteral
+      ^| CharLiteral
+      ^| StringLiteral
+      ^| "true"  !LetterOrDigit
+      ^| "false" !LetterOrDigit
+      ^| "null"  !LetterOrDigit
+      ) _
     
 IntegerLiteral
     = ( HexNumeral 
@@ -565,51 +558,57 @@ IntegerLiteral
       ) [lL]?
     
 DecimalNumeral
-    = "0" 
-    | [1-9]Digit*         
+    = "0" ^| [1-9] DigitS       
       
 HexNumeral
-    = ("0x" | "0X") HexDigit+ 
+    = ("0x" ^| "0X") HexDigitP
     
 HexDigit
-    = [a-f] | [A-F] | [0-9]
+    = [a-fA-F0-9]
+HexDigitS = HexDigit HexDigitS ^| ;
+HexDigitP = HexDigit (HexDigitP ^| ;)
       
 OctalNumeral
-    = "0" [0-7]+ 
+    = "0" OctalNumeralP
+OctalNumeralP = [0-7] (OctalNumeral ^| ;)
       
 FloatLiteral 
     = HexFloat
     | DecimalFloat 
 
 DecimalFloat
-    = Digit+ "." Digit*  Exponent? [fFdD]?
-    | "." Digit+ Exponent? [fFdD]?
-    | Digit+ Exponent [fFdD]?
-    | Digit+ Exponent? [fFdD]
+    = DigitP "." DigitS  (Exponent ^| ;) ([fFdD] ^| ;)
+    | "." DigitP (Exponent ^| ;) ([fFdD] ^| ;)
+    | DigitP Exponent ([fFdD] ^| ;)
+    | DigitP (Exponent ^| ;) [fFdD]
     
 Exponent 
-    = [eE] ('+' | '-')? Digit+ 
+    = [eE] ('+' ^| '-' ^| ;) DigitP
 
 Digit  = [0-9]
+DigitS = Digit DigitS ^| ;
+DigitP = Digit (DigitP ^| ;)
     
 HexFloat
-    = HexSignificand BinaryExponent [fFdD]?
+    = HexSignificand BinaryExponent ([fFdD] ^| ;)
 
 HexSignificand
-    = HexNumeral "."?
-    | ("0x" | "0X") HexDigit* "." HexDigit+
+    = HexNumeral ("." ^| ;)
+    | ("0x" ^| "0X") HexDigitS "." HexDigitP
 
 BinaryExponent
-     = [pP] ('+' | '-')? Digit+
+     = [pP] ('+' ^| '-' ^| ;) DigitP
 
 CharLiteral 
-    = "\'" (Escape | ![\'\\] .) "\'"
+    = "\'" (Escape ^| ![\'\\] .) "\'"
 
 StringLiteral 
-    = "\"" (Escape | ![\"\\] .)* "\""
+    = "\"" StringLiteralR
+StringLiteralR
+    = "\"" | (Escape ^| ![\\] .) StringLiteralR
 
 Escape 
-    = "\\" ([btnfr\"\'\\] | OctalEscape | UnicodeEscape) 
+    = "\\" ([btnfr\"\'\\] ^| OctalEscape ^| UnicodeEscape) 
 
 OctalEscape 
     = [0-3][0-7][0-7]
@@ -626,54 +625,52 @@ UnicodeEscape
 #  JLS 3.11-12  Separators, Operators
 #-------------------------------------------------------------
 
-AT              =   "@"       Spacing?
-AND             =   "&"![=&]  Spacing?
-AND_AND         =   "&&"      Spacing?
-AND_EQU         =   "&="      Spacing?
-BANG            =   "!" !"="  Spacing?
-BSR             =   ">>>"!"=" Spacing?
-BSR_EQU         =   ">>>="    Spacing?
-COLON           =   ":"       Spacing?
-COMMA           =   ","       Spacing?
-DEC             =   "--"      Spacing?
-DIV             =   "/" !"="  Spacing?
-DIV_EQU         =   "/="      Spacing?
-DOT             =   "."       Spacing?
-EQU             =   "=" !"="  Spacing?
-EQUAL           =   "=="      Spacing?
-GE              =   ">="      Spacing?
-GT              =   ">"![=>]  Spacing? 
-HAT             =   "^"!"="   Spacing?
-HAT_EQU         =   "^="      Spacing?
-INC             =   "++"      Spacing?
-LBRK            =   "["       Spacing?
-LE              =   "<="      Spacing?
-LPAR            =   "("       Spacing?
-LPOINT          =   "<"       Spacing?
-LT              =   "<"![=<]  Spacing?
-LWING           =   "{"       Spacing?
-MINUS           =   "-"!('=' | '-')  Spacing?
-MINUS_EQU       =   "-="      Spacing?
-MOD             =   "%"!"="   Spacing?
-MOD_EQU         =   "%="      Spacing?
-NOT_EQUAL       =   "!="      Spacing?
-OR              =   "|"![=|]  Spacing?
-OR_EQU          =   "|="      Spacing?
-OR_OR           =   "||"      Spacing?
-PLUS            =   "+"![=+]  Spacing?
-PLUS_EQU        =   "+="      Spacing?
-QUERY           =   "?"       Spacing?
-RBRK            =   "]"       Spacing?
-RPAR            =   ")"       Spacing?
-RPOINT          =   ">"       Spacing?
-RWING           =   "}"       Spacing?
-SEMI            =   ";"       Spacing?
-SL              =   "<<"!"="  Spacing?
-SL_EQU          =   "<<="     Spacing?
-SR              =   ">>"![=>] Spacing?
-SR_EQU          =   ">>="     Spacing?
-STAR            =   "*"!"="   Spacing?
-STAR_EQU        =   "*="      Spacing?
-TILDA           =   "~"       Spacing?
-
-EOT = !.
+AT              =   "@"       _
+AND             =   "&"![=&]  _
+AND_AND         =   "&&"      _
+AND_EQU         =   "&="      _
+BANG            =   "!" !"="  _
+BSR             =   ">>>"!"=" _
+BSR_EQU         =   ">>>="    _
+COLON           =   ":"       _
+COMMA           =   ","       _
+DEC             =   "--"      _
+DIV             =   "/" !"="  _
+DIV_EQU         =   "/="      _
+DOT             =   "."       _
+EQU             =   "=" !"="  _
+EQUAL           =   "=="      _
+GE              =   ">="      _
+GT              =   ">"![=>]  _ 
+HAT             =   "^"!"="   _
+HAT_EQU         =   "^="      _
+INC             =   "++"      _
+LBRK            =   "["       _
+LE              =   "<="      _
+LPAR            =   "("       _
+LPOINT          =   "<"       _
+LT              =   "<"![=<]  _
+LWING           =   "{"       _
+MINUS           =   "-"!('=' ^| '-')  _
+MINUS_EQU       =   "-="      _
+MOD             =   "%"!"="   _
+MOD_EQU         =   "%="      _
+NOT_EQUAL       =   "!="      _
+OR              =   "|"![=|]  _
+OR_EQU          =   "|="      _
+OR_OR           =   "||"      _
+PLUS            =   "+"![=+]  _
+PLUS_EQU        =   "+="      _
+QUERY           =   "?"       _
+RBRK            =   "]"       _
+RPAR            =   ")"       _
+RPOINT          =   ">"       _
+RWING           =   "}"       _
+SEMI            =   ";"       _
+SL              =   "<<"!"="  _
+SL_EQU          =   "<<="     _
+SR              =   ">>"![=>] _
+SR_EQU          =   ">>="     _
+STAR            =   "*"!"="   _
+STAR_EQU        =   "*="      _
+TILDA           =   "~"       _
