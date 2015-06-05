@@ -18,11 +18,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-CXX = clang++
-#CXX = g++
+#CXX = clang++
+CXX = g++
 
 # Development
-CXXFLAGS = -O0 -ggdb --std=c++0x
+#CXXFLAGS = -O0 -ggdb --std=c++0x
 
 # Profiling
 #CXXFLAGS = -O0 -ggdb --std=c++0x -DNDEBUG
@@ -30,7 +30,7 @@ CXXFLAGS = -O0 -ggdb --std=c++0x
 
 # Release
 #CXXFLAGS = -O2 --std=c++0x -DNDEBUG
-#CXXFLAGS = -O3 --std=c++0x -DNDEBUG
+CXXFLAGS = -O3 --std=c++0x -DNDEBUG
 
 parser.hpp:  
 	ln -s ../parser.hpp .
@@ -38,26 +38,26 @@ parser.hpp:
 %.cpp:  %.egg
 	../egg -o $@ -i $<
 
-xml.hpp:  ../perf_test/XML.egg
-	../egg -o xml.hpp -i ../perf_test/XML.egg
+xml.hpp:  ../perf_test/XML-bak.egg
+	../egg -o xml.hpp -i ../perf_test/XML-bak.egg
 
-json.hpp:  ../perf_test/JSON.egg
-	../egg -o json.hpp -i ../perf_test/JSON.egg
+json.hpp:  ../perf_test/JSON-bak.egg
+	../egg -o json.hpp -i ../perf_test/JSON-bak.egg
 
-java.hpp:  ../perf_test/Java.egg
-	../egg -o java.hpp -i ../perf_test/Java.egg
+java.hpp:  ../perf_test/Java-bak.egg
+	../egg -o java.hpp -i ../perf_test/Java-bak.egg
 
 %-nomemo.cpp:  %.egg
 	../egg --no-memo -o $@ -i $<
 
-xml-nomemo.hpp:  ../perf_test/XML.egg
-	../egg --no-memo -o xml-nomemo.hpp -i ../perf_test/XML.egg
+xml-nomemo.hpp:  ../perf_test/XML-bak.egg
+	../egg --no-memo -o xml-nomemo.hpp -i ../perf_test/XML-bak.egg
 
-json-nomemo.hpp:  ../perf_test/JSON.egg
-	../egg --no-memo -o json-nomemo.hpp -i ../perf_test/JSON.egg
+json-nomemo.hpp:  ../perf_test/JSON-bak.egg
+	../egg --no-memo -o json-nomemo.hpp -i ../perf_test/JSON-bak.egg
 
-java-nomemo.hpp:  ../perf_test/Java.egg
-	../egg --no-memo -o java-nomemo.hpp -i ../perf_test/Java.egg
+java-nomemo.hpp:  ../perf_test/Java-bak.egg
+	../egg --no-memo -o java-nomemo.hpp -i ../perf_test/Java-bak.egg
 
 abc:  abc.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -o abc abc.cpp $(LDFLAGS)

@@ -1,0 +1,9 @@
+#!/bin/zsh
+
+ojson=( output/dlf-*-json.csv(om[2]) )
+njson=( output/dlf-*-json.csv(om[1]) )
+oxml=( output/dlf-*-xml.csv(om[2]) )
+nxml=( output/dlf-*-xml.csv(om[1]) )
+
+gnuplot -e "ojson='${ojson}'; njson='${njson}'; oxml='${oxml}'; nxml='${nxml}';" diff_plots.plg
+

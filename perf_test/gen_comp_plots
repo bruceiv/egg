@@ -1,0 +1,16 @@
+#!/bin/zsh
+
+nxml=( output/naive-*-xml.csv(om[1]) )
+njson=( output/naive-*-json.csv(om[1]) )
+njava=( output/naive-*-java.csv(om[1]) )
+pxml=( output/packrat-*-xml.csv(om[1]) )
+pjson=( output/packrat-*-json.csv(om[1]) )
+pjava=( output/packrat-*-java.csv(om[1]) )
+lxml=( output/dlf-*-xml.csv(om[1]) )
+ljson=( output/dlf-*-json.csv(om[1]) )
+ljava=( output/dlf-*-java.csv(om[1]) )
+dxml=( output/deriv-*-xml.csv(om[1]) )
+djson=( output/deriv-*-json.csv(om[1]) )
+djava=( output/deriv-*-json.csv(om[1]) )
+
+gnuplot -e "nxml='${nxml}'; njson='${njson}'; njava='${njava}'; pxml='${pxml}'; pjson='${pjson}'; pjava='${pjava}'; lxml='${lxml}'; ljson='${ljson}'; ljava='${ljava}'; dxml='${dxml}'; djson='${djson}'; djava='${djava}'" comp_plots.plg

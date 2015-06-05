@@ -27,19 +27,8 @@ echo
 outfile="${outname}-java.csv"
 echo '"filename","output","user(s)","sys(s)","wall(s)","max-mem(KB)","size(B)"' | tee $outfile
 # Iterate Java files sorted increasing by size
-for file in input/java-cs/*(oL); do
+for file in input/javacc/*(oL); do
 	echo -n "\"`basename $file`\",\"" | tee -a $outfile
 	/usr/bin/time -f "\",%U,%S,%e,%M," ../egg match Java.egg CompilationUnit < $file 2>&1 | tr -d '\n' | tee -a $outfile
 	stat -c %s $file | tee -a $outfile
 done
-
-#echo
-#
-#outfile="${outname}-java.csv"
-#echo '"filename","output","user(s)","sys(s)","wall(s)","max-mem(KB)","size(B)"' | tee $outfile
-## Iterate Java files sorted increasing by size
-#for file in input/javacc/*(oL); do
-#	echo -n "\"`basename $file`\",\"" | tee -a $outfile
-#	/usr/bin/time -f "\",%U,%S,%e,%M," ../egg match Java.egg CompilationUnit < $file 2>&1 | tr -d '\n' | tee -a $outfile
-#	stat -c %s $file | tee -a $outfile
-#done
