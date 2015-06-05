@@ -1,22 +1,11 @@
 `' DOESN'T MATCH  @0
-	Expected "ab"
-	Expected 'a'
 `abc' MATCHES
 `aabbcc' MATCHES
 `aaabbbccc' MATCHES
 `abbcc' DOESN'T MATCH  @2
-	Expected 'c'
 `aabcc' DOESN'T MATCH  @3
-	Expected 'b'
 `aabbc' DOESN'T MATCH  @5
-	Expected 'c'
 `x' DOESN'T MATCH  @0
-	Expected "ab"
-	Expected 'a'
 `abcc' DOESN'T MATCH  @2
-	Expected "bc"
-	Expected 'b'
 `abbc' DOESN'T MATCH  @2
-	Expected 'c'
 `aabc' DOESN'T MATCH  @3
-	Expected 'b'

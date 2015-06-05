@@ -6,7 +6,3 @@
 3
 3
 SYNTAX ERROR @4
-	Expected ' '
-	Expected '('
-	Expected '\t'
-	Expected character in '0'-'9'
