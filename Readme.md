@@ -1,5 +1,7 @@
 # Egg Parsing Expression Grammar Generator #
 
+**THE dlf BRANCH IS AN ALGORITHMIC EXPERIMENT, AND HAS UNAVOIDABLY POOR PERFORMANCE. THE AUTHOR RECOMMENDS USE OF THE master BRANCH INSTEAD**
+
 Egg is a parser generator for parsing expression grammars (PEGs). 
 Its grammar is based on the grammar of Ian Piumarta's [`leg`](http://piumarta.com/software/peg/). 
 Parsing expression grammars are a formalization of recursive top-down parsers; they are similar to context free grammars, with the primary difference being that alternation in a PEG is ordered, while it is unordered in context free grammars. 
