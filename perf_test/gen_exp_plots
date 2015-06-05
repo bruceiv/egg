@@ -1,0 +1,8 @@
+#!/bin/zsh
+
+nexp=( output/naive-*-exp.csv(om[1]) )
+pexp=( output/packrat-*-exp.csv(om[1]) )
+dexp=( output/deriv-*-exp.csv(om[1]) )
+
+gnuplot -e "nexp='${nexp}'; pexp='${pexp}'; dexp='${dexp}'" exp-plots.plg
+

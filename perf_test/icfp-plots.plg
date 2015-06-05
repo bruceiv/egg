@@ -1,0 +1,85 @@
+# Plots output data from egg performance tests
+# requires parameters nxml, njson, njava, pxml, pjson, pjava, dxml, djson, djava, mxml, mjson, mjava; the files to plot
+
+set datafile separator ","
+
+set terminal pdfcairo linewidth 3
+set output 'plots/runtime.pdf'
+
+set xlabel 'Input Size (KB)'
+set ylabel 'Runtime (s)'
+set key top left
+
+set style line 1 lt rgb '#ce5c00' lw 1.5 pt 2
+set style line 2 lt rgb '#ce5c00' lw 1.5 pt 7
+set style line 3 lt rgb '#ce5c00' lw 1.5 pt 4
+
+set style line 4 lt rgb '#8ae234' lw 1.5 pt 2
+set style line 5 lt rgb '#8ae234' lw 1.5 pt 7
+set style line 6 lt rgb '#8ae234' lw 1.5 pt 4
+
+set style line 7 lt rgb '#5c3566' lw 1.5 pt 2
+set style line 8 lt rgb '#5c3566' lw 1.5 pt 7
+set style line 9 lt rgb '#5c3566' lw 1.5 pt 4
+
+set style line 10 lt rgb '#ce5c00' lw 1.5 pt 3
+set style line 11 lt rgb '#8ae234' lw 1.5 pt 3
+set style line 12 lt rgb '#5c3566' lw 1.5 pt 3
+
+plot nxml using ($7/1000):3 with linespoints title 'Recursive XML' ls 1, \
+     njson using ($7/1000):3 with linespoints title 'Recursive JSON' ls 2, \
+     njava using ($7/1000):3 with linespoints title 'Recursive Java' ls 3, \
+     pxml using ($7/1000):3 with linespoints title 'Packrat XML' ls 4, \
+     pjson using ($7/1000):3 with linespoints title 'Packrat JSON' ls 5, \
+     pjava using ($7/1000):3 with linespoints title 'Packrat Java' ls 6, \
+     dxml using ($7/1000):3 with linespoints title 'Derivative XML' ls 7, \
+     djson using ($7/1000):3 with linespoints title 'Derivative JSON' ls 8, \
+     djava using ($7/1000):3 with linespoints title 'Derivative Java' ls 9
+
+set output 'plots/mem-use.pdf'
+set ylabel 'Maximum RAM Use (MB)'
+
+plot nxml using ($7/1000):($6/1000) with linespoints title 'Recursive XML' ls 1, \
+     njson using ($7/1000):($6/1000) with linespoints title 'Recursive JSON' ls 2, \
+     njava using ($7/1000):($6/1000) with linespoints title 'Recursive Java' ls 3, \
+     pxml using ($7/1000):($6/1000) with linespoints title 'Packrat XML' ls 4, \
+     pjson using ($7/1000):($6/1000) with linespoints title 'Packrat JSON' ls 5, \
+     pjava using ($7/1000):($6/1000) with linespoints title 'Packrat Java' ls 6, \
+     dxml using ($7/1000):($6/1000) with linespoints title 'Derivative XML' ls 7, \
+     djson using ($7/1000):($6/1000) with linespoints title 'Derivative JSON' ls 8, \
+     djava using ($7/1000):($6/1000) with linespoints title 'Derivative Java' ls 9
+
+set output 'plots/mem-use-nomemo.pdf'
+set key top right
+
+plot nxml using ($7/1000):($6/1000) with linespoints title 'Recursive XML' ls 1, \
+     njson using ($7/1000):($6/1000) with linespoints title 'Recursive JSON' ls 2, \
+     njava using ($7/1000):($6/1000) with linespoints title 'Recursive Java' ls 3, \
+     dxml using ($7/1000):($6/1000) with linespoints title 'Derivative XML' ls 7, \
+     djson using ($7/1000):($6/1000) with linespoints title 'Derivative JSON' ls 8, \
+     djava using ($7/1000):($6/1000) with linespoints title 'Derivative Java' ls 9
+
+set output 'plots/speedup.pdf'
+set key top left
+set ytics 0.2
+set ylabel 'Speedup vs. Recursive Descent'
+
+plot 1 title 'Recursive' ls 2, \
+     'pxml-join.csv' using ($7/1000):($3/$9) with linespoints title 'Packrat XML' ls 4, \
+     'pjson-join.csv' using ($7/1000):($3/$9) with linespoints title 'Packrat JSON' ls 5, \
+     'pjava-join.csv' using ($7/1000):($3/$9) with linespoints title 'Packrat Java' ls 6, \
+     'dxml-join.csv' using ($7/1000):($3/$9) with linespoints title 'Derivative XML' ls 7, \
+     'djson-join.csv' using ($7/1000):($3/$9) with linespoints title 'Derivative JSON' ls 8, \
+     'djava-join.csv' using ($7/1000):($3/$9) with linespoints title 'Derivative Java' ls 9
+
+set output 'plots/exp-runtime.pdf'
+set xlabel 'n'
+set ytics autofreq
+set ylabel 'Runtime (s)'
+
+
+plot nexp using 1:3 with linespoints title 'Recursive' ls 10, \
+     pexp using 1:3 with linespoints title 'Packrat' ls 11, \
+     dexp using 1:3 with linespoints title 'Derivative' ls 12 
+
+set output

@@ -47,6 +47,9 @@ json.hpp:  ../perf_test/JSON.egg
 java.hpp:  ../perf_test/Java.egg
 	../egg -o java.hpp -i ../perf_test/Java.egg
 
+exp.hpp:  ../perf_test/Exp.egg
+	../egg -o exp.hpp -i ../perf_test/Exp.egg
+
 %-nomemo.cpp:  %.egg
 	../egg --no-memo -o $@ -i $<
 
@@ -58,6 +61,9 @@ json-nomemo.hpp:  ../perf_test/JSON.egg
 
 java-nomemo.hpp:  ../perf_test/Java.egg
 	../egg --no-memo -o java-nomemo.hpp -i ../perf_test/Java.egg
+
+exp-nomemo.hpp:  ../perf_test/Exp.egg
+	../egg --no-memo -o exp-nomemo.hpp -i ../perf_test/Exp.egg
 
 abc:  abc.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -o abc abc.cpp $(LDFLAGS)
@@ -80,6 +86,9 @@ json:  json.hpp json.cpp parser.hpp
 java:  java.hpp java.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -o java java.cpp $(LDFLAGS)
 
+exp:  exp.hpp exp.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -o exp exp.cpp $(LDFLAGS)
+
 abc-nomemo:  abc-nomemo.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -o abc-nomemo abc-nomemo.cpp $(LDFLAGS)
 
@@ -100,6 +109,9 @@ json-nomemo:  json-nomemo.hpp json.cpp parser.hpp
 
 java-nomemo:  java-nomemo.hpp java.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -DNOMEMO -o java-nomemo java.cpp $(LDFLAGS)
+
+exp-nomemo:  exp-nomemo.hpp exp.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -DNOMEMO -o exp-nomemo exp.cpp $(LDFLAGS)
 
 egg:
 	cd .. && $(MAKE) egg

@@ -5,6 +5,7 @@ nested
 xml
 json
 java
+exp
 abc-nomemo
 anbncn-nomemo
 calc-nomemo
@@ -12,6 +13,7 @@ nested-nomemo
 xml-nomemo
 json-nomemo
 java-nomemo
+exp-nomemo
 *.hpp
 abc.cpp
 anbncn.cpp

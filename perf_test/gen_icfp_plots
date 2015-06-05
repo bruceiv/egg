@@ -1,0 +1,28 @@
+#!/bin/zsh
+
+nxml=( output/naive-*-xml.csv(om[1]) )
+njson=( output/naive-*-json.csv(om[1]) )
+njava=( output/naive-*-java.csv(om[1]) )
+pxml=( output/packrat-*-xml.csv(om[1]) )
+pjson=( output/packrat-*-json.csv(om[1]) )
+pjava=( output/packrat-*-java.csv(om[1]) )
+dxml=( output/deriv-*-xml.csv(om[1]) )
+djson=( output/deriv-*-json.csv(om[1]) )
+djava=( output/deriv-*-java.csv(om[1]) )
+nexp=( output/naive-*-exp.csv(om[1]) )
+pexp=( output/packrat-*-exp.csv(om[1]) )
+dexp=( output/deriv-*-exp.csv(om[1]) )
+
+join -t ',' $nxml $pxml > pxml-join.csv
+join -t ',' $njson $pjson > pjson-join.csv
+join -t ',' $njava $pjava > pjava-join.csv
+join -t ',' $nxml $dxml > dxml-join.csv
+join -t ',' $njson $djson > djson-join.csv
+join -t ',' $njava $djava > djava-join.csv
+join -t ',' $pxml $dxml > d2xml-join.csv
+join -t ',' $pjson $djson > d2json-join.csv
+join -t ',' $pjava $djava > d2java-join.csv
+
+gnuplot -e "nxml='${nxml}'; njson='${njson}'; njava='${njava}'; pxml='${pxml}'; pjson='${pjson}'; pjava='${pjava}'; dxml='${dxml}'; djson='${djson}'; djava='${djava}'; nexp='${nexp}'; pexp='${pexp}'; dexp='${dexp}';" icfp-plots.plg
+
+rm {p,d,d2}{xml,json,java}-join.csv
