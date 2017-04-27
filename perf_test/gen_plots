@@ -20,6 +20,8 @@ join -t ',' $pxml $dxml > d2xml-join.csv
 join -t ',' $pjson $djson > d2json-join.csv
 join -t ',' $pjava $djava > d2java-join.csv
 
+if [[ ! -d plots ]]; then mkdir plots; fi
+
 gnuplot -e "nxml='${nxml}'; njson='${njson}'; njava='${njava}'; pxml='${pxml}'; pjson='${pjson}'; pjava='${pjava}'; dxml='${dxml}'; djson='${djson}'; djava='${djava}'" plots.plg
 
 rm {p,d,d2}{xml,json,java}-join.csv

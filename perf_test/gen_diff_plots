@@ -5,4 +5,6 @@ ojson=( output/mut-deriv-*-json.csv(om[2]) )
 nxml=( output/mut-deriv-*-xml.csv(om[1]) )
 njson=( output/mut-deriv-*-json.csv(om[1]) )
 
+if [[ ! -d plots ]]; then mkdir plots; fi
+
 gnuplot -e "oxml='${oxml}'; ojson='${ojson}'; nxml='${nxml}'; njson='${njson}'" diff_plots.plg

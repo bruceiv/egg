@@ -3,12 +3,18 @@
 vertag="`date +%y%m%d%H%M`-`git describe --tags --long`"
 outfile="output/deriv-${vertag}-exp.csv"
 
+if [[ ! -d output ]]; then mkdir output; fi
+
 echo '"n","output","user(s)","sys(s)","wall(s)","max-mem(KB)"' | tee $outfile
 # Iterate exponential files sorted increasing by size through derivative parser
-for file in input/exp/*(oL[1,49]); do
-	echo -n "`basename $file`,\"" | tee -a $outfile
-	timeout 60s /usr/bin/time -f "\",%U,%S,%e,%M," ../egg match Exp.egg S < $file 2>&1 | tr -d '\n' | tee -a $outfile
-	echo | tee -a $outfile
+for file in input/exp/*(oL); do
+	result="`basename $file`,\""
+	result+=`timeout 60s /usr/bin/time -f "\",%U,%S,%e,%M" ../egg match Exp.egg S < $file 2>&1`
+	if [[ $? -ne 0 ]]; then break;
+	else 
+		echo $result | tr -d '\n' | tee -a $outfile
+		echo | tee -a $outfile
+	fi
 done
 
 echo
@@ -16,11 +22,15 @@ echo
 outfile="output/packrat-${vertag}-exp.csv"
 
 echo '"n","output","user(s)","sys(s)","wall(s)","max-mem(KB)"' | tee $outfile
-# Iterate exponential files sorted increasing by size through derivative parser
+# Iterate exponential files sorted increasing by size through packrat parser
 for file in input/exp/*(oL); do
-	echo -n "`basename $file`,\"" | tee -a $outfile
-	timeout 60s /usr/bin/time -f "\",%U,%S,%e,%M," ../grammars/exp < $file 2>&1 | tr -d '\n' | tee -a $outfile
-	echo | tee -a $outfile
+	result="`basename $file`,\""
+	result+=`timeout 60s /usr/bin/time -f "\",%U,%S,%e,%M" ../grammars/exp < $file 2>&1`
+	if [[ $? -ne 0 ]]; then break;
+	else 
+		echo $result | tr -d '\n' | tee -a $outfile
+		echo | tee -a $outfile
+	fi
 done
 
 echo
@@ -28,9 +38,13 @@ echo
 outfile="output/naive-${vertag}-exp.csv"
 
 echo '"n","output","user(s)","sys(s)","wall(s)","max-mem(KB)"' | tee $outfile
-# Iterate exponential files sorted increasing by size through derivative parser
-for file in input/exp/*(oL[1,16]); do
-	echo -n "`basename $file`,\"" | tee -a $outfile
-	timeout 60s /usr/bin/time -f "\",%U,%S,%e,%M," ../grammars/exp-nomemo < $file 2>&1 | tr -d '\n' | tee -a $outfile
-	echo | tee -a $outfile
+# Iterate exponential files sorted increasing by size through naive parser
+for file in input/exp/*(oL); do
+	result="`basename $file`,\""
+	result+=`timeout 60s /usr/bin/time -f "\",%U,%S,%e,%M" ../grammars/exp-nomemo < $file 2>&1`
+	if [[ $? -ne 0 ]]; then break;
+	else 
+		echo $result | tr -d '\n' | tee -a $outfile
+		echo | tee -a $outfile
+	fi
 done

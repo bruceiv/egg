@@ -2,6 +2,8 @@
 
 outname="output/naive-`date +%y%m%d%H%M`-`git describe --tags --long`"
 
+if [[ ! -d output ]]; then mkdir output; fi
+
 outfile="${outname}-xml.csv"
 echo '"filename","output","user(s)","sys(s)","wall(s)","max-mem(KB)","size(B)"' | tee $outfile
 # Iterate XML files sorted increasing by size

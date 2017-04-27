@@ -4,5 +4,7 @@ nexp=( output/naive-*-exp.csv(om[1]) )
 pexp=( output/packrat-*-exp.csv(om[1]) )
 dexp=( output/deriv-*-exp.csv(om[1]) )
 
+if [[ ! -d plots ]]; then mkdir plots; fi
+
 gnuplot -e "nexp='${nexp}'; pexp='${pexp}'; dexp='${dexp}'" exp-plots.plg
 
