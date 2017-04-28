@@ -40,7 +40,7 @@ namespace derivs {
 	/// Rebuilds a set of derivative expressions using their smart constructors
 	class normalizer : derivs::visitor {
 	public:
-		normalizer(memo_expr::table& memo) : rVal(nullptr), memo(memo), rs() {}
+		normalizer() = default;
 		
 		/// Converts any expression
 		ptr<expr> normalize(ptr<expr> e) {
@@ -67,7 +67,7 @@ namespace derivs {
 			auto it = rs.find(&e);
 			if ( it == rs.end() ) {
 				// no stored rule; store one, then update its pointed to rule
-				ptr<rule_expr> r = std::make_shared<rule_expr>(memo, inf_expr::make());
+				ptr<rule_expr> r = std::make_shared<rule_expr>(inf_expr::make());
 				rs./*emplace(&e, r)*/insert(std::make_pair(&e, r));
 				e.r->accept(this);
 				r->r = rVal;
@@ -80,13 +80,13 @@ namespace derivs {
 		
 		void visit(not_expr& e) {
 			e.e->accept(this);
-			rVal = not_expr::make(memo, rVal);
+			rVal = not_expr::make(rVal);
 		}
 		
 		void visit(map_expr& e) {
 			// won't appear in un-normalized expression anyway
 			e.e->accept(this);
-			rVal = map_expr::make(memo, rVal, e.gm, e.eg);
+			rVal = map_expr::make(rVal, e.gm, e.eg);
 		}
 		
 		void visit(alt_expr& e) {
@@ -95,19 +95,18 @@ namespace derivs {
 				x.e->accept(this);
 				es.emplace_back(rVal);
 			}
-			rVal = alt_expr::make(memo, es);
+			rVal = alt_expr::make(es);
 		}
 		
 		void visit(seq_expr& e) {
 			e.a->accept(this);
 			ptr<expr> a = rVal;
 			e.b->accept(this);
-			rVal = seq_expr::make(memo, a, rVal);
+			rVal = seq_expr::make(a, rVal);
 		}
 	
 	private:
 		ptr<expr>                            rVal;  ///< result of last read
-		memo_expr::table&                    memo;  ///< Memoization table
 		std::map<rule_expr*, ptr<rule_expr>> rs;    ///< Unique transformation of rule expressions
 	};  // class normalizer
 	
@@ -117,7 +116,7 @@ namespace derivs {
 		/// Gets the unique rule expression correspoinding to the given name
 		ptr<rule_expr> get_rule(const std::string& s) {
 			if ( rs.count(s) == 0 ) {
-				ptr<rule_expr> r = std::make_shared<rule_expr>(memo, fail_expr::make());
+				ptr<rule_expr> r = std::make_shared<rule_expr>(fail_expr::make());
 				rs./*emplace(s, r)*/insert(std::make_pair(s, r));
 				return r;
 			} else {
@@ -135,11 +134,10 @@ namespace derivs {
 		/// Makes a new anonymous nonterminal for a many-expression
 		ptr<expr> make_many(ptr<expr> e) {
 			// make anonymous non-terminal R
-			ptr<expr> r = expr::make_ptr<rule_expr>(memo, fail_expr::make());
+			ptr<expr> r = expr::make_ptr<rule_expr>(fail_expr::make());
 			// set non-terminal rule to e R / eps
 			std::static_pointer_cast<rule_expr>(r)->r = 
-				expr::make_ptr<alt_expr>(memo, 
-				                         expr::make_ptr<seq_expr>(memo, e, r),
+				expr::make_ptr<alt_expr>(expr::make_ptr<seq_expr>(e, r),
 				                         eps_expr::make());
 			return r;
 		}
@@ -157,7 +155,7 @@ namespace derivs {
 			rVal = nullptr;
 			
 			// Normalize rules
-			normalizer n(memo);
+			normalizer n;
 			std::map<std::string, ptr<rule_expr>> nrs;
 			for (auto rp : rs) {
 				ptr<rule_expr> nr = n.normalize(rp.second);
@@ -185,9 +183,6 @@ namespace derivs {
 		/// Gets the rules from a grammar
 		std::map<std::string, ptr<rule_expr>>& get_rules() { return rs; }
 		
-		/// Gets the memoization table that goes along with them
-		memo_expr::table& get_memo() { return memo; }
-		
 		/// Gets the rule names for this grammar
 		std::map<expr*, std::string>& get_names() { return names; }
 		
@@ -206,7 +201,7 @@ namespace derivs {
 			// Transform remaining options
 			while ( ++it != m.rs.rend() ) {
 				auto tVal = make_char_range(*it);
-				rVal = expr::make_ptr<alt_expr>(memo, tVal, rVal);
+				rVal = expr::make_ptr<alt_expr>(tVal, rVal);
 			}
 		}
 		
@@ -224,7 +219,7 @@ namespace derivs {
 		virtual void visit(ast::opt_matcher& m) {
 			// match subexpression or epsilon
 			m.m->accept(this);
-			rVal = expr::make_ptr<alt_expr>(memo, rVal, eps_expr::make());
+			rVal = expr::make_ptr<alt_expr>(rVal, eps_expr::make());
 		}
 		
 		virtual void visit(ast::many_matcher& m) {
@@ -234,7 +229,7 @@ namespace derivs {
 		
 		virtual void visit(ast::some_matcher& m) {
 			m.m->accept(this);
-			rVal = expr::make_ptr<seq_expr>(memo, rVal, make_many(rVal));
+			rVal = expr::make_ptr<seq_expr>(rVal, make_many(rVal));
 		}
 		
 		virtual void visit(ast::seq_matcher& m) {
@@ -251,7 +246,7 @@ namespace derivs {
 			while ( ++it != m.ms.rend() ) {
 				ptr<expr> tVal = rVal;
 				(*it)->accept(this);
-				rVal = expr::make_ptr<seq_expr>(memo, rVal, tVal);
+				rVal = expr::make_ptr<seq_expr>(rVal, tVal);
 			}
 		}
 		
@@ -265,17 +260,17 @@ namespace derivs {
 				mi->accept(this);
 				es.emplace_back(rVal);
 			}
-			rVal = alt_expr::make(memo, es);
+			rVal = alt_expr::make(es);
 		}
 		
 		virtual void visit(ast::look_matcher& m) {
 			m.m->accept(this);
-			rVal = expr::make_ptr<not_expr>(memo, expr::make_ptr<not_expr>(memo, rVal));
+			rVal = expr::make_ptr<not_expr>(expr::make_ptr<not_expr>(rVal));
 		}
 		
 		virtual void visit(ast::not_matcher& m) {
 			m.m->accept(this);
-			rVal = expr::make_ptr<not_expr>(memo, rVal);
+			rVal = expr::make_ptr<not_expr>(rVal);
 		}
 		
 		virtual void visit(ast::capt_matcher& m) {
@@ -296,7 +291,6 @@ namespace derivs {
 	private:
 		std::map<std::string, ptr<rule_expr>>  rs;     ///< List of rules
 		std::map<expr*, std::string>           names;  ///< Names of rule expressions
-		memo_expr::table                       memo;   ///< Memoization table
 		ptr<expr>                              rVal;   ///< Return value of node visits
 	};  // class loader
 	
@@ -308,7 +302,6 @@ namespace derivs {
 	/// @return true for match, false for failure
 	bool match(loader& l, std::istream& in, std::string rule, bool dbg = false) {
 		auto& rs = l.get_rules();
-		auto& memo = l.get_memo();
 		derivs::printer p(std::cout, l.get_names());
 		
 		// fail on no such rule
@@ -340,7 +333,6 @@ namespace derivs {
 			}
 			
 			e = e->d(x);
-			memo.clear(); // clear memoization table after every character
 			
 			if ( x == '\0' ) break;
 		}

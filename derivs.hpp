@@ -45,8 +45,8 @@
  * the original expression which start with the given prefix.
  */
 namespace derivs {
-	template <typename T>
-	using ptr = std::shared_ptr<T>;
+	template <typename T> using ptr = std::shared_ptr<T>;
+	template <typename T> using memo_ptr = std::weak_ptr<T>;
 	
 	/// map of backtrack generations
 	using gen_map  = utils::uint_pfn;
@@ -172,13 +172,9 @@ namespace derivs {
 	/// Abstract base class for memoized parsing expressions
 	class memo_expr : public expr {
 	friend class fixer;
-	public:
-		/// Memoization table type
-		using table = std::unordered_map<memo_expr*, ptr<expr>>;
-	
 	protected:
 		/// Constructor providing memoization table reference
-		memo_expr(table& memo) : memo(memo) { flags = {false,false}; }
+		memo_expr() : memo_d(), last_char(0x7F) { flags = {false,false}; }
 		
 		/// Actual derivative calculation
 		virtual ptr<expr> deriv(char) const = 0;
@@ -200,9 +196,11 @@ namespace derivs {
 		virtual gen_set   back()    const;
 	
 	protected:
-		table&          memo;        ///< Memoization table for derivatives
-		mutable gen_set memo_match;  ///< Stored match set
-		mutable gen_set memo_back;   ///< Stored backtracking set
+		mutable memo_ptr<expr> memo_d; ///< Stored derivative
+		mutable gen_set memo_match;    ///< Stored match set
+		mutable gen_set memo_back;     ///< Stored backtracking set
+		/// Character stored derivative was taken w.r.t. [0x7F for none such]
+		mutable char last_char;
 		mutable struct {
 			bool match : 1; ///< Is there a match set stored?
 			bool back  : 1; ///< Is there a backtrack set stored?
@@ -411,9 +409,9 @@ namespace derivs {
 	/// A parsing expression representing a non-terminal
 	class rule_expr : public memo_expr {
 	public:
-		rule_expr(memo_expr::table& memo, ptr<expr> r = nullptr) : memo_expr(memo), r(r) {}
+		rule_expr(ptr<expr> r = nullptr) : memo_expr(), r(r) {}
 		
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> r = nullptr);
+		static ptr<expr> make(ptr<expr> r = nullptr);
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char) const;
@@ -427,10 +425,9 @@ namespace derivs {
 	/// A parsing expression representing negative lookahead
 	class not_expr : public memo_expr {
 	public:
-		not_expr(memo_expr::table& memo, ptr<expr> e)
-			: memo_expr(memo), e(e) { flags.match = flags.back = true; }
+		not_expr(ptr<expr> e) : memo_expr(), e(e) { flags.match = flags.back = true; }
 		
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> e);
+		static ptr<expr> make(ptr<expr> e);
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char) const;
@@ -447,10 +444,9 @@ namespace derivs {
 	/// Maintains generation mapping from collapsed alternation expression.
 	class map_expr : public memo_expr {
 	public:
-		map_expr(memo_expr::table& memo, ptr<expr> e, gen_type gm, gen_map eg)
-			: memo_expr(memo), e(e), gm(gm), eg(eg) {}
+		map_expr(ptr<expr> e, gen_type gm, gen_map eg) : memo_expr(), e(e), gm(gm), eg(eg) {}
 		
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> e, gen_type mg, gen_map eg);
+		static ptr<expr> make(ptr<expr> e, gen_type mg, gen_map eg);
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char) const;
@@ -474,20 +470,19 @@ namespace derivs {
 		};  // struct alt_node
 		using alt_list = std::vector<alt_node>;
 		
-		alt_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
-		         gen_map ag = gen_map{0}, gen_map bg = gen_map{0}, gen_type gm = 0)
-			: memo_expr(memo), es{alt_node{a, ag}, alt_node{b, bg}}, gm(gm) {}
+		alt_expr(ptr<expr> a, ptr<expr> b, 
+				gen_map ag = gen_map{0}, gen_map bg = gen_map{0}, gen_type gm = 0)
+			: memo_expr(), es{alt_node{a, ag}, alt_node{b, bg}}, gm(gm) {}
 		
-		alt_expr(memo_expr::table& memo, const alt_list& es, gen_type gm) 
-			: memo_expr(memo), es(es), gm(gm) {}
+		alt_expr(const alt_list& es, gen_type gm) : memo_expr(), es(es), gm(gm) {}
 		
 		/// Make an expression using the default generation rules
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
+		static ptr<expr> make(ptr<expr> a, ptr<expr> b);
 		/// Make an expression with the given generation maps
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, 
+		static ptr<expr> make(ptr<expr> a, ptr<expr> b, 
 		                      gen_map ag, gen_map bg, gen_type gm);
 		/// Make an expression using the default generation rules
-		static ptr<expr> make(memo_expr::table& memo, const expr_list& es);
+		static ptr<expr> make(const expr_list& es);
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char) const;
@@ -513,19 +508,18 @@ namespace derivs {
 		}; // struct look_node
 		using look_list = std::vector<look_node>;
 		
-		seq_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b)
-			: memo_expr(memo), a(a), b(b), bs(), c(fail_expr::make()), cg(gen_map{0}), gm(0) {}
+		seq_expr(ptr<expr> a, ptr<expr> b)
+			: memo_expr(), a(a), b(b), bs(), c(fail_expr::make()), cg(gen_map{0}), gm(0) {}
 		
-		seq_expr(memo_expr::table& memo, ptr<expr> a, ptr<expr> b, look_list bs, 
-		         ptr<expr> c, gen_map cg, gen_type gm)
-			: memo_expr(memo), a(a), b(b), bs(bs), c(c), cg(cg), gm(gm) {}
+		seq_expr(ptr<expr> a, ptr<expr> b, look_list bs, ptr<expr> c, gen_map cg, gen_type gm)
+			: memo_expr(), a(a), b(b), bs(bs), c(c), cg(cg), gm(gm) {}
 	
-		static ptr<expr> make(memo_expr::table& memo, ptr<expr> a, ptr<expr> b);
+		static ptr<expr> make(ptr<expr> a, ptr<expr> b);
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char) const;
-		virtual gen_set  match_set()  const;
-		virtual gen_set  back_set()   const;
+		virtual gen_set   match_set() const;
+		virtual gen_set   back_set()  const;
 		virtual expr_type type()      const { return seq_type; }
 		
 		ptr<expr> a;   ///< First subexpression
