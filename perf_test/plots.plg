@@ -1,5 +1,5 @@
 # Plots output data from egg performance tests
-# requires parameters nxml, njson, njava, pxml, pjson, pjava, dxml, djson, djava, mxml, mjson, mjava; the files to plot
+# requires parameters nxml, njson, njava, pxml, pjson, pjava, dxml, djson, djava; the files to plot
 
 set datafile separator ","
 

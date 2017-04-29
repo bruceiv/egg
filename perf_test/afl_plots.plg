@@ -1,0 +1,80 @@
+# Plots output data from egg performance tests
+# requires parameters nxml, njson, njava, nexp, pxml, pjson, pjava, pexp, dxml, djson, djava, dexp; the files to plot
+
+set terminal epslatex size 16cm,5cm color solid
+
+set style line 1 lt rgb 'red' lw 1.25 pt 1 ps 1.3
+set style line 2 lt rgb 'red' lw 1.25 pt 2 ps 1.3
+set style line 3 lt rgb 'red' lw 1.25 pt 3 ps 1.3
+
+set style line 4 lt rgb 'green' lw 1.25 pt 5 ps 1.3
+set style line 5 lt rgb 'green' lw 1.25 pt 7 ps 1.3
+set style line 6 lt rgb 'green' lw 1.25 pt 9 ps 1.3
+
+set style line 7 lt rgb 'blue' lw 1.25 pt 4 ps 1.3
+set style line 8 lt rgb 'blue' lw 1.25 pt 6 ps 1.3
+set style line 9 lt rgb 'blue' lw 1.25 pt 8 ps 1.3
+
+set format x '\lbl %g'
+set format y '\lbl %g'
+
+set bmargin at screen 0.1
+
+set key outside
+set key top right
+set key width -8
+
+set datafile separator ","
+
+set output 'runtime.tex'
+set xlabel '\lbl Input Size (KB)'
+set ylabel '\lbl Runtime (s)' offset 2,0
+
+plot nxml using ($7/1000):3 with points title '\lbl Recursive XML' ls 1, \
+     njson using ($7/1000):3 with points title '\lbl Recursive JSON' ls 2, \
+     njava using ($7/1000):3 with points title '\lbl Recursive Java' ls 3, \
+     pxml using ($7/1000):3 with points title '\lbl Packrat XML' ls 4, \
+     pjson using ($7/1000):3 with points title '\lbl Packrat JSON' ls 5, \
+     pjava using ($7/1000):3 with points title '\lbl Packrat Java' ls 6, \
+     dxml using ($7/1000):3 with points title '\lbl Derivative XML' ls 7, \
+     djson using ($7/1000):3 with points title '\lbl Derivative JSON' ls 8, \
+     djava using ($7/1000):3 with points title '\lbl Derivative Java' ls 9
+
+set output 'speedup.tex'
+set ytics 0.2
+set yrange [0:1.1]
+set ylabel '\lbl Speedup vs. Recursive' offset 2,0
+
+plot 1 title '\lbl Recursive' ls 2, \
+     'pxml-join.csv' using ($7/1000):($3/$9) with points title '\lbl Packrat XML' ls 4, \
+     'pjson-join.csv' using ($7/1000):($3/$9) with points title '\lbl Packrat JSON' ls 5, \
+     'pjava-join.csv' using ($7/1000):($3/$9) with points title '\lbl Packrat Java' ls 6, \
+     'dxml-join.csv' using ($7/1000):($3/$9) with points title '\lbl Derivative XML' ls 7, \
+     'djson-join.csv' using ($7/1000):($3/$9) with points title '\lbl Derivative JSON' ls 8, \
+     'djava-join.csv' using ($7/1000):($3/$9) with points title '\lbl Derivative Java' ls 9
+
+set output 'mem-use.tex'
+set logscale xy
+set ytics autofreq
+set autoscale y
+set ylabel '\lbl Maximum RAM Use (MB)' offset 2,0
+
+plot nxml using ($7/1000):($6/1000) with points title '\lbl Recursive XML' ls 1, \
+     njson using ($7/1000):($6/1000) with points title '\lbl Recursive JSON' ls 2, \
+     njava using ($7/1000):($6/1000) with points title '\lbl Recursive Java' ls 3, \
+     pxml using ($7/1000):($6/1000) with points title '\lbl Packrat XML' ls 4, \
+     pjson using ($7/1000):($6/1000) with points title '\lbl Packrat JSON' ls 5, \
+     pjava using ($7/1000):($6/1000) with points title '\lbl Packrat Java' ls 6, \
+     dxml using ($7/1000):($6/1000) with points title '\lbl Derivative XML' ls 7, \
+     djson using ($7/1000):($6/1000) with points title '\lbl Derivative JSON' ls 8, \
+     djava using ($7/1000):($6/1000) with points title '\lbl Derivative Java' ls 9
+
+set output 'exp-runtime.tex'
+set key width -7
+set nologscale xy
+set xlabel '\lbl n'
+set ylabel '\lbl Runtime (s)' offset 2,0
+
+plot nexp using 1:3 with points title '\lbl Recursive' ls 2, \
+     pexp using 1:3 with points title '\lbl Packrat' ls 5, \
+     dexp using 1:3 with points title '\lbl Derivative' ls 8
