@@ -61,6 +61,7 @@ namespace derivs {
 		void visit(char_expr& e)  { rVal = char_expr::make(e.c); }
 		void visit(range_expr& e) { rVal = range_expr::make(e.b, e.e); }
 		void visit(any_expr& e)   { rVal = any_expr::make(); }
+		void visit(none_expr& e)  { rVal = none_expr::make(); }
 		void visit(str_expr& e)   { rVal = str_expr::make(e.str()); }
 		
 		void visit(rule_expr& e) {
@@ -96,6 +97,15 @@ namespace derivs {
 				es.emplace_back(rVal);
 			}
 			rVal = alt_expr::make(es);
+		}
+
+		void visit(ualt_expr& e) {
+			expr_list es;
+			for (auto& x : e.es) {
+				x.e->accept(this);
+				es.emplace_back(rVal);
+			}
+			rVal = ualt_expr::make(es);
 		}
 		
 		void visit(seq_expr& e) {
@@ -201,13 +211,15 @@ namespace derivs {
 			// Transform remaining options
 			while ( ++it != m.rs.rend() ) {
 				auto tVal = make_char_range(*it);
-				rVal = expr::make_ptr<alt_expr>(tVal, rVal);
+				rVal = expr::make_ptr<ualt_expr>(tVal, rVal);
 			}
 		}
 		
 		virtual void visit(ast::rule_matcher& m) { rVal = get_rule(m.rule); }
 		
 		virtual void visit(ast::any_matcher& m) { rVal = expr::make_ptr<any_expr>(); }
+
+		virtual void visit(ast::none_matcher& m) { rVal = expr::make_ptr<none_expr>(); }
 		
 		virtual void visit(ast::empty_matcher& m) { rVal = eps_expr::make(); }
 		
@@ -261,6 +273,19 @@ namespace derivs {
 				es.emplace_back(rVal);
 			}
 			rVal = alt_expr::make(es);
+		}
+
+		virtual void visit(ast::ualt_matcher& m) {
+			// Empty sequence is a success
+			if ( m.ms.size() == 0 ) { rVal = eps_expr::make(); return; }
+			
+			// Transform options to expression list
+			expr_list es;
+			for (auto& mi : m.ms) {
+				mi->accept(this);
+				es.emplace_back(rVal);
+			}
+			rVal = ualt_expr::make(es);
 		}
 		
 		virtual void visit(ast::look_matcher& m) {

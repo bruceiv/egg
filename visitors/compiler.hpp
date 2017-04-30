@@ -122,6 +122,12 @@ namespace visitor {
 			}
 		}
 		
+		void visit(ast::ualt_matcher& m) {
+			for (auto it = m.ms.begin(); lexical && it != m.ms.end(); ++it) {
+				(*it)->accept(this);
+			}
+		}
+		
 		void visit(ast::capt_matcher& m) { lexical = m.var.empty(); }
 	private:
 		bool lexical;  ///< Is the given expression lacking in semantic elements?
@@ -214,6 +220,10 @@ namespace visitor {
 		void visit(ast::empty_matcher& m) {
 			out << "parser::empty()";
 		}
+		
+		void visit(ast::none_matcher& m) {
+			out << "parser::none()";
+		}
 
 		void visit(ast::action_matcher& m) {
 			//runs action code with all variables bound, then returns true
@@ -284,6 +294,45 @@ namespace visitor {
 		}
 		
 		void visit(ast::alt_matcher& m) {
+			// empty alternation bad form, but always matches
+			if ( m.ms.empty() ) {
+				out << "parser::empty()";
+				return;
+			}
+			
+			// singleton alternation also bad form, equivalent to the single matcher
+			if ( m.ms.size() == 1 ) {
+				m.ms.front()->accept(this);
+				return;
+			}
+
+			std::string indent(++tabs, '\t');
+			
+			out << std::endl
+				<< indent << "parser::choice({\n"
+				<< indent << "\t"
+				;
+			
+			indent += '\t';
+			++tabs;
+
+			auto it = m.ms.begin();
+			(*it)->accept(this);
+			while ( ++it != m.ms.end() ) {
+				out << "," << std::endl
+					<< indent 
+					;
+				(*it)->accept(this);
+			}
+
+			out << "})";
+
+			tabs -= 2;
+		}
+		
+		void visit(ast::ualt_matcher& m) {
+			// NOTE: this does NOT provide unordered choice semantics; the ualt_matcher is a user optimization
+			
 			// empty alternation bad form, but always matches
 			if ( m.ms.empty() ) {
 				out << "parser::empty()";

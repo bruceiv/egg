@@ -28,7 +28,7 @@ CompilationUnit
         | InterfaceDeclaration
         )
       )*
-      EOT
+      $
     
 PackageDeclaration
     = PACKAGE QualifiedIdentifier SEMI
@@ -675,5 +675,3 @@ SR_EQU          =   ">>="     Spacing?
 STAR            =   "*"!"="   Spacing?
 STAR_EQU        =   "*="      Spacing?
 TILDA           =   "~"       Spacing?
-
-EOT = !.

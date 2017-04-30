@@ -1,4 +1,4 @@
-Document       = prolog Element Misc* EOT
+Document       = prolog Element Misc* $
 prolog 	       = XMLDecl? Misc*
 XMLDecl 	   = "<?xml" VersionInfo EncodingDecl? S? "?>"
 VersionInfo    = S "version" Eq ("\'" VersionNum "\'" 
@@ -19,7 +19,6 @@ NAME           = (LETTER | "_" | ":") NAME_CHAR*
 ENTITY_REF     = "&" NAME ";"
 CHAR_REF 	   = "&#x" [0-9a-fA-F]+ ";" | "&#" [0-9]+ ";"
 REFERENCE 	   = ENTITY_REF | CHAR_REF
-EOT            = !.
 COMMENT 	   = "<!--" (!'-' . | "-" !'-' .)* "-->"
 ATT_VALUE 	   = "\"" (![<&\"] . | REFERENCE)* "\""
 			         | "\'"  (![<&\'] . | REFERENCE)* "\'"

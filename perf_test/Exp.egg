@@ -1,5 +1,5 @@
 # Grammar with possible exponential runtime under recursive descent
 
-S = A '\n' !.
+S = A '\n' $
 A = 'a' A 'b' | 'a' A 'c' | ;
 

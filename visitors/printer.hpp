@@ -80,6 +80,10 @@ namespace visitor {
 		void visit(ast::empty_matcher& m) {
 			out << ";";
 		}
+		
+		void visit(ast::none_matcher& m) {
+			out << "$";
+		}
 
 		void visit(ast::action_matcher& m) {
 			out << "{" << strings::single_line(m.a) << "}";
@@ -126,6 +130,23 @@ namespace visitor {
 				(*iter)->accept(this);
 				while ( ++iter != m.ms.end() ) {
 					out << "\n" << indent << "| ";
+					(*iter)->accept(this);
+				}
+				
+				--tabs;
+			}
+			if ( m.ms.size() != 1 ) { out << " )"; }
+		}
+		
+		void visit(ast::ualt_matcher& m) {
+			if ( m.ms.size() != 1 ) { out << "( "; }
+			if ( ! m.ms.empty() ) {
+				std::string indent((4 * ++tabs), ' ');
+
+				auto iter = m.ms.begin();
+				(*iter)->accept(this);
+				while ( ++iter != m.ms.end() ) {
+					out << "\n" << indent << "^| ";
 					(*iter)->accept(this);
 				}
 				
@@ -187,8 +208,8 @@ namespace visitor {
 		}
 		
 	private:
-		std::ostream& out;	/**< output stream */
-		int tabs;			/**< current number of tab stops */
+		std::ostream& out;	///< output stream
+		int tabs;			///< current number of tab stops
 	};
 } /* namespace visitor */
 

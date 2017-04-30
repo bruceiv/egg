@@ -48,11 +48,13 @@ namespace derivs {
 		void visit(char_expr& e)  { compound = false; }
 		void visit(range_expr& e) { compound = false; }
 		void visit(any_expr& e)   { compound = false; }
+		void visit(none_expr& e)  { compound = false; }
 		void visit(str_expr& e)   { compound = false; }
 		void visit(rule_expr& e)  { compound = false; }
 		void visit(not_expr& e)   { compound = false; }
 		void visit(map_expr& e)   { compound = false; }
 		void visit(alt_expr& e)   { compound = true; }
+		void visit(ualt_expr& e)  { compound = true; }
 		void visit(seq_expr& e)   { compound = true; }
 		
 	private:
@@ -178,6 +180,8 @@ namespace derivs {
 		}
 		
 		void visit(any_expr& e)   { out << "."; }
+
+		void visit(none_expr& e)   { out << "$"; }
 		
 		void visit(str_expr& e)   { out << "\"" << strings::escape(e.str()) << "\""; }
 		
@@ -199,14 +203,7 @@ namespace derivs {
 		}
 		
 		void visit(not_expr& e)   { out << "!"; print_unbraced(e.e); }
-/*		void visit(not_expr& e)   {
-			out << "(not:";
-			print_fns(&e);
-			out << " ";
-			print_unbraced(e.e);
-			out << ")";
-		}
-*/		
+		
 		void visit(map_expr& e)   {
 			out << "(map:";
 			print_fns(&e);
@@ -233,6 +230,29 @@ namespace derivs {
 
 			while ( ++et != e.es.end() ) {
 				out << " / ";
+				print_uint_map(et->eg);
+				out << " ";
+				print_unbraced(et->e);
+			}
+
+			out << ")";
+		}
+
+		void visit(ualt_expr& e)  {
+			out << "(ualt:";
+			print_fns(&e);
+			out << "g" << (unsigned int)e.gm;
+			
+			auto et = e.es.begin();
+			if ( et != e.es.end() ) {
+				out << " ";
+				print_uint_map(et->eg);
+				out << " ";
+				print_unbraced(et->e);
+			}
+
+			while ( ++et != e.es.end() ) {
+				out << " ^/ ";
 				print_uint_map(et->eg);
 				out << " ";
 				print_unbraced(et->e);

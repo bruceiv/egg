@@ -63,11 +63,13 @@ namespace derivs {
 	class char_expr;
 	class range_expr;
 	class any_expr;
+	class none_expr;
 	class str_expr;
 	class rule_expr;
 	class not_expr;
 	class map_expr;
 	class alt_expr;
+	class ualt_expr;
 	class seq_expr;
 	
 	/// Type of expression node
@@ -79,11 +81,13 @@ namespace derivs {
 		char_type,
 		range_type,
 		any_type,
+		none_type,
 		str_type,
 		rule_type,
 		not_type,
 		map_type,
 		alt_type,
+		ualt_type,
 		seq_type
 	}; // enum expr_type
 	
@@ -99,11 +103,13 @@ namespace derivs {
 		virtual void visit(char_expr&)  = 0;
 		virtual void visit(range_expr&) = 0;
 		virtual void visit(any_expr&)   = 0;
+		virtual void visit(none_expr&)  = 0;
 		virtual void visit(str_expr&)   = 0;
 		virtual void visit(rule_expr&)  = 0;
 		virtual void visit(not_expr&)   = 0;
 		virtual void visit(map_expr&)   = 0;
 		virtual void visit(alt_expr&)   = 0;
+		virtual void visit(ualt_expr&)  = 0;
 		virtual void visit(seq_expr&)   = 0;
 	}; // class visitor
 	
@@ -223,11 +229,13 @@ namespace derivs {
 		void visit(char_expr&);
 		void visit(range_expr&);
 		void visit(any_expr&);
+		void visit(none_expr&);
 		void visit(str_expr&);
 		void visit(rule_expr&);
 		void visit(not_expr&);
 		void visit(map_expr&);
 		void visit(alt_expr&);
+		void visit(ualt_expr&);
 		void visit(seq_expr&);
 	
 	private:
@@ -384,6 +392,20 @@ namespace derivs {
 		virtual expr_type type()  const { return any_type; }
 	}; // class any_expr
 
+	/// A parsing expression which matches end-of-input
+	class none_expr : public expr {
+	public:
+		none_expr() = default;
+		
+		static ptr<expr> make();
+		void accept(visitor* v) { v->visit(*this); }
+		
+		virtual ptr<expr> d(char) const;
+		virtual gen_set   match() const;
+		virtual gen_set   back()  const;
+		virtual expr_type type()  const { return none_type; }
+	}; // class none_expr
+
 	/// A parsing expression representing a character string
 	class str_expr : public expr {
 		str_expr(ptr<std::string> sp, unsigned long i) : sp(sp), i(i) {}
@@ -493,6 +515,42 @@ namespace derivs {
 		alt_list  es;  ///< List of subexpressions, ordered by priority
 		gen_type  gm;  ///< Maximum generation
 	}; // class alt_expr
+
+	/// A parsing expression representing the unordered alternation of two parsing expressions
+	/// An optimization which accepts the first match; correctness is guaranteed by grammar writer.
+	class ualt_expr : public memo_expr {
+	public:
+		struct alt_node {
+			alt_node(ptr<expr> e, gen_map eg) : e(e), eg(eg) {}
+
+			ptr<expr> e;   ///< Subexpression
+			gen_map   eg;  ///< Generation flags for subexpression
+		};  // struct alt_node
+		using alt_list = std::vector<alt_node>;
+		
+		ualt_expr(ptr<expr> a, ptr<expr> b, 
+				gen_map ag = gen_map{0}, gen_map bg = gen_map{0}, gen_type gm = 0)
+			: memo_expr(), es{alt_node{a, ag}, alt_node{b, bg}}, gm(gm) {}
+		
+		ualt_expr(const alt_list& es, gen_type gm) : memo_expr(), es(es), gm(gm) {}
+		
+		/// Make an expression using the default generation rules
+		static ptr<expr> make(ptr<expr> a, ptr<expr> b);
+		/// Make an expression with the given generation maps
+		static ptr<expr> make(ptr<expr> a, ptr<expr> b, 
+		                      gen_map ag, gen_map bg, gen_type gm);
+		/// Make an expression using the default generation rules
+		static ptr<expr> make(const expr_list& es);
+		void accept(visitor* v) { v->visit(*this); }
+		
+		virtual ptr<expr> deriv(char) const;
+		virtual gen_set   match_set() const;
+		virtual gen_set   back_set()  const;
+		virtual expr_type type()      const { return alt_type; }
+		
+		alt_list  es;  ///< List of subexpressions
+		gen_type  gm;  ///< Maximum generation
+	}; // class ualt_expr
 	
 	/// A parsing expression representing the concatenation of two parsing expressions
 	class seq_expr : public memo_expr {

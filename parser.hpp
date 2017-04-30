@@ -92,8 +92,8 @@ namespace parser {
 		 *  Uses Bryan Ford's heuristic of "furthest forward error information".
 		 */
 		error& operator |= (const error& o) {
-			if ( pos > o.pos /* || o.empty() */ ) return *this;
-			if ( pos < o.pos /* || empty() */ ) return *this = o;
+			if ( pos > o.pos ) return *this;
+			if ( pos < o.pos ) return *this = o;
 			
 			expected.insert(o.expected.begin(), o.expected.end());
 			messages.insert(o.messages.begin(), o.messages.end());
@@ -101,10 +101,10 @@ namespace parser {
 		}
 		
 		/** Adds an "expected" message */
-		inline error& expect(const std::string& s) { expected./*emplace*/insert(s); return *this; }
+		inline error& expect(const std::string& s) { expected.emplace(s); return *this; }
 		
 		/** Adds a programmer-defined error message */
-		inline error& message(const std::string& s) { messages./*emplace*/insert(s); return *this; }
+		inline error& message(const std::string& s) { messages.emplace(s); return *this; }
 		
 		/** Tests both sets of messages for emptiness */
 		inline bool empty() const { return expected.empty() && messages.empty(); }
@@ -537,6 +537,9 @@ namespace parser {
 			return true;
 		}
 		
+		/** Attempts to match end-of-input at the current position */
+		bool matches_none() { return (*this)() == '\0'; }
+		
 		/** Attempts to match a character in the given range at the current 
 		 *  position.
 		 *  @param s        The start of the range
@@ -627,6 +630,7 @@ namespace parser {
 //		return [](state& ps) { return ps.matches_any(); };
 		return [](state& ps) {
 			if ( ps.matches_any() ) { return true; }
+
 			ps.fail();
 			return false;
 		};
@@ -640,6 +644,16 @@ namespace parser {
 		return [&psVal](state& ps) {
 			if ( ps.matches_any(psVal) ) { return true; }
 			
+			ps.fail();
+			return false;
+		};
+	}
+	
+	/** End-of-input parser */
+	combinator none() {
+		return [](state& ps) {
+			if ( ps.matches_none() ) { return true; }
+
 			ps.fail();
 			return false;
 		};

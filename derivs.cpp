@@ -37,11 +37,13 @@ namespace derivs {
 		case char_type:  out << "CHAR";  break;
 		case range_type: out << "RANGE"; break;
 		case any_type:   out << "ANY";   break;
+		case none_type:  out << "NONE";  break;
 		case str_type:   out << "STR";   break;
 		case rule_type:  out << "RULE";  break;
 		case not_type:   out << "NOT";   break;
 		case map_type:   out << "MAP";   break;
 		case alt_type:   out << "ALT";   break;
+		case ualt_type:  out << "UALT";  break;
 		case seq_type:   out << "SEQ";   break;
 		}
 		return out;
@@ -157,8 +159,8 @@ namespace derivs {
 		// Fast path for expressions that can't have recursively-defined match set
 		switch ( x->type() ) {
 		case fail_type: case inf_type:   case eps_type: case look_type:
-		case char_type: case range_type: case any_type: case str_type: 
-		case not_type:
+		case char_type: case range_type: case any_type: case none_type: 
+		case str_type:  case not_type:
 			fixed.insert(x);
 			return x->match();
 		default: break;
@@ -216,6 +218,7 @@ namespace derivs {
 	void fixer::visit(char_expr&)   { match = gen_set{}; }
 	void fixer::visit(range_expr&)  { match = gen_set{}; }
 	void fixer::visit(any_expr&)    { match = gen_set{}; }
+	void fixer::visit(none_expr&)   { match = gen_set{}; }
 	void fixer::visit(str_expr& x)  { match = gen_set{}; }
 	
 	void fixer::visit(rule_expr& x) {
@@ -243,6 +246,22 @@ namespace derivs {
 	}
 	
 	void fixer::visit(alt_expr& x)  {
+		// Save changed and visited references, in case first iter_match overwrites
+		bool& changed = *(this->changed);
+		std::unordered_set<ptr<expr>>& visited = *(this->visited);
+		
+		// Calculate and cache match set
+		gen_set m;
+		
+		for (auto& e : x.es) {
+			m |= e.eg(iter_match(e.e, changed, visited));
+		}
+		
+		match = x.memo_match = m;
+		x.flags.match = true;
+	}
+
+	void fixer::visit(ualt_expr& x)  {
 		// Save changed and visited references, in case first iter_match overwrites
 		bool& changed = *(this->changed);
 		std::unordered_set<ptr<expr>>& visited = *(this->visited);
@@ -410,6 +429,19 @@ namespace derivs {
 	gen_set any_expr::match() const { return gen_set{}; }
 	
 	gen_set any_expr::back()  const { return gen_set{0}; }
+
+	// none_expr ///////////////////////////////////////////////////////////////////
+	
+	ptr<expr> none_expr::make() { return expr::make_ptr<none_expr>(); }
+	
+	// None-expression only matches at end-of-input
+	ptr<expr> none_expr::d(char x) const {
+		return ( x == '\0' ) ? eps_expr::make() : fail_expr::make();
+	}
+	
+	gen_set none_expr::match() const { return gen_set{}; }
+	
+	gen_set none_expr::back()  const { return gen_set{0}; }
 	
 	// str_expr ////////////////////////////////////////////////////////////////////
 	
@@ -471,6 +503,7 @@ namespace derivs {
 		switch ( e->type() ) {
 		case fail_type: return look_expr::make(1);  // return match on subexpression failure
 		case inf_type:  return e;                   // propegate infinite loop
+		case any_type:  return none_expr::make();   // !. becomes $ for end-of-input
 		default:        break;
 		}
 		
@@ -673,6 +706,132 @@ namespace derivs {
 	}
 	
 	gen_set alt_expr::back_set() const {
+		gen_set x;
+		for (auto& e : es) { x |= e.eg(e.e->back()); }
+		return x;
+	}
+
+	// alt_expr ////////////////////////////////////////////////////////////////////
+	
+	ptr<expr> ualt_expr::make(ptr<expr> a, ptr<expr> b) {
+		switch ( a->type() ) {
+		// if first alternative fails, use second
+		case fail_type: return b;
+		// if first alternative is infinite loop, propegate
+		case inf_type:  return a; // an inf_expr
+		default:        break; // do nothing
+		}
+		
+		// if first alternative matches or second alternative fails, use first
+		if ( b->type() == fail_type || ! a->match().empty() ) return a;
+
+		// if second alternative matches, use it
+		if ( ! b->match().empty() ) return b;
+		
+		bool did_inc = false;
+		gen_map ag = expr::default_back_map(a, did_inc);
+		gen_map bg = expr::default_back_map(b, did_inc);
+		return expr::make_ptr<ualt_expr>(a, b, ag, bg, 0 + did_inc);
+	}
+	
+	ptr<expr> ualt_expr::make(ptr<expr> a, ptr<expr> b, 
+	                          gen_map ag, gen_map bg, gen_type gm) {
+	    assert(!(ag.empty() || bg.empty()) && "backtrack maps non-empty");
+	    assert(gm >= ag.max() && gm >= bg.max() && "gm is actual maximum");
+	    
+		switch ( a->type() ) {
+		// if first alternative fails, use second
+		case fail_type: return map_expr::make(b, gm, bg);
+		// if first alternative is infinite loop, propegate
+		case inf_type:  return a; // an inf_expr
+		default:        break; // do nothing
+		}
+		
+		// if first alternative matches or second alternative fails, use first
+		if ( b->type() == fail_type || ! a->match().empty() ) {
+			return map_expr::make(a, gm, ag);
+		}
+
+		// if second alternative matches, use it
+		if ( ! b->match().empty() ) return map_expr::make(b, gm, bg);
+		
+		return expr::make_ptr<ualt_expr>(a, b, ag, bg, gm);
+	}
+
+	ptr<expr> ualt_expr::make(const expr_list& es) {
+		// Empty alternation list is an epsilon-rule; all failing list is a fail-rule
+		if ( es.empty() ) return eps_expr::make();
+
+		bool did_inc = false;
+		
+		alt_list nes;
+		for (auto& e : es) {
+			expr_type ety = e->type();
+			// skip failing nodes
+			if ( ety == fail_type ) continue;
+
+			// Set default generation map and add to list
+			gen_map eg = expr::default_back_map(e, did_inc);
+			nes.emplace_back(e, eg);
+			
+			// infinite loops end the alternation
+			if ( ety == inf_type ) break;
+
+			// matching nodes replace the alternation
+			if ( ! e->match().empty() ) return map_expr::make(e, 0 + did_inc, eg);
+		}
+
+		// Eliminate alternation node if not enough nodes left
+		switch ( nes.size() ) {
+		case 0: return fail_expr::make();
+		case 1: return map_expr::make(nes[0].e, 0 + did_inc, nes[0].eg);
+		default: return expr::make_ptr<ualt_expr>(nes, 0 + did_inc);
+		}
+	}
+	
+	ptr<expr> ualt_expr::deriv(char x) const {
+		bool did_inc = false;
+		
+		alt_list des;
+		for (auto& e : es) {
+			// Take derivative
+			ptr<expr> de = e.e->d(x);
+			
+			expr_type dety = de->type();
+			// skip failing nodes
+			if ( dety == fail_type ) continue;
+			// infinite loops end the alternation
+			if ( dety == inf_type ) { des.emplace_back(de, e.eg); break; }
+			
+			// Update generation map
+			gen_map deg = expr::update_back_map(e.e, de, e.eg, gm, did_inc);
+
+			if ( de->match().empty() ) {
+				// add to alternation if no match
+				des.emplace_back(de, deg);
+			} else {
+				// propegate match if seen
+				return map_expr::make(de, gm + did_inc, deg);
+			}
+		}
+		
+		// Eliminate alternation node if not enough nodes left
+		switch ( des.size() ) {
+		case 0: return fail_expr::make();
+		case 1: return map_expr::make(des[0].e, gm + did_inc, des[0].eg);
+		default: return expr::make_ptr<ualt_expr>(des, gm + did_inc);
+		}
+	}
+	
+	gen_set ualt_expr::match_set() const {
+		gen_set x;
+		for (auto& e : es) { x |= e.eg(e.e->match()); }
+		// TODO test this, then replace by empty set if applicable
+		assert( x.empty() && "ualt_expr should disappear if any branch matches" );
+		return x;
+	}
+	
+	gen_set ualt_expr::back_set() const {
 		gen_set x;
 		for (auto& e : es) { x |= e.eg(e.e->back()); }
 		return x;

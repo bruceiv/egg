@@ -62,8 +62,12 @@ err_string: std::string `error string` =
 			{ psVal = strings::unescape_error(s); }
 
 choice: ast::alt_matcher_ptr =
-		sequence : m { psVal = ast::make_ptr<ast::alt_matcher>(); *psVal += m; } 
-			( PIPE sequence : m { *psVal += m; } )*
+		un_choice : m { psVal = ast::make_ptr<ast::alt_matcher>(); *psVal += m; } 
+			( PIPE un_choice : m { *psVal += m; } )*
+
+un_choice: ast::ualt_matcher_ptr = 
+		sequence : m { psVal = ast::make_ptr<ast::ualt_matcher>(); *psVal += m; }
+			( UN_PIPE sequence : m { *psVal += m; } )*
 
 sequence: ast::seq_matcher_ptr =
 		{ psVal = ast::make_ptr<ast::seq_matcher>(); }
@@ -93,6 +97,7 @@ primary: ast::matcher_ptr =
 		    ( BIND identifier : s 
 		        { ast::as_ptr<ast::any_matcher>(psVal)->var = s; } )?
 		| EMPTY { psVal = ast::make_ptr<ast::empty_matcher>(); }
+		| NONE { psVal = ast::make_ptr<ast::none_matcher>(); }
 		| ( BEGIN sequence : bm END BIND identifier : s 
 		    { psVal = ast::make_ptr<ast::capt_matcher>(bm, s); } )@`capturing expression`
 		| EXPECT ( 
@@ -131,6 +136,7 @@ OUT_END =		@"%}"
 BIND =			@':' _
 EQUAL =			@'=' _
 PIPE =			@'|' _
+UN_PIPE =       @"^|" _
 AND =			@'&' _
 NOT =			@'!' _
 OPT =			@'?' _
@@ -140,6 +146,7 @@ OPEN =			@'(' _
 CLOSE =			@')' _
 ANY =			@'.' _
 EMPTY =			@';' _
+NONE =          @'$' _
 BEGIN =			@'<' _
 END =			@'>' _
 EXPECT =		@'@' _
@@ -150,5 +157,5 @@ space =			' ' | '\t' | end_of_line
 comment =		'#' ( !end_of_line . )* end_of_line
 end_of_line = 	"\r\n" | '\n' | '\r'
 
-end_of_file `end of input` = !.
+end_of_file `end of input` = $
 

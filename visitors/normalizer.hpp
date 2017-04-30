@@ -56,6 +56,10 @@ namespace visitor {
 		void visit(ast::empty_matcher& m) {
 			rVal = ast::make_ptr<ast::empty_matcher>();
 		}
+		
+		void visit(ast::none_matcher& m) {
+			rVal = ast::make_ptr<ast::none_matcher>();
+		}
 
 		void visit(ast::action_matcher& m) {
 			rVal = ast::as_ptr<ast::matcher>(
@@ -122,6 +126,26 @@ namespace visitor {
 				break;
 			}
 		}
+		
+		void visit(ast::ualt_matcher& m) {
+			switch( m.ms.size() ) {
+			case 0:
+				rVal = ast::make_ptr<ast::empty_matcher>();
+				break;
+			case 1:
+				m.ms.front()->accept(this);
+				// rVal = rVal;
+				break;
+			default:
+				ast::ualt_matcher_ptr p = ast::make_ptr<ast::ualt_matcher>();
+				for (auto it = m.ms.begin(); it != m.ms.end(); ++it) {
+					(*it)->accept(this);
+					*p += rVal;
+				}
+				rVal = ast::as_ptr<ast::matcher>(p);
+				break;
+			}
+		}
 
 		void visit(ast::look_matcher& m) {
 			m.m->accept(this);
@@ -132,9 +156,14 @@ namespace visitor {
 
 		void visit(ast::not_matcher& m) {
 			m.m->accept(this);
-			m.m = rVal;
-			rVal = ast::as_ptr<ast::matcher>(
-					ast::make_ptr<ast::not_matcher>(m));
+			if ( rVal->type() == ast::any_type ) {
+				// replace !. by $ for end-of-input
+				rVal = ast::make_ptr<ast::none_matcher>();
+			} else {
+				m.m = rVal;
+				rVal = ast::as_ptr<ast::matcher>(
+						ast::make_ptr<ast::not_matcher>(m));
+			}
 		}
 
 		void visit(ast::capt_matcher& m) {
