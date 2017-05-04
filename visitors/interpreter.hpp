@@ -69,7 +69,7 @@ namespace derivs {
 			if ( it == rs.end() ) {
 				// no stored rule; store one, then update its pointed to rule
 				ptr<rule_expr> r = std::make_shared<rule_expr>(inf_expr::make());
-				rs./*emplace(&e, r)*/insert(std::make_pair(&e, r));
+				rs.emplace(&e, r)/*insert(std::make_pair(&e, r))*/;
 				e.r->accept(this);
 				r->r = rVal;
 				r->reset_memo();
@@ -127,7 +127,7 @@ namespace derivs {
 		ptr<rule_expr> get_rule(const std::string& s) {
 			if ( rs.count(s) == 0 ) {
 				ptr<rule_expr> r = std::make_shared<rule_expr>(fail_expr::make());
-				rs./*emplace(s, r)*/insert(std::make_pair(s, r));
+				rs.emplace(s, r)/*insert(std::make_pair(s, r))*/;
 				return r;
 			} else {
 				return rs.at(s);
@@ -149,6 +149,16 @@ namespace derivs {
 			std::static_pointer_cast<rule_expr>(r)->r = 
 				expr::make_ptr<alt_expr>(expr::make_ptr<seq_expr>(e, r),
 				                         eps_expr::make());
+			return r;
+		}
+
+		/// Makes a new anonymous nonterminal for an until-expression
+		ptr<expr> make_until(ptr<expr> e, ptr<expr> t) {
+			// make anonymous nonterminal R
+			ptr<expr> r = expr::make_ptr<rule_expr>(fail_expr::make());
+			// set non-terminal rule to t / e R
+			std::static_pointer_cast<rule_expr>(r)->r =
+				expr::make_ptr<alt_expr>(t, expr::make_ptr<seq_expr>(e, r));
 			return r;
 		}
 		
@@ -286,6 +296,13 @@ namespace derivs {
 				es.emplace_back(rVal);
 			}
 			rVal = ualt_expr::make(es);
+		}
+
+		virtual void visit(ast::until_matcher& m) {
+			m.r->accept(this);
+			ptr<expr> r = rVal;
+			m.t->accept(this);
+			rVal = make_until(r, rVal);
 		}
 		
 		virtual void visit(ast::look_matcher& m) {

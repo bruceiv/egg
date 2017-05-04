@@ -147,6 +147,15 @@ namespace visitor {
 			}
 		}
 
+		void visit(ast::until_matcher& m) {
+			m.r->accept(this);
+			m.r = rVal;
+			m.t->accept(this);
+			m.t = rVal;
+			rVal = ast::as_ptr<ast::matcher>(
+					ast::make_ptr<ast::until_matcher>(m));
+		}
+
 		void visit(ast::look_matcher& m) {
 			m.m->accept(this);
 			m.m = rVal;

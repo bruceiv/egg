@@ -255,6 +255,18 @@ namespace visitor {
 			m.m->accept(this);
 			out << ")";
 		}
+
+		void visit(ast::until_matcher& m) {
+			if ( do_memo && is_lexical(m.r) && is_lexical(m.t) ) {
+				out << "parser::memoize_until(" << ++max_memo_id << ", ";
+			} else {
+				out << "parser::until(";
+			}
+			m.r->accept(this);
+			out << ", ";
+			m.t->accept(this);
+			out << ")";
+		}
 		
 		void visit(ast::seq_matcher& m) {
 			// empty sequence bad form, but always matches

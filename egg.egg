@@ -80,6 +80,7 @@ expression: ast::matcher_ptr `` =
 			OPT { psVal = ast::make_ptr<ast::opt_matcher>(m); }
 			| STAR { psVal = ast::make_ptr<ast::many_matcher>(m); }
 			| PLUS { psVal = ast::make_ptr<ast::some_matcher>(m); }
+			| UNTIL primary : n { psVal = ast::make_ptr<ast::until_matcher>(m, n); }
 			| EXPECT err_string : s { psVal = ast::make_ptr<ast::named_matcher>(m, s); } )?
 
 primary: ast::matcher_ptr =
@@ -137,6 +138,7 @@ BIND =			@':' _
 EQUAL =			@'=' _
 PIPE =			@'|' _
 UN_PIPE =       @"^|" _
+UNTIL =			@"->" _
 AND =			@'&' _
 NOT =			@'!' _
 OPT =			@'?' _

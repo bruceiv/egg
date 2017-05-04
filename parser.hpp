@@ -592,7 +592,6 @@ namespace parser {
 	
 	/** Character literal parser */
 	combinator literal(state::value_type c) {
-//		return [c](state& ps) { return ps.matches(c); };
 		return [c](state& ps) {
 			if ( ps.matches(c) ) { return true; }
 			
@@ -607,7 +606,6 @@ namespace parser {
 	combinator literal(state::value_type c, state::value_type& psVal) {
 		return [c,&psVal](state& ps) {
 			if ( ps.matches(c) ) { psVal = c; return true; }
-//			else return false;
 			
 			ps.fail();
 			return false;
@@ -616,7 +614,6 @@ namespace parser {
 	
 	/** String literal parser */
 	combinator literal(const state::string_type& s) {
-//		return [&s](state& ps) { return ps.matches(s); };
 		return [&s](state& ps) {
 			if ( ps.matches(s) ) { return true; }
 			
@@ -627,7 +624,6 @@ namespace parser {
 	
 	/** Any character parser */
 	combinator any() {
-//		return [](state& ps) { return ps.matches_any(); };
 		return [](state& ps) {
 			if ( ps.matches_any() ) { return true; }
 
@@ -640,7 +636,6 @@ namespace parser {
 	 *  @param psVal    Will be bound to the character matched
 	 */
 	combinator any(state::value_type& psVal) {
-//		return [&psVal](state& ps) { return ps.matches_any(psVal); };
 		return [&psVal](state& ps) {
 			if ( ps.matches_any(psVal) ) { return true; }
 			
@@ -661,7 +656,6 @@ namespace parser {
 	
 	/** Character range parser parser */
 	combinator between(state::value_type s, state::value_type e) {
-//		return [s,e](state& ps) { return ps.matches_in(s, e); };
 		return [s,e](state& ps) {
 			if ( ps.matches_in(s, e) ) { return true; }
 			
@@ -674,7 +668,6 @@ namespace parser {
 	 *  @param psVal    Will be bound to the character matched
 	 */
 	combinator between(state::value_type s, state::value_type e, state::value_type& psVal) {
-//		return [s,e,&psVal](state& ps) { return ps.matches_in(s, e, psVal); };
 		return [s,e,&psVal](state& ps) {
 			if ( ps.matches_in(s, e, psVal) ) { return true; }
 			
@@ -720,6 +713,18 @@ namespace parser {
 			while ( f(ps) )
 				;
 			return true;
+		};
+	}
+
+	/** Matches a parser repeatedly until its terminator matches */
+	combinator until(const combinator& r, const combinator& t) {
+		return [&r,&t](state& ps) {
+			if ( t(ps) ) return true;
+			posn psStart = ps.posn();
+			while ( r(ps) )
+				if ( t(ps) ) return true;
+			ps.set_posn(psStart);
+			return false;
 		};
 	}
 	
@@ -815,6 +820,27 @@ namespace parser {
 			}
 			return m;
 		}
+
+		/** Helper function for memoizing until-repetition */
+		memo until_memoized(ind id, const combinator& r, const combinator& t, state& ps) {
+			memo m;
+			if ( ps.memo(id, m) ) {
+				if ( m.success ) ps.set_posn(m.end);
+			} else {
+				posn psStart = ps.posn();
+				if ( t(ps) ) {
+					m.success = true;
+					m.end = ps.posn();
+				} else if ( r(ps) ) {
+					m = until_memoized(id, r, t, ps);
+				} else {
+					m.success = false;
+					m.end = ps.posn();
+				}
+				ps.set_memo(psStart, id, m);
+			}
+			return m;
+		}
 	} /* anonymous namespace */
 	
 	/** Memoizes a many-matcher  */
@@ -831,6 +857,14 @@ namespace parser {
 			posn psStart = ps.posn();
 			many_memoized(id, f, ps);
 			return ( ps.posn() > psStart );
+		};
+	}
+
+	/** Memoizes an until-matcher */
+	combinator memoize_until(ind id, const combinator& r, const combinator& t) {
+		return [id,&r,&t](state& ps) {
+			memo m = until_memoized(id, r, t, ps);
+			return m.success;
 		};
 	}
 	

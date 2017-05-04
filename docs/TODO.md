@@ -2,8 +2,6 @@
 - Finish derivative implementation
 - add &{ ... } semantic predicates to the language
 - add ~{ ... } failure actions to the language
-- add until operator ->
-  - `a -> b` is shorthand for `(!b a)* b`
 - Improve binding syntax so it can bind directly to most C++ rValues
   - Motivating case is `e:v { x.y = v }`
 - Add backtrack trimming (i.e. auto-cut on last alternation option)

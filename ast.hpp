@@ -72,6 +72,7 @@ namespace ast {
 	class seq_matcher;
 	class alt_matcher;
 	class ualt_matcher;
+	class until_matcher;
 	class look_matcher;
 	class not_matcher;
 	class capt_matcher;
@@ -94,6 +95,7 @@ namespace ast {
 		seq_type,
 		alt_type,
 		ualt_type,
+		until_type,
 		look_type,
 		not_type,
 		capt_type,
@@ -119,6 +121,7 @@ namespace ast {
 		virtual void visit(seq_matcher&) = 0;
 		virtual void visit(alt_matcher&) = 0;
 		virtual void visit(ualt_matcher&) = 0;
+		virtual void visit(until_matcher&) = 0;
 		virtual void visit(look_matcher&) = 0;
 		virtual void visit(not_matcher&) = 0;
 		virtual void visit(capt_matcher&) = 0;
@@ -321,8 +324,21 @@ namespace ast {
 		ualt_matcher& operator += (shared_ptr<matcher> m) { ms.push_back(m); return *this; }
 
 		vector<shared_ptr<matcher>> ms; /**< The alternate matchers */
-	}; /* class alt_matcher */
+	}; /* class ualt_matcher */
 	typedef shared_ptr<ualt_matcher> ualt_matcher_ptr;
+
+	/** Until matcher. */
+	class until_matcher : public matcher {
+	public:
+		until_matcher(shared_ptr<matcher> r, shared_ptr<matcher> t) : r(r), t(t) {}
+
+		void accept(visitor* v) { v->visit(*this); }
+		matcher_type type() { return until_type; }
+
+		shared_ptr<matcher> r; /**< The repeated matcher */
+		shared_ptr<matcher> t; /**< The terminator matcher */
+	}; /* class until_matcher */
+	typedef shared_ptr<until_matcher> until_matcher_ptr;
 
 	/** Lookahead matcher. */
 	class look_matcher : public matcher {
@@ -410,6 +426,7 @@ namespace ast {
 		virtual void visit(seq_matcher& m) {}
 		virtual void visit(alt_matcher& m) {}
 		virtual void visit(ualt_matcher& m) {}
+		virtual void visit(until_matcher& m) {}
 		virtual void visit(look_matcher& m) {}
 		virtual void visit(not_matcher& m) {}
 		virtual void visit(capt_matcher& m) {}
@@ -436,6 +453,10 @@ namespace ast {
 			for (auto it = m.ms.begin(); it != m.ms.end(); ++it) {
 				(*it)->accept(this);
 			}
+		}
+		virtual void visit(until_matcher& m) {
+			m.r->accept(this);
+			m.t->accept(this);
 		}
 		virtual void visit(look_matcher& m) { m.m->accept(this); }
 		virtual void visit(not_matcher& m) { m.m->accept(this); }

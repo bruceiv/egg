@@ -155,6 +155,12 @@ namespace visitor {
 			if ( m.ms.size() != 1 ) { out << " )"; }
 		}
 
+		void visit(ast::until_matcher& m) {
+			m.r->accept(this);
+			out << " -> ";
+			m.t->accept(this);
+		}
+
 		void visit(ast::look_matcher& m) {
 			out << "&";
 			m.m->accept(this);

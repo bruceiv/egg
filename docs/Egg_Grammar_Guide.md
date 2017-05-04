@@ -156,6 +156,7 @@ The following is an Egg grammar for Egg grammars - it is an authoritative repres
     BIND =			':' _
     EQUAL =			'=' _
     PIPE =			'|' _
+    UNTIL =         "->" _
     AND =			'&' _
     NOT =			'!' _
     OPT =			'?' _
