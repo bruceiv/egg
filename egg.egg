@@ -122,7 +122,7 @@ str_literal: ast::str_matcher_ptr `string literal` =
 
 char_class: ast::range_matcher_ptr `character class` =
 		'[' { psVal = ast::make_ptr<ast::range_matcher>(); } 
-			( !']' characters : r { *psVal += r; } )* ']' _
+			( characters : r { *psVal += r; } ) -> ']' _
 
 characters: ast::char_range =
 		character : f '-' character : t { psVal = ast::char_range(f,t); }
@@ -156,7 +156,7 @@ FAIL =			@'~' _
 
 _ =		 		( space | comment )*
 space =			' ' | '\t' | end_of_line
-comment =		'#' ( !end_of_line . )* end_of_line
+comment =		'#' . -> end_of_line
 end_of_line = 	"\r\n" | '\n' | '\r'
 
 end_of_file `end of input` = $

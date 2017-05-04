@@ -452,12 +452,10 @@ namespace egg {
 			parser::sequence({
 				parser::literal('['),
 				[&](parser::state& ps) { psVal = ast::make_ptr<ast::range_matcher>();  return true; },
-				parser::many(
+				parser::until(
 					parser::sequence({
-						parser::look_not(parser::literal(']')),
 						parser::bind(r, characters),
-						[&](parser::state& ps) { *psVal += r;  return true; }})),
-				parser::literal(']'),
+						[&](parser::state& ps) { *psVal += r;  return true; }}), parser::literal(']')),
 				_})))(ps);
 	}
 
@@ -667,11 +665,7 @@ namespace egg {
 		return parser::memoize(47, 
 			parser::sequence({
 				parser::literal('#'),
-				parser::memoize_many(48, 
-					parser::sequence({
-						parser::look_not(end_of_line),
-						parser::any()})),
-				end_of_line}))(ps);
+				parser::memoize_until(48, parser::any(), end_of_line)}))(ps);
 	}
 
 	bool end_of_line(parser::state& ps) {
