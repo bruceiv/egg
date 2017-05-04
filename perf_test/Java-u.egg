@@ -422,9 +422,9 @@ Modifier
 #  JLS 3.6-7  Spacing
 #-------------------------------------------------------------
 
-_   = ( [ \t\r\n]                 # WhiteSpace
-      | "/*" (!"*/" .)* "*/"      # TraditionalComment
-      | "//" (![\r\n] .)* [\r\n]  # EndOfLineComment
+_   = ( [ \t\r\n]         # WhiteSpace
+      | "/*" . -> "*/"    # TraditionalComment
+      | "//" . -> [\r\n]  # EndOfLineComment
       )*
 
 #-------------------------------------------------------------

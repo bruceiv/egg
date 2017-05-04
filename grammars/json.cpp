@@ -23,9 +23,17 @@
 
 #include "parser.hpp"
 #ifdef NOMEMO
-  #include "json-nomemo.hpp"
+  #ifdef UNT
+    #include "json-nomemo-unt.hpp"
+  #else 
+    #include "json-nomemo.hpp"
+  #endif
 #else
-  #include "json.hpp"
+  #ifdef UNT
+    #include "json-unt.hpp"
+  #else
+    #include "json.hpp"
+  #endif
 #endif
 
 int main(int argc, char** argv) {

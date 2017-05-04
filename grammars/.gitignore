@@ -14,6 +14,12 @@ xml-nomemo
 json-nomemo
 java-nomemo
 exp-nomemo
+xml-unt
+json-unt
+java-unt
+xml-nomemo-unt
+json-nomemo-unt
+java-nomemo-unt
 *.hpp
 abc.cpp
 anbncn.cpp

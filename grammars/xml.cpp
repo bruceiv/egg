@@ -23,9 +23,17 @@
 
 #include "parser.hpp"
 #ifdef NOMEMO
-  #include "xml-nomemo.hpp"
+  #ifdef UNT
+    #include "xml-nomemo-unt.hpp"
+  #else 
+    #include "xml-nomemo.hpp"
+  #endif
 #else
-  #include "xml.hpp"
+  #ifdef UNT
+    #include "xml-unt.hpp"
+  #else
+    #include "xml.hpp"
+  #endif
 #endif
 
 int main(int argc, char** argv) {

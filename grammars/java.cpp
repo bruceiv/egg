@@ -23,9 +23,17 @@
 
 #include "parser.hpp"
 #ifdef NOMEMO
-  #include "java-nomemo.hpp"
+  #ifdef UNT
+    #include "java-nomemo-unt.hpp"
+  #else 
+    #include "java-nomemo.hpp"
+  #endif
 #else
-  #include "java.hpp"
+  #ifdef UNT
+    #include "java-unt.hpp"
+  #else
+    #include "java.hpp"
+  #endif
 #endif
 
 int main(int argc, char** argv) {

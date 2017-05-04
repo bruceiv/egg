@@ -65,6 +65,24 @@ java-nomemo.hpp:  ../perf_test/Java.egg
 exp-nomemo.hpp:  ../perf_test/Exp.egg
 	../egg --no-memo -o exp-nomemo.hpp -i ../perf_test/Exp.egg
 
+xml-unt.hpp:  ../perf_test/XML-u.egg
+	../egg -o xml-unt.hpp -i ../perf_test/XML-u.egg
+
+json-unt.hpp:  ../perf_test/JSON-u.egg
+	../egg -o json-unt.hpp -i ../perf_test/JSON-u.egg
+
+java-unt.hpp:  ../perf_test/Java-u.egg
+	../egg -o java-unt.hpp -i ../perf_test/Java-u.egg
+
+xml-nomemo-unt.hpp:  ../perf_test/XML-u.egg
+	../egg --no-memo -o xml-nomemo-unt.hpp -i ../perf_test/XML-u.egg
+
+json-nomemo-unt.hpp:  ../perf_test/JSON-u.egg
+	../egg --no-memo -o json-nomemo-unt.hpp -i ../perf_test/JSON-u.egg
+
+java-nomemo-unt.hpp:  ../perf_test/Java-u.egg
+	../egg --no-memo -o java-nomemo-unt.hpp -i ../perf_test/Java-u.egg
+
 abc:  abc.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -o abc abc.cpp $(LDFLAGS)
 
@@ -112,6 +130,24 @@ java-nomemo:  java-nomemo.hpp java.cpp parser.hpp
 
 exp-nomemo:  exp-nomemo.hpp exp.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -DNOMEMO -o exp-nomemo exp.cpp $(LDFLAGS)
+
+xml-unt:  xml-unt.hpp xml.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -DUNT -o xml-unt xml.cpp $(LDFLAGS)
+
+json-unt:  json-unt.hpp json.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -DUNT -o json-unt json.cpp $(LDFLAGS)
+
+java-unt:  java-unt.hpp java.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -DUNT -o java-unt java.cpp $(LDFLAGS)
+
+xml-nomemo-unt:  xml-nomemo-unt.hpp xml.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -DNOMEMO -DUNT -o xml-nomemo-unt xml.cpp $(LDFLAGS)
+
+json-nomemo-unt:  json-nomemo-unt.hpp json.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -DNOMEMO -DUNT -o json-nomemo-unt json.cpp $(LDFLAGS)
+
+java-nomemo-unt:  java-nomemo-unt.hpp java.cpp parser.hpp
+	$(CXX) $(CXXFLAGS) -DNOMEMO -DUNT -o java-nomemo-unt java.cpp $(LDFLAGS)
 
 egg:
 	cd .. && $(MAKE) egg
