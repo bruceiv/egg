@@ -61,7 +61,9 @@ namespace derivs {
 	class eps_expr;
 	class look_expr;
 	class char_expr;
+	class except_expr;
 	class range_expr;
+	class except_range_expr;
 	class any_expr;
 	class none_expr;
 	class str_expr;
@@ -69,7 +71,8 @@ namespace derivs {
 	class not_expr;
 	class map_expr;
 	class alt_expr;
-	class ualt_expr;
+	class or_expr;
+	class and_expr;
 	class seq_expr;
 	
 	/// Type of expression node
@@ -79,7 +82,9 @@ namespace derivs {
 		eps_type,
 		look_type,
 		char_type,
+		except_type,
 		range_type,
+		except_range_type,
 		any_type,
 		none_type,
 		str_type,
@@ -87,7 +92,8 @@ namespace derivs {
 		not_type,
 		map_type,
 		alt_type,
-		ualt_type,
+		or_type,
+		and_type,
 		seq_type
 	}; // enum expr_type
 	
@@ -101,7 +107,9 @@ namespace derivs {
 		virtual void visit(eps_expr&)   = 0;
 		virtual void visit(look_expr&)  = 0;
 		virtual void visit(char_expr&)  = 0;
+		virtual void visit(except_expr&) = 0;
 		virtual void visit(range_expr&) = 0;
+		virtual void visit(except_range_expr&) = 0;
 		virtual void visit(any_expr&)   = 0;
 		virtual void visit(none_expr&)  = 0;
 		virtual void visit(str_expr&)   = 0;
@@ -109,7 +117,8 @@ namespace derivs {
 		virtual void visit(not_expr&)   = 0;
 		virtual void visit(map_expr&)   = 0;
 		virtual void visit(alt_expr&)   = 0;
-		virtual void visit(ualt_expr&)  = 0;
+		virtual void visit(or_expr&)  = 0;
+		virtual void visit(and_expr&)   = 0;
 		virtual void visit(seq_expr&)   = 0;
 	}; // class visitor
 	
@@ -227,7 +236,9 @@ namespace derivs {
 		void visit(eps_expr&);
 		void visit(look_expr&);
 		void visit(char_expr&);
+		void visit(except_expr&);
 		void visit(range_expr&);
+		void visit(except_range_expr&);
 		void visit(any_expr&);
 		void visit(none_expr&);
 		void visit(str_expr&);
@@ -235,7 +246,8 @@ namespace derivs {
 		void visit(not_expr&);
 		void visit(map_expr&);
 		void visit(alt_expr&);
-		void visit(ualt_expr&);
+		void visit(or_expr&);
+		void visit(and_expr&);
 		void visit(seq_expr&);
 	
 	private:
@@ -360,6 +372,22 @@ namespace derivs {
 		
 		char c; ///< Character represented by the expression
 	}; // class char_expr
+
+	/// A single-character-excluded parsing expression
+	class except_expr : public expr {
+	public:
+		except_expr(char c) : c(c) {}
+		
+		static ptr<expr> make(char c);
+		void accept(visitor* v) { v->visit(*this); }
+		
+		virtual ptr<expr> d(char) const;
+		virtual gen_set   match() const;
+		virtual gen_set   back()  const;
+		virtual expr_type type()  const { return except_type; }
+		
+		char c; ///< Character excluded by the expression
+	}; // class except_expr
 	
 	/// A character range parsing expression
 	class range_expr : public expr {
@@ -377,6 +405,23 @@ namespace derivs {
 		char b;  ///< First character in expression range 
 		char e;  ///< Last character in expression range
 	}; // class range_expr
+
+	/// A character range-excluded parsing expression
+	class except_range_expr : public expr {
+	public:
+		except_range_expr(char b, char e) : b(b), e(e) {}
+		
+		static ptr<expr> make(char b, char e);
+		void accept(visitor* v) { v->visit(*this); }
+		
+		virtual ptr<expr> d(char) const;
+		virtual gen_set   match() const;
+		virtual gen_set   back()  const;
+		virtual expr_type type()  const { return except_range_type; }
+		
+		char b;  ///< First character in excluded range 
+		char e;  ///< Last character in excluded range
+	}; // class except_range_expr
 	
 	/// A parsing expression which matches any character
 	class any_expr : public expr {
@@ -516,41 +561,42 @@ namespace derivs {
 		gen_type  gm;  ///< Maximum generation
 	}; // class alt_expr
 
-	/// A parsing expression representing the unordered alternation of two parsing expressions
-	/// An optimization which accepts the first match; correctness is guaranteed by grammar writer.
-	class ualt_expr : public memo_expr {
+	/// A parsing expression representing the simultaneous match of any of multiple 
+	/// expressions at the same position. Only guaranteed to work for single-character 
+	/// subexpressions.
+	class or_expr : public memo_expr {
 	public:
-		struct alt_node {
-			alt_node(ptr<expr> e, gen_map eg) : e(e), eg(eg) {}
-
-			ptr<expr> e;   ///< Subexpression
-			gen_map   eg;  ///< Generation flags for subexpression
-		};  // struct alt_node
-		using alt_list = std::vector<alt_node>;
-		
-		ualt_expr(ptr<expr> a, ptr<expr> b, 
-				gen_map ag = gen_map{0}, gen_map bg = gen_map{0}, gen_type gm = 0)
-			: memo_expr(), es{alt_node{a, ag}, alt_node{b, bg}}, gm(gm) {}
-		
-		ualt_expr(const alt_list& es, gen_type gm) : memo_expr(), es(es), gm(gm) {}
+		or_expr(expr_list&& es) : memo_expr(), es(es) {}
 		
 		/// Make an expression using the default generation rules
-		static ptr<expr> make(ptr<expr> a, ptr<expr> b);
-		/// Make an expression with the given generation maps
-		static ptr<expr> make(ptr<expr> a, ptr<expr> b, 
-		                      gen_map ag, gen_map bg, gen_type gm);
-		/// Make an expression using the default generation rules
-		static ptr<expr> make(const expr_list& es);
+		static ptr<expr> make(expr_list&& es);
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char) const;
 		virtual gen_set   match_set() const;
 		virtual gen_set   back_set()  const;
-		virtual expr_type type()      const { return alt_type; }
+		virtual expr_type type()      const { return or_type; }
 		
-		alt_list  es;  ///< List of subexpressions
-		gen_type  gm;  ///< Maximum generation
-	}; // class ualt_expr
+		expr_list es;  ///< List of subexpressions
+	}; // class or_expr
+
+	/// A parsing expression representing the simultaneous match of multiple expressions 
+	/// at the same position. Only guaranteed to work for single-character subexpressions.
+	class and_expr : public memo_expr {
+	public:
+		and_expr(expr_list&& es) : memo_expr(), es(es) {}
+		
+		/// Make an expression using the default generation rules
+		static ptr<expr> make(expr_list&& es);
+		void accept(visitor* v) { v->visit(*this); }
+		
+		virtual ptr<expr> deriv(char) const;
+		virtual gen_set   match_set() const;
+		virtual gen_set   back_set()  const;
+		virtual expr_type type()      const { return and_type; }
+		
+		expr_list es;  ///< List of subexpressions
+	}; // class and_expr
 	
 	/// A parsing expression representing the concatenation of two parsing expressions
 	class seq_expr : public memo_expr {

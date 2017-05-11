@@ -6,6 +6,6 @@
 `aabcc' DOESN'T MATCH  @3
 `aabbc' DOESN'T MATCH  @5
 `x' DOESN'T MATCH  @0
-`abcc' DOESN'T MATCH  @3
+`abcc' DOESN'T MATCH  @2
 `abbc' DOESN'T MATCH  @2
 `aabc' DOESN'T MATCH  @3

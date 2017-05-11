@@ -518,6 +518,24 @@ namespace parser {
 			(*this) += s.size();
 			return true;
 		}
+
+		/** Attempts to match any character but one at the current position
+		 *  @param psVal	The character matched, if any
+		 */
+		bool matches_except(value_type e, value_type& psVal) {
+			value_type c = (*this)();
+			if ( c == e ) return false;
+			psVal = c;
+			++(*this);
+			return true;
+		}
+
+		/** Attempts to match any character but one at the current position */
+		bool matches_except(value_type e) {
+			if ( (*this)() == e ) return false;
+			++(*this);
+			return true;
+		}
 		
 		/** Attempts to match any character at the current position
 		 *  @param psVal    The character matched, if any
@@ -562,6 +580,32 @@ namespace parser {
 		bool matches_in(value_type s, value_type e) {
 			value_type c = (*this)();
 			if ( c < s || c > e ) return false;
+			++(*this);
+			return true;
+		}
+
+		/** Attempts to match a character outside the given range at the 
+		 *  current position.
+		 *  @param s        The start of the range
+		 *  @param e        The end of the range
+		 *  @param psVal    The character matched, if any
+		 */
+		bool matches_not_in(value_type s, value_type e, value_type& psVal) {
+			value_type c = (*this)();
+			if ( c >= s && c <= e ) return false;
+			psVal = c;
+			++(*this);
+			return true;
+		}
+		
+		/** Attempts to match a character outside the given range at the 
+		 *  current position.
+		 *  @param s        The start of the range
+		 *  @param e        The end of the range
+		 */
+		bool matches_not_in(value_type s, value_type e) {
+			value_type c = (*this)();
+			if ( c >= s && c <= e ) return false;
 			++(*this);
 			return true;
 		}
@@ -643,6 +687,28 @@ namespace parser {
 			return false;
 		};
 	}
+
+	/** Any character parser with exception */
+	combinator any_except(state::value_type c) {
+		return [c](state& ps) {
+			if ( ps.matches_except(c) ) { return true; }
+
+			ps.fail();
+			return false;
+		};
+	}
+	
+	/** Any character parser with exception
+	 *  @param psVal    Will be bound to the character matched
+	 */
+	combinator any_except(state::value_type c, state::value_type& psVal) {
+		return [c,&psVal](state& ps) {
+			if ( ps.matches_except(c, psVal) ) { return true; }
+			
+			ps.fail();
+			return false;
+		};
+	}
 	
 	/** End-of-input parser */
 	combinator none() {
@@ -675,6 +741,28 @@ namespace parser {
 			return false;
 		};
 	}
+
+	/** Exclusive character range parser parser */
+	combinator not_between(state::value_type s, state::value_type e) {
+		return [s,e](state& ps) {
+			if ( ps.matches_not_in(s, e) ) { return true; }
+			
+			ps.fail();
+			return false;
+		};
+	}
+	
+	/** Exclusive character range parser
+	 *  @param psVal    Will be bound to the character matched
+	 */
+	combinator not_between(state::value_type s, state::value_type e, state::value_type& psVal) {
+		return [s,e,&psVal](state& ps) {
+			if ( ps.matches_not_in(s, e, psVal) ) { return true; }
+			
+			ps.fail();
+			return false;
+		};
+	}
 	
 	/** Matches all or none of a sequence of parsers */
 	combinator sequence(combinator_list fs) {
@@ -694,6 +782,18 @@ namespace parser {
 				if ( f(ps) ) return true;
 			}
 			return false;
+		};
+	}
+
+	/** Matches all of a sequence of parsers at the same point in the input. */
+	combinator all(combinator_list fs) {
+		return [fs](state& ps) {
+			posn psStart = ps.posn();
+			for (auto f : fs) {
+				ps.set_posn(psStart);
+				if ( ! f(ps) ) return false;
+			}
+			return true;
 		};
 	}
 	

@@ -1,20 +1,20 @@
-Document       = prolog Element Misc* $
+Document       = prolog Element Misc* !.
 prolog 	       = XMLDecl? Misc*
 XMLDecl 	     = "<?xml" VersionInfo EncodingDecl? S? "?>"
 VersionInfo    = S "version" Eq ('\'' VersionNum '\'' 
                  | '\"' VersionNum '\"'
                  )
 Eq             = S? '=' S?
-VersionNum 	   = ([a-zA-Z0-9_.:] | '-')+
+VersionNum 	   = [a-zA-Z0-9_.:\-]+
 Misc 	         = COMMENT | S
 EncodingDecl   = S "encoding" Eq ('\'' EncName '\'' 
                  | '\"' EncName '\"'
                  )
-EncName 	     = [A-Za-z] ([A-Za-z0-9._] | '-')*
+EncName 	     = [A-Za-z] [A-Za-z0-9._\-]*
 S              = [ \t\r\n]+
 LETTER         = [a-zA-Z]
 DIGIT          = [0-9]
-NAME_CHAR      = LETTER | DIGIT | '-' | [._:]
+NAME_CHAR      = LETTER | DIGIT | [\-._:]
 NAME           = (LETTER | [_:]) NAME_CHAR*
 ENTITY_REF     = '&' NAME ';'
 CHAR_REF       = "&#x" [0-9a-fA-F]+ ';' | "&#" [0-9]+ ';'

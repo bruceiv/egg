@@ -415,9 +415,9 @@ Modifier
     # The main body of JLS has different lists of modifiers 
     # for different language elements.
 
-#=============================================================
+#-------------------------------------------------------------
 #  Lexical Structure
-#=============================================================
+#-------------------------------------------------------------
 #-------------------------------------------------------------
 #  JLS 3.6-7  Spacing
 #-------------------------------------------------------------
@@ -578,7 +578,7 @@ DecimalFloat
     | Digit+ Exponent? [fFdD]
     
 Exponent 
-    = [eE] ('+' | '-')? Digit+ 
+    = [eE] [+\-]? Digit+ 
 
 Digit  = [0-9]
     
@@ -590,13 +590,13 @@ HexSignificand
     | '0' [xX] HexDigit* "." HexDigit+
 
 BinaryExponent
-     = [pP] ('+' | '-')? Digit+
+     = [pP] [+\-]? Digit+
 
 CharLiteral 
-    = "\'" (Escape | ![\'\\] .) "\'"
+    = '\'' (Escape | [^\'\\]) '\''
 
 StringLiteral 
-    = "\"" (Escape | ![\"\\] .)* "\""
+    = '\"' (Escape | [^\\]) -> '\"'
 
 Escape 
     = "\\" ([btnfr\"\'\\] | OctalEscape | UnicodeEscape) 
@@ -616,52 +616,52 @@ UnicodeEscape
 #  JLS 3.11-12  Separators, Operators
 #-------------------------------------------------------------
 
-AT              =   "@"       _
-AND             =   "&"![=&]  _
+AT              =   '@'       _
+AND             =   '&'![=&]  _
 AND_AND         =   "&&"      _
 AND_EQU         =   "&="      _
-BANG            =   "!" !"="  _
-BSR             =   ">>>"!"=" _
+BANG            =   '!' !'='  _
+BSR             =   ">>>"!'=' _
 BSR_EQU         =   ">>>="    _
-COLON           =   ":"       _
-COMMA           =   ","       _
+COLON           =   ':'       _
+COMMA           =   ','       _
 DEC             =   "--"      _
-DIV             =   "/" !"="  _
+DIV             =   '/' !'='  _
 DIV_EQU         =   "/="      _
-DOT             =   "."       _
-EQU             =   "=" !"="  _
+DOT             =   '.'       _
+EQU             =   '=' !'='  _
 EQUAL           =   "=="      _
 GE              =   ">="      _
-GT              =   ">"![=>]  _ 
-HAT             =   "^"!"="   _
+GT              =   '>'![=>]  _ 
+HAT             =   '^'!'='   _
 HAT_EQU         =   "^="      _
 INC             =   "++"      _
-LBRK            =   "["       _
+LBRK            =   '['       _
 LE              =   "<="      _
-LPAR            =   "("       _
-LPOINT          =   "<"       _
-LT              =   "<"![=<]  _
-LWING           =   "{"       _
-MINUS           =   "-"!('=' | '-')  _
+LPAR            =   '('       _
+LPOINT          =   '<'       _
+LT              =   '<'![=<]  _
+LWING           =   '{'       _
+MINUS           =   '-'![=\-] _
 MINUS_EQU       =   "-="      _
-MOD             =   "%"!"="   _
+MOD             =   '%'!'='   _
 MOD_EQU         =   "%="      _
 NOT_EQUAL       =   "!="      _
-OR              =   "|"![=|]  _
+OR              =   '|'![=|]  _
 OR_EQU          =   "|="      _
 OR_OR           =   "||"      _
-PLUS            =   "+"![=+]  _
+PLUS            =   '+'![=+]  _
 PLUS_EQU        =   "+="      _
-QUERY           =   "?"       _
-RBRK            =   "]"       _
-RPAR            =   ")"       _
-RPOINT          =   ">"       _
-RWING           =   "}"       _
-SEMI            =   ";"       _
-SL              =   "<<"!"="  _
+QUERY           =   '?'       _
+RBRK            =   ']'       _
+RPAR            =   ')'       _
+RPOINT          =   '>'       _
+RWING           =   '}'       _
+SEMI            =   ';'       _
+SL              =   "<<"!'='  _
 SL_EQU          =   "<<="     _
 SR              =   ">>"![=>] _
 SR_EQU          =   ">>="     _
-STAR            =   "*"!"="   _
+STAR            =   '*'!'='   _
 STAR_EQU        =   "*="      _
-TILDA           =   "~"       _
+TILDA           =   '~'       _

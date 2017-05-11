@@ -1,9 +1,9 @@
 #!/bin/zsh
 
-oxml=( output/deriv-*-xml.csv(om[2]) )
-ojson=( output/deriv-*-json.csv(om[2]) )
-nxml=( output/deriv-*-xml.csv(om[1]) )
-njson=( output/deriv-*-json.csv(om[1]) )
+oxml=( output/naive-*-xml.csv(om[1]) )
+ojson=( output/naive-*-json.csv(om[1]) )
+nxml=( output/unaive-*-xml.csv(om[1]) )
+njson=( output/unaive-*-json.csv(om[1]) )
 
 if [[ ! -d plots ]]; then mkdir plots; fi
 

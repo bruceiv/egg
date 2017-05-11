@@ -46,7 +46,9 @@ namespace derivs {
 		void visit(eps_expr& e)   { compound = false; }
 		void visit(look_expr& e)  { compound = false; }
 		void visit(char_expr& e)  { compound = false; }
+		void visit(except_expr& e) { compound = false; }
 		void visit(range_expr& e) { compound = false; }
+		void visit(except_range_expr& e) { compound = false; }
 		void visit(any_expr& e)   { compound = false; }
 		void visit(none_expr& e)  { compound = false; }
 		void visit(str_expr& e)   { compound = false; }
@@ -54,7 +56,8 @@ namespace derivs {
 		void visit(not_expr& e)   { compound = false; }
 		void visit(map_expr& e)   { compound = false; }
 		void visit(alt_expr& e)   { compound = true; }
-		void visit(ualt_expr& e)  { compound = true; }
+		void visit(or_expr& e)  { compound = true; }
+		void visit(and_expr& e) { compound = true; }
 		void visit(seq_expr& e)   { compound = true; }
 		
 	private:
@@ -174,9 +177,15 @@ namespace derivs {
 		void visit(look_expr& e)  { out << "{LOOK:" << e.b << "}"; }
 		
 		void visit(char_expr& e)  { out << "\'" << strings::escape(e.c) << "\'"; }
+
+		void visit(except_expr& e)  { out << "[^" << strings::escape(e.c) << "]"; }
 		
 		void visit(range_expr& e) {
 			out << "[" << strings::escape(e.b) << "-" << strings::escape(e.e) << "]";
+		}
+
+		void visit(except_range_expr& e) {
+			out << "[^" << strings::escape(e.b) << "-" << strings::escape(e.e) << "]";
 		}
 		
 		void visit(any_expr& e)   { out << "."; }
@@ -238,24 +247,35 @@ namespace derivs {
 			out << ")";
 		}
 
-		void visit(ualt_expr& e)  {
-			out << "(ualt:";
-			print_fns(&e);
-			out << "g" << (unsigned int)e.gm;
-			
+		void visit(or_expr& e)  {
+			out << "(or:";
+						
 			auto et = e.es.begin();
 			if ( et != e.es.end() ) {
 				out << " ";
-				print_uint_map(et->eg);
-				out << " ";
-				print_unbraced(et->e);
+				print_unbraced(*et);
 			}
 
 			while ( ++et != e.es.end() ) {
-				out << " ^/ ";
-				print_uint_map(et->eg);
+				out << " || ";
+				print_unbraced(*et);
+			}
+
+			out << ")";
+		}
+
+		void visit(and_expr& e)  {
+			out << "(and:";
+						
+			auto et = e.es.begin();
+			if ( et != e.es.end() ) {
 				out << " ";
-				print_unbraced(et->e);
+				print_unbraced(*et);
+			}
+
+			while ( ++et != e.es.end() ) {
+				out << " && ";
+				print_unbraced(*et);
 			}
 
 			out << ")";

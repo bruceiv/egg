@@ -1,4 +1,4 @@
-JSON = _ Object $
+JSON = _ Object !.
 Object = LBRACE Members? RBRACE
 Members = Pair (COMMA Pair)*
 Pair = String COLON Value

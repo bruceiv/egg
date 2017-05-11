@@ -72,16 +72,16 @@ plot 1 title 'Recursive' ls 2, \
      'djson-join.csv' using ($7/1000):($3/$9) with linespoints title 'Derivative JSON' ls 8, \
      'djava-join.csv' using ($7/1000):($3/$9) with linespoints title 'Derivative Java' ls 9
 
-# set output 'plots/speedup2.pdf'
-# set ylabel 'Speedup vs. Packrat'
-# 
-# plot 1 title 'Packrat' ls 5, \
-#     'pxml-join.csv' using ($7/1000):($9/$3) with linespoints title 'Recursive XML' ls 1, \
-#     'pjson-join.csv' using ($7/1000):($9/$3) with linespoints title 'Recursive JSON' ls 2, \
-#     'pjava-join.csv' using ($7/1000):($9/$3) with linespoints title 'Recursive Java' ls 3, \
-#     'd2xml-join.csv' using ($7/1000):($3/$9) with linespoints title 'Derivative XML' ls 7, \
-#     'd2json-join.csv' using ($7/1000):($3/$9) with linespoints title 'Derivative JSON' ls 8, \
-#     'd2java-join.csv' using ($7/1000):($3/$9) with linespoints title 'Derivative Java' ls 9
+set output 'plots/speedup2.pdf'
+set ylabel 'Speedup vs. Packrat'
+
+plot 1 title 'Packrat' ls 5, \
+    'pxml-join.csv' using ($7/1000):($9/$3) with linespoints title 'Recursive XML' ls 1, \
+    'pjson-join.csv' using ($7/1000):($9/$3) with linespoints title 'Recursive JSON' ls 2, \
+    'pjava-join.csv' using ($7/1000):($9/$3) with linespoints title 'Recursive Java' ls 3, \
+    'd2xml-join.csv' using ($7/1000):($3/$9) with linespoints title 'Derivative XML' ls 7, \
+    'd2json-join.csv' using ($7/1000):($3/$9) with linespoints title 'Derivative JSON' ls 8, \
+    'd2java-join.csv' using ($7/1000):($3/$9) with linespoints title 'Derivative Java' ls 9
 
 #set output 'plots/mem-use-multi.pdf'
 #set size 1,0.5

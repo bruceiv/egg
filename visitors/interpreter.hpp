@@ -59,7 +59,9 @@ namespace derivs {
 		void visit(eps_expr& e)   { rVal = eps_expr::make(); }
 		void visit(look_expr& e)  { rVal = look_expr::make(e.b); }
 		void visit(char_expr& e)  { rVal = char_expr::make(e.c); }
+		void visit(except_expr& e) { rVal = except_expr::make(e.c); }
 		void visit(range_expr& e) { rVal = range_expr::make(e.b, e.e); }
+		void visit(except_range_expr& e) { rVal = except_range_expr::make(e.b, e.e); }
 		void visit(any_expr& e)   { rVal = any_expr::make(); }
 		void visit(none_expr& e)  { rVal = none_expr::make(); }
 		void visit(str_expr& e)   { rVal = str_expr::make(e.str()); }
@@ -99,13 +101,22 @@ namespace derivs {
 			rVal = alt_expr::make(es);
 		}
 
-		void visit(ualt_expr& e) {
+		void visit(or_expr& e) {
 			expr_list es;
 			for (auto& x : e.es) {
-				x.e->accept(this);
+				x->accept(this);
 				es.emplace_back(rVal);
 			}
-			rVal = ualt_expr::make(es);
+			rVal = or_expr::make(std::move(es));
+		}
+
+		void visit(and_expr& e) {
+			expr_list es;
+			for (auto& x : e.es) {
+				x->accept(this);
+				es.emplace_back(rVal);
+			}
+			rVal = and_expr::make(std::move(es));
 		}
 		
 		void visit(seq_expr& e) {
@@ -134,11 +145,15 @@ namespace derivs {
 			}
 		}
 		
-		/// Converts an AST char range into a derivative expr. char_range
-		ptr<expr> make_char_range(const ast::char_range& r) const {
+		/// Converts an AST char range into a derivative expr char_range
+		ptr<expr> make_char_range(const ast::char_range& r, bool neg) const {
 			return ( r.from == r.to ) ? 
-				expr::make_ptr<char_expr>(r.from) : 
-				expr::make_ptr<range_expr>(r.from, r.to);
+				neg ? 
+					expr::make_ptr<except_expr>(r.from) :
+					expr::make_ptr<char_expr>(r.from) : 
+				neg ?
+					expr::make_ptr<except_range_expr>(r.from, r.to) :
+					expr::make_ptr<range_expr>(r.from, r.to);
 		}
 		
 		/// Makes a new anonymous nonterminal for a many-expression
@@ -211,18 +226,24 @@ namespace derivs {
 		virtual void visit(ast::str_matcher& m) { rVal = expr::make_ptr<str_expr>(m.s); }
 		
 		virtual void visit(ast::range_matcher& m) {
-			// Empty alternation is a success
-			if ( m.rs.size() == 0 ) { rVal = eps_expr::make(); return; }
+			// Empty alternation is a success or failure, depending on sense
+			if ( m.rs.size() == 0 ) {
+				rVal = m.neg ? fail_expr::make() :  eps_expr::make();
+				return;
+			}
 			
 			// Transform last option
 			auto it = m.rs.rbegin();
-			rVal = make_char_range(*it);
+			rVal = make_char_range(*it, m.neg);
+			if ( m.rs.size() == 1 ) return;
 			
 			// Transform remaining options
+			expr_list rs{ rVal };
 			while ( ++it != m.rs.rend() ) {
-				auto tVal = make_char_range(*it);
-				rVal = expr::make_ptr<ualt_expr>(tVal, rVal);
+				rs.push_back( make_char_range(*it, m.neg) );
 			}
+			rVal = m.neg ? expr::make_ptr<and_expr>( std::move(rs) ) :
+					expr::make_ptr<or_expr>( std::move(rs) );
 		}
 		
 		virtual void visit(ast::rule_matcher& m) { rVal = get_rule(m.rule); }
@@ -283,19 +304,6 @@ namespace derivs {
 				es.emplace_back(rVal);
 			}
 			rVal = alt_expr::make(es);
-		}
-
-		virtual void visit(ast::ualt_matcher& m) {
-			// Empty sequence is a success
-			if ( m.ms.size() == 0 ) { rVal = eps_expr::make(); return; }
-			
-			// Transform options to expression list
-			expr_list es;
-			for (auto& mi : m.ms) {
-				mi->accept(this);
-				es.emplace_back(rVal);
-			}
-			rVal = ualt_expr::make(es);
 		}
 
 		virtual void visit(ast::until_matcher& m) {

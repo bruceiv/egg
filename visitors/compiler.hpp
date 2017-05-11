@@ -122,12 +122,6 @@ namespace visitor {
 			}
 		}
 		
-		void visit(ast::ualt_matcher& m) {
-			for (auto it = m.ms.begin(); lexical && it != m.ms.end(); ++it) {
-				(*it)->accept(this);
-			}
-		}
-		
 		void visit(ast::capt_matcher& m) { lexical = m.var.empty(); }
 	private:
 		bool lexical;  ///< Is the given expression lacking in semantic elements?
@@ -150,12 +144,14 @@ namespace visitor {
 			out << "parser::literal(\"" << strings::escape(m.s) << "\")";
 		}
 		
-		void visit(ast::char_range& r, const std::string& var) {
+		void visit(ast::char_range& r, const std::string& var, bool neg) {
 			if ( r.single() ) {
-				out << "parser::literal(\'" << strings::escape(r.to) << "\'";
+				out << "parser::" << ( neg ? "any_except" : "literal" ) 
+					<< "(\'" << strings::escape(r.to) << "\'";
 			} else {
-				out << "parser::between(\'" << strings::escape(r.from) 
-				    << "\', \'" << strings::escape(r.to) << "\'";
+				out << "parser::" << (neg ? "not_" : "") << "between(\'" 
+					<< strings::escape(r.from) << "\', \'" 
+					<< strings::escape(r.to) << "\'";
 			}
 			
 			if ( ! var.empty() ) {
@@ -167,11 +163,12 @@ namespace visitor {
 		
 		void visit(ast::range_matcher& m) {
 			if ( m.rs.empty() ) {
-				out << "parser::empty()";
+				out << "parser::" << (m.neg ? "fail" : "empty" ) << "()";
+				return;
 			}
 			
 			if ( m.rs.size() == 1 ) {
-				visit(m.rs.front(), m.var);
+				visit(m.rs.front(), m.var, m.neg);
 				return;
 			}
 			
@@ -179,22 +176,32 @@ namespace visitor {
 
 			//chain matcher ranges
 			out << std::endl 
-				<< indent << "parser::choice({\n"
+				<< indent << "parser::" << (m.neg ? "all" : "choice") << "({\n"
 				<< indent << "\t"
 				;
 				
 			indent += '\t';
 			++tabs;
 			
+			std::string mt;
+
 			auto it = m.rs.begin();
-			visit(*it, m.var);
+			if ( m.neg ) { visit(*it, mt, true); }
+			else { visit(*it, m.var, false); }
 			
-			while ( ++it != m.rs.end() ) {
+			++it;
+			auto next_it = it;
+			do {
+				++next_it;
+
 				out << "," << std::endl
 					<< indent 
 					;
-				visit(*it, m.var);
-			}
+				
+				if ( m.neg && next_it != m.rs.end() ) { visit(*it, mt, true); }
+				else { visit(*it, m.var, m.neg); }
+				it = next_it;
+			} while ( next_it != m.rs.end() );
 			
 			out << "})";
 			
@@ -342,45 +349,6 @@ namespace visitor {
 			tabs -= 2;
 		}
 		
-		void visit(ast::ualt_matcher& m) {
-			// NOTE: this does NOT provide unordered choice semantics; the ualt_matcher is a user optimization
-			
-			// empty alternation bad form, but always matches
-			if ( m.ms.empty() ) {
-				out << "parser::empty()";
-				return;
-			}
-			
-			// singleton alternation also bad form, equivalent to the single matcher
-			if ( m.ms.size() == 1 ) {
-				m.ms.front()->accept(this);
-				return;
-			}
-
-			std::string indent(++tabs, '\t');
-			
-			out << std::endl
-				<< indent << "parser::choice({\n"
-				<< indent << "\t"
-				;
-			
-			indent += '\t';
-			++tabs;
-
-			auto it = m.ms.begin();
-			(*it)->accept(this);
-			while ( ++it != m.ms.end() ) {
-				out << "," << std::endl
-					<< indent 
-					;
-				(*it)->accept(this);
-			}
-
-			out << "})";
-
-			tabs -= 2;
-		}
-
 		void visit(ast::look_matcher& m) {
 			out << "parser::look(";
 			m.m->accept(this);

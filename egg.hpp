@@ -47,16 +47,16 @@ namespace egg {
 	bool type_id(parser::state&, std::string &);
 	bool err_string(parser::state&, std::string &);
 	bool choice(parser::state&, ast::alt_matcher_ptr &);
-	bool un_choice(parser::state&, ast::ualt_matcher_ptr &);
 	bool sequence(parser::state&, ast::seq_matcher_ptr &);
 	bool expression(parser::state&, ast::matcher_ptr &);
 	bool primary(parser::state&, ast::matcher_ptr &);
 	bool action(parser::state&, ast::action_matcher_ptr &);
 	bool char_literal(parser::state&, ast::char_matcher_ptr &);
 	bool str_literal(parser::state&, ast::str_matcher_ptr &);
-	bool char_class(parser::state&, ast::range_matcher_ptr &);
-	bool characters(parser::state&, ast::char_range &);
 	bool character(parser::state&, char &);
+	bool char_class(parser::state&, ast::range_matcher_ptr &);
+	bool range_chars(parser::state&, ast::char_range &);
+	bool range_char(parser::state&, char &);
 	bool OUT_BEGIN(parser::state&);
 	bool OUT_END(parser::state&);
 	bool BIND(parser::state&);
@@ -221,29 +221,15 @@ namespace egg {
 	}
 
 	bool choice(parser::state& ps, ast::alt_matcher_ptr & psVal) {
-		ast::ualt_matcher_ptr  m;
+		ast::seq_matcher_ptr  m;
 
 		return parser::memoize(10, psVal, 
 			parser::sequence({
-				parser::bind(m, un_choice),
+				parser::bind(m, sequence),
 				[&](parser::state& ps) { psVal = ast::make_ptr<ast::alt_matcher>(); *psVal += m;  return true; },
 				parser::many(
 					parser::sequence({
 						PIPE,
-						parser::bind(m, un_choice),
-						[&](parser::state& ps) { *psVal += m;  return true; }}))}))(ps);
-	}
-
-	bool un_choice(parser::state& ps, ast::ualt_matcher_ptr & psVal) {
-		ast::seq_matcher_ptr  m;
-
-		return parser::memoize(11, psVal, 
-			parser::sequence({
-				parser::bind(m, sequence),
-				[&](parser::state& ps) { psVal = ast::make_ptr<ast::ualt_matcher>(); *psVal += m;  return true; },
-				parser::many(
-					parser::sequence({
-						UN_PIPE,
 						parser::bind(m, sequence),
 						[&](parser::state& ps) { *psVal += m;  return true; }}))}))(ps);
 	}
@@ -252,7 +238,7 @@ namespace egg {
 		ast::action_matcher_ptr  a;
 		ast::matcher_ptr  e;
 
-		return parser::memoize(12, psVal, 
+		return parser::memoize(11, psVal, 
 			parser::sequence({
 				[&](parser::state& ps) { psVal = ast::make_ptr<ast::seq_matcher>();  return true; },
 				parser::some(
@@ -272,7 +258,7 @@ namespace egg {
 		ast::matcher_ptr  n;
 		std::string  s;
 
-		return parser::memoize(13, psVal, parser::named("expression", 
+		return parser::memoize(12, psVal, parser::named("expression", 
 			parser::choice({
 				
 					parser::sequence({
@@ -322,7 +308,7 @@ namespace egg {
 		std::string  s;
 		ast::str_matcher_ptr  sm;
 
-		return parser::memoize(14, psVal, 
+		return parser::memoize(13, psVal, 
 			parser::choice({
 				parser::named("nonterminal expression", 
 					parser::sequence({
@@ -405,11 +391,11 @@ namespace egg {
 	bool action(parser::state& ps, ast::action_matcher_ptr & psVal) {
 		std::string s;
 
-		return parser::memoize(15, psVal, parser::named("action", 
+		return parser::memoize(14, psVal, parser::named("action", 
 			parser::sequence({
 				parser::look_not(OUT_BEGIN),
 				parser::literal('{'),
-				parser::capture(s, parser::memoize_many(16, 
+				parser::capture(s, parser::memoize_many(15, 
 					parser::choice({
 						parser::unbind(action),
 						
@@ -424,7 +410,7 @@ namespace egg {
 	bool char_literal(parser::state& ps, ast::char_matcher_ptr & psVal) {
 		char  c;
 
-		return parser::memoize(17, psVal, parser::named("character literal", 
+		return parser::memoize(16, psVal, parser::named("character literal", 
 			parser::sequence({
 				parser::literal('\''),
 				parser::bind(c, character),
@@ -436,52 +422,19 @@ namespace egg {
 	bool str_literal(parser::state& ps, ast::str_matcher_ptr & psVal) {
 		std::string s;
 
-		return parser::memoize(18, psVal, parser::named("string literal", 
+		return parser::memoize(17, psVal, parser::named("string literal", 
 			parser::sequence({
 				parser::literal('\"'),
-				parser::capture(s, parser::memoize_many(19, parser::unbind(character))),
+				parser::capture(s, parser::memoize_many(18, parser::unbind(character))),
 				parser::literal('\"'),
 				_,
 				[&](parser::state& ps) { psVal = ast::make_ptr<ast::str_matcher>(strings::unescape(s));  return true; }})))(ps);
 	}
 
-	bool char_class(parser::state& ps, ast::range_matcher_ptr & psVal) {
-		ast::char_range  r;
-
-		return parser::memoize(20, psVal, parser::named("character class", 
-			parser::sequence({
-				parser::literal('['),
-				[&](parser::state& ps) { psVal = ast::make_ptr<ast::range_matcher>();  return true; },
-				parser::until(
-					parser::sequence({
-						parser::bind(r, characters),
-						[&](parser::state& ps) { *psVal += r;  return true; }}), parser::literal(']')),
-				_})))(ps);
-	}
-
-	bool characters(parser::state& ps, ast::char_range & psVal) {
-		char  c;
-		char  f;
-		char  t;
-
-		return parser::memoize(21, psVal, 
-			parser::choice({
-				
-					parser::sequence({
-						parser::bind(f, character),
-						parser::literal('-'),
-						parser::bind(t, character),
-						[&](parser::state& ps) { psVal = ast::char_range(f,t);  return true; }}),
-				
-					parser::sequence({
-						parser::bind(c, character),
-						[&](parser::state& ps) { psVal = ast::char_range(c);  return true; }})}))(ps);
-	}
-
 	bool character(parser::state& ps, char & psVal) {
 		char c;
 
-		return parser::memoize(22, psVal, 
+		return parser::memoize(19, psVal, 
 			parser::choice({
 				
 					parser::sequence({
@@ -502,6 +455,73 @@ namespace egg {
 								parser::literal('\''),
 								parser::literal('\"'),
 								parser::literal('\\')})),
+						parser::any(psVal)})}))(ps);
+	}
+
+	bool char_class(parser::state& ps, ast::range_matcher_ptr & psVal) {
+		ast::char_range  r;
+
+		return parser::memoize(20, psVal, parser::named("character class", 
+			parser::sequence({
+				parser::literal('['),
+				[&](parser::state& ps) { psVal = ast::make_ptr<ast::range_matcher>();  return true; },
+				parser::option(
+					parser::sequence({
+						parser::literal('^'),
+						[&](parser::state& ps) { psVal->neg = true;  return true; }})),
+				parser::until(
+					parser::sequence({
+						parser::bind(r, range_chars),
+						[&](parser::state& ps) { *psVal += r;  return true; }}), parser::literal(']')),
+				_})))(ps);
+	}
+
+	bool range_chars(parser::state& ps, ast::char_range & psVal) {
+		char  c;
+		char  f;
+		char  t;
+
+		return parser::memoize(21, psVal, 
+			parser::choice({
+				
+					parser::sequence({
+						parser::bind(f, range_char),
+						parser::literal('-'),
+						parser::bind(t, range_char),
+						[&](parser::state& ps) { psVal = ast::char_range(f,t);  return true; }}),
+				
+					parser::sequence({
+						parser::bind(c, range_char),
+						[&](parser::state& ps) { psVal = ast::char_range(c);  return true; }})}))(ps);
+	}
+
+	bool range_char(parser::state& ps, char & psVal) {
+		char c;
+
+		return parser::memoize(22, psVal, 
+			parser::choice({
+				
+					parser::sequence({
+						parser::literal('\\'),
+						
+							parser::choice({
+								parser::literal('n', c),
+								parser::literal('r', c),
+								parser::literal('t', c),
+								parser::literal('\'', c),
+								parser::literal('\"', c),
+								parser::literal('\\', c),
+								parser::literal('^', c),
+								parser::literal('-', c),
+								parser::literal(']', c)}),
+						[&](parser::state& ps) { psVal = strings::unescaped_char(c);  return true; }}),
+				
+					parser::sequence({
+						parser::look_not(
+							parser::choice({
+								parser::literal('\\'),
+								parser::literal('^'),
+								parser::literal('-')})),
 						parser::any(psVal)})}))(ps);
 	}
 
@@ -656,8 +676,10 @@ namespace egg {
 	bool space(parser::state& ps) {
 		return parser::memoize(46, 
 			parser::choice({
-				parser::literal(' '),
-				parser::literal('\t'),
+				
+					parser::choice({
+						parser::literal(' '),
+						parser::literal('\t')}),
 				end_of_line}))(ps);
 	}
 
@@ -672,8 +694,10 @@ namespace egg {
 		return parser::memoize(49, 
 			parser::choice({
 				parser::literal("\r\n"),
-				parser::literal('\n'),
-				parser::literal('\r')}))(ps);
+				
+					parser::choice({
+						parser::literal('\n'),
+						parser::literal('\r')})}))(ps);
 	}
 
 	bool end_of_file(parser::state& ps) {
