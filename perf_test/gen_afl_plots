@@ -1,27 +1,24 @@
 #!/bin/zsh
 
-nxml=( output/naive-*-xml.csv(om[1]) )
-njson=( output/naive-*-json.csv(om[1]) )
-njava=( output/naive-*-java.csv(om[1]) )
-pxml=( output/packrat-*-xml.csv(om[1]) )
-pjson=( output/packrat-*-json.csv(om[1]) )
-pjava=( output/packrat-*-java.csv(om[1]) )
-dxml=( output/deriv-*-xml.csv(om[1]) )
-djson=( output/deriv-*-json.csv(om[1]) )
-djava=( output/deriv-*-java.csv(om[1]) )
-nexp=( output/naive-*-exp.csv(om[1]) )
-pexp=( output/packrat-*-exp.csv(om[1]) )
-dexp=( output/deriv-*-exp.csv(om[1]) )
-
-join -t ',' $nxml $pxml > pxml-join.csv
-join -t ',' $njson $pjson > pjson-join.csv
-join -t ',' $njava $pjava > pjava-join.csv
-join -t ',' $nxml $dxml > dxml-join.csv
-join -t ',' $njson $djson > djson-join.csv
-join -t ',' $njava $djava > djava-join.csv
+nxml=( output/unaive-*-xml.csv(om[1]) )
+njson=( output/unaive-*-json.csv(om[1]) )
+njava=( output/unaive-*-java.csv(om[1]) )
+pxml=( output/upackrat-*-xml.csv(om[1]) )
+pjson=( output/upackrat-*-json.csv(om[1]) )
+pjava=( output/upackrat-*-java.csv(om[1]) )
+dxml=( output/uderiv-*-xml.csv(om[1]) )
+djson=( output/uderiv-*-json.csv(om[1]) )
+djava=( output/uderiv-*-java.csv(om[1]) )
+inxml=( output/inst-unaive-*-xml.csv(om[1]) )
+injson=( output/inst-unaive-*-json.csv(om[1]) )
+injava=( output/inst-unaive-*-java.csv(om[1]) )
+ipxml=( output/inst-upackrat-*-xml.csv(om[1]) )
+ipjson=( output/inst-upackrat-*-json.csv(om[1]) )
+ipjava=( output/inst-upackrat-*-java.csv(om[1]) )
+idxml=( output/inst-uderiv-*-xml.csv(om[1]) )
+idjson=( output/inst-uderiv-*-json.csv(om[1]) )
+idjava=( output/inst-uderiv-*-java.csv(om[1]) )
 
 if [[ ! -d plots ]]; then mkdir plots; fi
 
-gnuplot -e "nxml='${nxml}'; njson='${njson}'; njava='${njava}'; pxml='${pxml}'; pjson='${pjson}'; pjava='${pjava}'; dxml='${dxml}'; djson='${djson}'; djava='${djava}'; nexp='${nexp}'; pexp='${pexp}'; dexp='${dexp}'" afl_plots.plg
-
-rm {p,d}{xml,json,java}-join.csv
+gnuplot -e "nxml='${nxml}'; njson='${njson}'; njava='${njava}'; pxml='${pxml}'; pjson='${pjson}'; pjava='${pjava}'; dxml='${dxml}'; djson='${djson}'; djava='${djava}'; inxml='${inxml}'; injson='${injson}'; injava='${injava}'; ipxml='${ipxml}'; ipjson='${ipjson}'; ipjava='${ipjava}'; idxml='${idxml}'; idjson='${idjson}'; idjava='${idjava}'" afl_plots.plg

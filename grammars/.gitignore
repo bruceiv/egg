@@ -20,6 +20,12 @@ java-unt
 xml-nomemo-unt
 json-nomemo-unt
 java-nomemo-unt
+xml-inst
+json-inst
+java-inst
+xml-nomemo-inst
+json-nomemo-inst
+java-nomemo-inst
 *.hpp
 abc.cpp
 anbncn.cpp

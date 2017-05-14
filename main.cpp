@@ -30,6 +30,7 @@
 #include "egg.hpp"
 #include "parser.hpp"
 #include "visitors/compiler.hpp"
+#include "visitors/instrumenter.hpp"
 #include "visitors/normalizer.hpp"
 #include "visitors/printer.hpp"
 #ifdef EGG_MUT
@@ -64,6 +65,7 @@ Supported flags are\n\
  --dbg         turn on debugging\n\
  --no-norm     turns off grammar normalization\n\
  --no-memo     turns of grammar memoization\n\
+ --instrument  instruments interpreted grammar\n\
  --usage       print usage message\n\
  --help        print full help message\n\
  --version     print version string\n";
@@ -196,7 +198,7 @@ public:
 	args(int argc, char** argv) 
 		: in(nullptr), out(nullptr), src(nullptr),
 		  inName(), outName(), srcName(), outType(STREAM_TYPE), pName(), rName(),
-		  dbgFlag(false), nameFlag(false), normFlag(true), memoFlag(true), 
+		  dbgFlag(false), nameFlag(false), normFlag(true), memoFlag(true), instFlag(false),
 		  eMode(COMPILE_MODE) {
 		
 		i = 1;
@@ -231,6 +233,8 @@ public:
 				normFlag = false;
 			} else if ( eq("--no-memo", argv[i]) ) {
 				memoFlag = false;
+			} else if ( eq("--instrument", argv[i]) ) {
+				instFlag = true;
 			} else if ( eq("--usage", argv[i]) ) {
 				eMode = USAGE_MODE;
 			} else if ( eq("--help", argv[i]) ) {
@@ -267,6 +271,7 @@ public:
 	bool dbg()  { return dbgFlag; }
 	bool norm() { return normFlag; }
 	bool memo() { return memoFlag; }
+	bool inst() { return instFlag; }
 	egg_mode mode() { return eMode; }
 
 private:
@@ -284,6 +289,7 @@ private:
 	bool nameFlag;		  ///< has the parser name been explicitly set?
 	bool normFlag;        ///< should egg do grammar normalization?
 	bool memoFlag;        ///< should the generated grammar do memoization?
+	bool instFlag;        ///< should the interpreted grammar be instrumented?
 	egg_mode eMode;		  ///< compiler mode to use
 };
 
@@ -346,10 +352,17 @@ int main(int argc, char** argv) {
 				p.print(*g); 
 				std::cout << std::endl;
 			}
+			derivs::instrumenter stats;
 			
-			bool b = derivs::match(*g, a.source(), a.rule(), a.dbg());
+			bool b = derivs::match(*g, a.source(), a.rule(), a.dbg(), 
+			                       a.inst() ? &stats : nullptr);
 			a.output() << "Rule `" << a.rule() << "` " 
-			           << ( b ? "matched" : "DID NOT match" ) << std::endl;
+			           << ( b ? "matched" : "DID NOT match" );
+			if ( a.inst() ) {
+				a.output() << "," << stats.max_backtracks() 
+				           << "," << stats.max_nesting_depth() << ",";
+			}
+			a.output() << std::endl;
 			break;
 		} case LINES_MODE: {   // Interpret grammar line-by-line
 			if ( a.dbg() ) {
@@ -357,15 +370,23 @@ int main(int argc, char** argv) {
 				p.print(*g); 
 				std::cout << std::endl;
 			}
+			derivs::instrumenter stats;
 			
 			std::string line;
 			derivs::loader l(*g, a.dbg());
 			while ( std::getline(a.source(), line) ) {
+				stats.reset();
 				std::stringstream ss(line);
-				bool b = derivs::match(l, ss, a.rule(), a.dbg());
+				bool b = derivs::match(l, ss, a.rule(), a.dbg(), 
+				                       a.inst() ? &stats : nullptr);
 				a.output() << "Rule `" << a.rule() << "` " 
 			               << ( b ? "matched" : "DID NOT match" ) 
-			               << " \"" << line << "\"" << std::endl;
+			               << " \"" << line << "\"";
+				if ( a.inst() ) {
+					a.output() << "," << stats.max_backtracks() 
+							   << "," << stats.max_nesting_depth() << ",";
+				}
+				a.output() << std::endl;
 			}
 			break;
 		} default: break;

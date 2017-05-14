@@ -149,6 +149,24 @@ json-nomemo-unt:  json-nomemo-unt.hpp json.cpp parser.hpp
 java-nomemo-unt:  java-nomemo-unt.hpp java.cpp parser.hpp
 	$(CXX) $(CXXFLAGS) -DNOMEMO -DUNT -o java-nomemo-unt java.cpp $(LDFLAGS)
 
+xml-inst:  xml-unt.hpp xml.cpp parser-inst.hpp
+	$(CXX) $(CXXFLAGS) -DUNT -DEGG_INST -o xml-inst xml.cpp $(LDFLAGS)
+
+json-inst:  json-unt.hpp json.cpp parser-inst.hpp
+	$(CXX) $(CXXFLAGS) -DUNT -DEGG_INST -o json-inst json.cpp $(LDFLAGS)
+
+java-inst:  java-unt.hpp java.cpp parser-inst.hpp
+	$(CXX) $(CXXFLAGS) -DUNT -DEGG_INST -o java-inst java.cpp $(LDFLAGS)
+
+xml-nomemo-inst:  xml-nomemo-unt.hpp xml.cpp parser-inst.hpp
+	$(CXX) $(CXXFLAGS) -DNOMEMO -DUNT -DEGG_INST -o xml-nomemo-inst xml.cpp $(LDFLAGS)
+
+json-nomemo-inst:  json-nomemo-unt.hpp json.cpp parser-inst.hpp
+	$(CXX) $(CXXFLAGS) -DNOMEMO -DUNT -DEGG_INST -o json-nomemo-inst json.cpp $(LDFLAGS)
+
+java-nomemo-inst:  java-nomemo-unt.hpp java.cpp parser-inst.hpp
+	$(CXX) $(CXXFLAGS) -DNOMEMO -DUNT -DEGG_INST -o java-nomemo-inst java.cpp $(LDFLAGS)
+
 egg:
 	cd .. && $(MAKE) egg
 

@@ -1,9 +1,5 @@
 #pragma once
 
-#ifdef EGG_INST
-#include "parser-inst.hpp"
-#else
-
 /*
  * Copyright (c) 2013 Aaron Moss
  * 
@@ -26,6 +22,7 @@
  * THE SOFTWARE.
  */
 
+#include <algorithm>
 #include <deque>
 #include <functional>
 #include <initializer_list>
@@ -37,6 +34,7 @@
 #include <typeinfo>
 #include <unordered_map>
 #include <utility>
+#include <vector>
 
 /** Implements parser state for an Egg parser.
  *  
@@ -262,6 +260,7 @@ namespace parser {
 			
 			// Add to stored input
 			str.push_back(c);
+			times_read.push_back(0);
 			return true;
 		}
 		
@@ -279,6 +278,7 @@ namespace parser {
 			ind i_max = off.i + str.size();
 			for (ind i = 0; i < r; ++i) {
 				if ( s[i] == '\n' ) { lines.push_back(i_max + i + 1); }
+				times_read.push_back(0);
 			}
 			// Add to stored input
 			str.insert(str.end(), s, s+r);
@@ -290,20 +290,24 @@ namespace parser {
 		 *  Initializes state at beginning of input stream.
 		 *  @param in		The input stream to read from
 		 */
-		state(stream_type& in) : pos(), off(), str(), lines(), memo_table(), err(), in(in) {
+		state(stream_type& in) : pos(), off(), str(), lines(), memo_table(), err(), in(in),
+				cur_depth(0), max_depth(0), times_read() {
 			// first line starts at 0
 			lines.push_back(0);
 			// read first character
 			read();
+			// mark first character as never read
+			times_read.push_back(0);
 		}
 		
 		/** Reads at the cursor.
 		 *  @return The character at the current position, or '\0' for end of 
 		 *          stream.
 		 */
-		value_type operator() () const {
+		value_type operator() () {
 			ind i = pos.i - off.i;
 			if ( i >= str.size() ) return '\0';
+			++times_read[pos.i];
 			return str[i];
 		}
 		
@@ -317,6 +321,7 @@ namespace parser {
 			
 			ind i = p.i - off.i;
 			if ( i >= str.size() ) return '\0';
+			++times_read[p.i];
 			return str[i];
 		}
 		
@@ -423,8 +428,10 @@ namespace parser {
 			
 			if ( ie >= str.size() ) {
 				eIter = str.end();
+				ie = str.size();
 				if ( ib >= str.size() ) {
 					bIter = str.end();
+					ib = str.size();
 				} else {
 					bIter = str.begin() + ib;
 				}
@@ -432,6 +439,9 @@ namespace parser {
 				bIter = str.begin() + ib;
 				eIter = str.begin() + ie;
 			}
+
+			// mark only first character of range as backtracked to
+			++times_read[off.i + ib];
 			
 			return range_type(bIter, eIter);
 		}
@@ -456,6 +466,7 @@ namespace parser {
 		bool memo(ind id, struct memo& m) {
 			// Get table iterator
 			ind i = pos.i - off.i;
+			if ( i < str.size() ) ++times_read[pos.i];  // mark memo read
 			if ( i >= memo_table.size() ) return false;
 			auto& tab = memo_table[i];
 			auto it = tab.find(id);
@@ -486,6 +497,23 @@ namespace parser {
 			// set table entry
 			memo_table[i][id] = m;
 			return true;
+		}
+
+		/** Increment current nesting depth */
+		void nest() { ++cur_depth; }
+
+		/** Decrement current nesting depth */
+		void unnest() { --cur_depth; }
+
+		/** Reached local maximum of nesting depth */
+		void final_nest() { max_depth = std::max(cur_depth + 1, max_depth); }
+
+		/** Report maximum nesting depth */
+		ind max_nesting_depth() const { return max_depth; }
+
+		/** Report maximum times read */
+		ind max_backtracks() const {
+			return *std::max_element( times_read.begin(), times_read.end() );
 		}
 		
 		/** Get the parser's internal error object */
@@ -628,6 +656,12 @@ namespace parser {
 		struct error err;
 		/** Input stream to read characters from */
 		stream_type& in;
+		/** Current nesting depth */
+		ind cur_depth;
+		/** Maximum nesting depth */
+		ind max_depth;
+		/** Number of reads on each index */
+		std::vector<ind> times_read;
 	}; /* class state */
 	
 	/** Parser combinator type */
@@ -641,6 +675,7 @@ namespace parser {
 	/** Character literal parser */
 	combinator literal(state::value_type c) {
 		return [c](state& ps) {
+			ps.final_nest();
 			if ( ps.matches(c) ) { return true; }
 			
 			ps.fail();
@@ -653,6 +688,7 @@ namespace parser {
 	 */
 	combinator literal(state::value_type c, state::value_type& psVal) {
 		return [c,&psVal](state& ps) {
+			ps.final_nest();
 			if ( ps.matches(c) ) { psVal = c; return true; }
 			
 			ps.fail();
@@ -663,6 +699,7 @@ namespace parser {
 	/** String literal parser */
 	combinator literal(const state::string_type& s) {
 		return [&s](state& ps) {
+			ps.final_nest();
 			if ( ps.matches(s) ) { return true; }
 			
 			ps.fail();
@@ -673,6 +710,7 @@ namespace parser {
 	/** Any character parser */
 	combinator any() {
 		return [](state& ps) {
+			ps.final_nest();
 			if ( ps.matches_any() ) { return true; }
 
 			ps.fail();
@@ -685,6 +723,7 @@ namespace parser {
 	 */
 	combinator any(state::value_type& psVal) {
 		return [&psVal](state& ps) {
+			ps.final_nest();
 			if ( ps.matches_any(psVal) ) { return true; }
 			
 			ps.fail();
@@ -695,6 +734,7 @@ namespace parser {
 	/** Any character parser with exception */
 	combinator any_except(state::value_type c) {
 		return [c](state& ps) {
+			ps.final_nest();
 			if ( ps.matches_except(c) ) { return true; }
 
 			ps.fail();
@@ -707,6 +747,7 @@ namespace parser {
 	 */
 	combinator any_except(state::value_type c, state::value_type& psVal) {
 		return [c,&psVal](state& ps) {
+			ps.final_nest();
 			if ( ps.matches_except(c, psVal) ) { return true; }
 			
 			ps.fail();
@@ -717,6 +758,7 @@ namespace parser {
 	/** End-of-input parser */
 	combinator none() {
 		return [](state& ps) {
+			ps.final_nest();
 			if ( ps.matches_none() ) { return true; }
 
 			ps.fail();
@@ -727,6 +769,7 @@ namespace parser {
 	/** Character range parser parser */
 	combinator between(state::value_type s, state::value_type e) {
 		return [s,e](state& ps) {
+			ps.final_nest();
 			if ( ps.matches_in(s, e) ) { return true; }
 			
 			ps.fail();
@@ -739,6 +782,7 @@ namespace parser {
 	 */
 	combinator between(state::value_type s, state::value_type e, state::value_type& psVal) {
 		return [s,e,&psVal](state& ps) {
+			ps.final_nest();
 			if ( ps.matches_in(s, e, psVal) ) { return true; }
 			
 			ps.fail();
@@ -749,6 +793,7 @@ namespace parser {
 	/** Exclusive character range parser parser */
 	combinator not_between(state::value_type s, state::value_type e) {
 		return [s,e](state& ps) {
+			ps.final_nest();
 			if ( ps.matches_not_in(s, e) ) { return true; }
 			
 			ps.fail();
@@ -761,16 +806,26 @@ namespace parser {
 	 */
 	combinator not_between(state::value_type s, state::value_type e, state::value_type& psVal) {
 		return [s,e,&psVal](state& ps) {
+			ps.final_nest();
 			if ( ps.matches_not_in(s, e, psVal) ) { return true; }
 			
 			ps.fail();
 			return false;
 		};
 	}
+
+	/** Uses RAII to increase and decrease nesting depth on a state */
+	struct nest_guard {
+		nest_guard(state& ps) : ps(ps) { ps.nest(); }
+		~nest_guard() { ps.unnest(); }
+	private:
+		state& ps;
+	};
 	
 	/** Matches all or none of a sequence of parsers */
 	combinator sequence(combinator_list fs) {
 		return [fs](state& ps) {
+			nest_guard g{ ps };
 			posn psStart = ps.posn();
 			for (auto f : fs) {
 				if ( ! f(ps) ) { ps.set_posn(psStart); return false; }
@@ -782,6 +837,7 @@ namespace parser {
 	/** Matches one of a set of alternate parsers */
 	combinator choice(combinator_list fs) {
 		return [fs](state& ps) {
+			nest_guard g{ ps };
 			for (auto f : fs) {
 				if ( f(ps) ) return true;
 			}
@@ -792,6 +848,7 @@ namespace parser {
 	/** Matches all of a sequence of parsers at the same point in the input. */
 	combinator all(combinator_list fs) {
 		return [fs](state& ps) {
+			nest_guard g{ ps };
 			posn psStart = ps.posn();
 			for (auto f : fs) {
 				ps.set_posn(psStart);
@@ -804,6 +861,7 @@ namespace parser {
 	/** Matches a parser any number of times */
 	combinator many(const combinator& f) {
 		return [&f](state& ps) {
+			nest_guard g{ ps };
 			while ( f(ps) )
 				;
 			return true;
@@ -813,6 +871,7 @@ namespace parser {
 	/** Matches a parser some positive number of times */
 	combinator some(const combinator& f) {
 		return [&f](state& ps) {
+			nest_guard g{ ps };
 			if ( ! f(ps) ) return false;
 			while ( f(ps) )
 				;
@@ -823,6 +882,7 @@ namespace parser {
 	/** Matches a parser repeatedly until its terminator matches */
 	combinator until(const combinator& r, const combinator& t) {
 		return [&r,&t](state& ps) {
+			nest_guard g{ ps };
 			if ( t(ps) ) return true;
 			posn psStart = ps.posn();
 			while ( r(ps) )
@@ -835,6 +895,7 @@ namespace parser {
 	/** Optionally matches a parser */
 	combinator option(const combinator& f) {
 		return [&f](state& ps) {
+			nest_guard g{ ps };
 			f(ps);
 			return true;
 		};
@@ -843,6 +904,7 @@ namespace parser {
 	/** Looks ahead to match a parser without consuming input */
 	combinator look(const combinator& f) {
 		return [&f](state& ps) {
+			nest_guard g{ ps };
 			posn psStart = ps.posn();
 			if ( f(ps) ) { ps.set_posn(psStart); return true; }
 			return false;
@@ -852,6 +914,7 @@ namespace parser {
 	/** Looks ahead to not match a parser without consuming input */
 	combinator look_not(const combinator& f) {
 		return [&f](state& ps) {
+			nest_guard g{ ps };
 			posn psStart = ps.posn();
 			if ( f(ps) ) { ps.set_posn(psStart); return false; }
 			return true;
@@ -950,6 +1013,7 @@ namespace parser {
 	/** Memoizes a many-matcher  */
 	combinator memoize_many(ind id, const combinator& f) {
 		return [id,&f](state& ps) {
+			nest_guard g{ ps };
 			many_memoized(id, f, ps);
 			return true;
 		};
@@ -958,6 +1022,7 @@ namespace parser {
 	/** Memoizes a some-matcher */
 	combinator memoize_some(ind id, const combinator& f) {
 		return [id,&f](state& ps) {
+			nest_guard g{ ps };
 			posn psStart = ps.posn();
 			many_memoized(id, f, ps);
 			return ( ps.posn() > psStart );
@@ -967,6 +1032,7 @@ namespace parser {
 	/** Memoizes an until-matcher */
 	combinator memoize_until(ind id, const combinator& r, const combinator& t) {
 		return [id,&r,&t](state& ps) {
+			nest_guard g{ ps };
 			memo m = until_memoized(id, r, t, ps);
 			return m.success;
 		};
@@ -984,12 +1050,12 @@ namespace parser {
 	
 	/** Empty parser; always matches */
 	combinator empty() {
-		return [](state&) { return true; };
+		return [](state& ps) { ps.final_nest(); return true; };
 	}
 	
 	/** Failure parser; inserts message */
 	combinator fail(const std::string& s) {
-		return [&s](state& ps) { ps.message(s); return false; };
+		return [&s](state& ps) { ps.final_nest(); ps.message(s); return false; };
 	}
 	
 	/** Names a parser for better error messages */
@@ -1004,4 +1070,3 @@ namespace parser {
 	
 } /* namespace parser */
 
-#endif

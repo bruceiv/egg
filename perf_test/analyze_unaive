@@ -1,0 +1,36 @@
+#!/bin/zsh
+
+outname="output/inst-unaive-`date +%y%m%d%H%M`-`git describe --tags --long`"
+
+if [[ ! -d output ]]; then mkdir output; fi
+
+outfile="${outname}-xml.csv"
+echo '"filename","output","max_backtracks","max_nesting_depth","size(B)"' | tee $outfile
+# Iterate XML files sorted increasing by size
+for file in input/ijs-elan2.0/*(oL); do
+	echo -n "\"`basename $file`\"," | tee -a $outfile
+	../grammars/xml-nomemo-inst < $file 2>&1 | tr -d '\n' | tee -a $outfile
+	stat -c %s $file | tee -a $outfile
+done
+
+echo
+
+outfile="${outname}-json.csv"
+echo '"filename","output","max_backtracks","max_nesting_depth","size(B)"' | tee $outfile
+# Iterate JSON files sorted increasing by size
+for file in input/json-ijs-elan2.0/*(oL); do
+	echo -n "\"`basename $file`\"," | tee -a $outfile
+	../grammars/json-nomemo-inst < $file 2>&1 | tr -d '\n' | tee -a $outfile
+	stat -c %s $file | tee -a $outfile
+done
+
+echo
+
+outfile="${outname}-java.csv"
+echo '"filename","output","max_backtracks","max_nesting_depth","size(B)"' | tee $outfile
+# Iterate Java files sorted increasing by size
+for file in input/javacc/*(oL); do
+	echo -n "\"`basename $file`\"," | tee -a $outfile
+	../grammars/java-nomemo-inst < $file 2>&1 | tr -d '\n' | tee -a $outfile
+	stat -c %s $file | tee -a $outfile
+done

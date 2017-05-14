@@ -34,6 +34,7 @@
 #include "../utils/uint_set.hpp"
 
 #include "deriv_printer.hpp"
+#include "instrumenter.hpp"
 
 namespace derivs {
 	
@@ -349,8 +350,10 @@ namespace derivs {
 	/// @param in		Input stream
 	/// @param rule		Start rule
 	/// @param dbg		Print debug output? (default false)
+	/// @param inst     Instrument grammar? (default false)
 	/// @return true for match, false for failure
-	bool match(loader& l, std::istream& in, std::string rule, bool dbg = false) {
+	bool match(loader& l, std::istream& in, std::string rule, bool dbg = false, 
+	           instrumenter* stats = nullptr) {
 		auto& rs = l.get_rules();
 		derivs::printer p(std::cout, l.get_names());
 		
@@ -362,6 +365,7 @@ namespace derivs {
 		// Take derivatives until failure, match, or end of input
 		while ( true ) {
 			if ( dbg ) { p.print(e); }
+			if ( stats ) (*stats)(*e);
 			
 			switch ( e->type() ) {
 			case fail_type: return false;
@@ -387,6 +391,7 @@ namespace derivs {
 			if ( x == '\0' ) break;
 		}
 		if ( dbg ) { p.print(e); }
+		if ( stats ) { (*stats)(*e); }
 		
 		// Match if final expression matched on terminator char
 		return ! e->match().empty();
@@ -397,10 +402,12 @@ namespace derivs {
 	/// @param in		Input stream
 	/// @param rule		Start rule
 	/// @param dbg		Print debug output? (default false)
+	/// @param inst     Instrument grammar? (default false)
 	/// @return true for match, false for failure
-	bool match(ast::grammar& g, std::istream& in, std::string rule, bool dbg = false) {
+	bool match(ast::grammar& g, std::istream& in, std::string rule, bool dbg = false, 
+	           instrumenter* stats = nullptr) {
 		loader l(g, dbg);
-		return match(l, in, rule, dbg);
+		return match(l, in, rule, dbg, stats);
 	}
 	
 } // namespace derivs

@@ -54,4 +54,8 @@ int main(int argc, char** argv) {
 			cout << "\tExpected " << exp << endl;
 		}
 	}
+
+	#ifdef EGG_INST
+	cout << "," << ps.max_backtracks() << "," << ps.max_nesting_depth() << "," << endl;
+	#endif
 }
