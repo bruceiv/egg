@@ -2,3 +2,5 @@ output/*.csv
 plots/*.pdf
 *.eps
 *.tex
+*.png
+

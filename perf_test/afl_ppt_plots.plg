@@ -1,0 +1,87 @@
+# Plots output data from egg performance tests
+# requires parameters nxml, njson, njava, pxml, pjson, pjava, dxml, djson, djava, inxml, injson, injava, ipxml, ipjson, ipjava, idxml, idjson, idjava; the files to plot
+
+# set terminal png size 800,500 background rgb '#757575'
+set terminal pngcairo size 900,500 font "Tw Cen MT,20" transparent
+
+set style line 1 lt rgb '#EE5675' lw 1.25 pt 1 ps 2
+set style line 2 lt rgb '#EE5675' lw 1.25 pt 2 ps 2
+set style line 3 lt rgb '#EE5675' lw 1.25 pt 3 ps 2
+
+set style line 4 lt rgb '#F3DD90' lw 1.25 pt 5 ps 2
+set style line 5 lt rgb '#F3DD90' lw 1.25 pt 7 ps 2
+set style line 6 lt rgb '#F3DD90' lw 1.25 pt 9 ps 2
+
+set style line 7 lt rgb '#49ABF9' lw 1.25 pt 4 ps 2
+set style line 8 lt rgb '#49ABF9' lw 1.25 pt 6 ps 2
+set style line 9 lt rgb '#49ABF9' lw 1.25 pt 8 ps 2
+
+# set bmargin at screen 0.125
+
+set xlabel textcolor rgb 'white'
+set ylabel textcolor rgb 'white'
+set border linecolor rgb 'white'
+set key textcolor rgb 'white'
+
+set key outside
+set key top right
+set key width -2
+
+set datafile separator ","
+
+set output 'runtime.png'
+set xlabel 'Input Size (KB)' # offset 0,0.3 
+set ylabel 'Runtime (s)' # offset 2,0
+
+plot nxml using ($7/1000):3 with points title 'Recursive XML' ls 1, \
+     njson using ($7/1000):3 with points title 'Recursive JSON' ls 2, \
+     njava using ($7/1000):3 with points title 'Recursive Java' ls 3, \
+     pxml using ($7/1000):3 with points title 'Packrat XML' ls 4, \
+     pjson using ($7/1000):3 with points title 'Packrat JSON' ls 5, \
+     pjava using ($7/1000):3 with points title 'Packrat Java' ls 6, \
+     dxml using ($7/1000):3 with points title 'Derivative XML' ls 7, \
+     djson using ($7/1000):3 with points title 'Derivative JSON' ls 8, \
+     djava using ($7/1000):3 with points title 'Derivative Java' ls 9
+
+set output 'mem-use.png'
+set logscale xy
+set ylabel 'Maximum RAM Use (MB)' offset 2,0
+
+plot nxml using ($7/1000):($6/1000) with points title 'Recursive XML' ls 1, \
+     njson using ($7/1000):($6/1000) with points title 'Recursive JSON' ls 2, \
+     njava using ($7/1000):($6/1000) with points title 'Recursive Java' ls 3, \
+     pxml using ($7/1000):($6/1000) with points title 'Packrat XML' ls 4, \
+     pjson using ($7/1000):($6/1000) with points title 'Packrat JSON' ls 5, \
+     pjava using ($7/1000):($6/1000) with points title 'Packrat Java' ls 6, \
+     dxml using ($7/1000):($6/1000) with points title 'Derivative XML' ls 7, \
+     djson using ($7/1000):($6/1000) with points title 'Derivative JSON' ls 8, \
+     djava using ($7/1000):($6/1000) with points title 'Derivative Java' ls 9
+
+set output 'backtracks.png'
+set nologscale x
+set xlabel 'Input Size (KB)' offset 0,0.3
+set ylabel 'Maximum Backtracks' offset 2,0
+
+plot inxml using ($5/1000):3 with points title 'Recursive XML' ls 1, \
+     injson using ($5/1000):3 with points title 'Recursive JSON' ls 2, \
+     injava using ($5/1000):3 with points title 'Recursive Java' ls 3, \
+     ipxml using ($5/1000):3 with points title 'Packrat XML' ls 4, \
+     ipjson using ($5/1000):3 with points title 'Packrat JSON' ls 5, \
+     ipjava using ($5/1000):3 with points title 'Packrat Java' ls 6, \
+     idxml using ($5/1000):3 with points title 'Derivative XML' ls 7, \
+     idjson using ($5/1000):3 with points title 'Derivative JSON' ls 8, \
+     idjava using ($5/1000):3 with points title 'Derivative Java' ls 9
+
+set output 'nesting-depth.png'
+set xlabel 'Input Size (KB)' offset 0,0.3
+set ylabel 'Maximum Nesting Depth' offset 2,0
+
+plot inxml using ($5/1000):4 with points title 'Recursive XML' ls 1, \
+     injson using ($5/1000):4 with points title 'Recursive JSON' ls 2, \
+     injava using ($5/1000):4 with points title 'Recursive Java' ls 3, \
+     ipxml using ($5/1000):4 with points title 'Packrat XML' ls 4, \
+     ipjson using ($5/1000):4 with points title 'Packrat JSON' ls 5, \
+     ipjava using ($5/1000):4 with points title 'Packrat Java' ls 6, \
+     idxml using ($5/1000):4 with points title 'Derivative XML' ls 7, \
+     idjson using ($5/1000):4 with points title 'Derivative JSON' ls 8, \
+     idjava using ($5/1000):4 with points title 'Derivative Java' ls 9
