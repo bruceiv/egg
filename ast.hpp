@@ -190,7 +190,7 @@ namespace ast {
 
 		void accept(visitor* v) { v->visit(*this); }
 		matcher_type type() { return rule_type; }
-
+		
 		string rule;	/**< The name of the rule to match */
 		string var;		/**< Variable to bind to the rule return. 
 						 *   Empty if unset. */

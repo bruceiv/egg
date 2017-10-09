@@ -26,12 +26,16 @@
 //#define NDEBUG
 #include <cassert>
 
+#include <limits>
 #include <memory>
+#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
+
+#include "ast.hpp"
 
 #include "utils/uint_pfn.hpp"
 
@@ -48,18 +52,24 @@ namespace derivs {
 	template <typename T> using ptr = std::shared_ptr<T>;
 	template <typename T> using memo_ptr = std::weak_ptr<T>;
 	
-	/// map of backtrack generations
-	using gen_map  = utils::uint_pfn;
-	/// set of backtrack generations
-	using gen_set  = gen_map::set_type;
 	/// single backtrack generation
-	using gen_type = gen_map::value_type;
+	using gen_type = unsigned long;
+	/// set of backtrack generations
+	using gen_set = std::set<gen_type>;
+
+	/// sentinel generation indicating none-such
+	static constexpr gen_type no_gen = std::numeric_limits<gen_type>::max();
+
+	/// Gets first index in a generation set; undefined for empty set
+	static inline first( const gen_set& gs ) { return *gs.begin(); }
+
+	/// Gets last index in a generation set; undefined for empty set
+	static inline last( const gen_set& gs ) { return *gs.rbegin(); }
 	
 	// Forward declarations of expression node types
 	class fail_expr;
 	class inf_expr;
 	class eps_expr;
-	class look_expr;
 	class char_expr;
 	class except_expr;
 	class range_expr;
@@ -69,7 +79,6 @@ namespace derivs {
 	class str_expr;
 	class rule_expr;
 	class not_expr;
-	class map_expr;
 	class alt_expr;
 	class or_expr;
 	class and_expr;
@@ -80,7 +89,6 @@ namespace derivs {
 		fail_type,
 		inf_type,
 		eps_type,
-		look_type,
 		char_type,
 		except_type,
 		range_type,
@@ -90,7 +98,6 @@ namespace derivs {
 		str_type,
 		rule_type,
 		not_type,
-		map_type,
 		alt_type,
 		or_type,
 		and_type,
@@ -105,7 +112,6 @@ namespace derivs {
 		virtual void visit(fail_expr&)  = 0;
 		virtual void visit(inf_expr&)   = 0;
 		virtual void visit(eps_expr&)   = 0;
-		virtual void visit(look_expr&)  = 0;
 		virtual void visit(char_expr&)  = 0;
 		virtual void visit(except_expr&) = 0;
 		virtual void visit(range_expr&) = 0;
@@ -115,7 +121,6 @@ namespace derivs {
 		virtual void visit(str_expr&)   = 0;
 		virtual void visit(rule_expr&)  = 0;
 		virtual void visit(not_expr&)   = 0;
-		virtual void visit(map_expr&)   = 0;
 		virtual void visit(alt_expr&)   = 0;
 		virtual void visit(or_expr&)  = 0;
 		virtual void visit(and_expr&)   = 0;
@@ -128,35 +133,6 @@ namespace derivs {
 	protected:
 		expr() = default;
 		
-		/// Creates a new backtrack map to map an expression into a generation space
-		static gen_map new_back_map(ptr<expr> e, gen_type gm, bool& did_inc);
-		static inline gen_map new_back_map(ptr<expr> e, gen_type gm) {
-			bool did_inc = true;
-			return new_back_map(e, gm, did_inc);
-		}
-		
-		/// Gets the default backtracking map for an expression 
-		///   (zero_map if no lookahead gens, zero_one_map otherwise)
-		static gen_map default_back_map(ptr<expr> e, bool& did_inc);
-		static inline gen_map default_back_map(ptr<expr> e) {
-			bool did_inc = true;
-			return default_back_map(e, did_inc);
-		}
-		
-		/// Gets an updated backtrack map
-		/// @param e        The original expression
-		/// @param de		The derivative of the expression to produce the new backtrack map for
-		/// @param eg		The backtrack map for e
-		/// @param gm		The current maximum generation
-		/// @param did_inc	Set to true if this operation involved a new backtrack gen
-		/// @return The backtrack map for de
-		static gen_map update_back_map(ptr<expr> e, ptr<expr> de, gen_map eg, 
-		                               gen_type gm, bool& did_inc);
-		static inline gen_map update_back_map(ptr<expr> e, ptr<expr> de, gen_map eg, gen_type gm) {
-			bool did_inc = true;
-			return update_back_map(e, de, eg, gm, did_inc);
-		}
-		
 	public:
 		template<typename T, typename... Args>
 		static ptr<expr> make_ptr(Args&&... args) {
@@ -166,7 +142,7 @@ namespace derivs {
 		}
 		
 		/// Derivative of this expression with respect to x
-		virtual ptr<expr> d(char x) const = 0;
+		virtual ptr<expr> d(char x, gen_type i) const = 0;
 		
 		/// Accept visitor
 		virtual void accept(visitor*) = 0;
@@ -189,10 +165,10 @@ namespace derivs {
 	friend class fixer;
 	protected:
 		/// Constructor providing memoization table reference
-		memo_expr() : memo_d(), last_char(0x7F) { flags = {false,false}; }
+		memo_expr() : memo_d(), last_index(no_gen) { flags = {false,false}; }
 		
 		/// Actual derivative calculation
-		virtual ptr<expr> deriv(char) const = 0;
+		virtual ptr<expr> deriv(char, gen_type) const = 0;
 		
 		/// Actual computation of match set
 		virtual gen_set match_set() const = 0;
@@ -206,7 +182,7 @@ namespace derivs {
 		
 		virtual void accept(visitor*) = 0;
 		
-		virtual ptr<expr> d(char x) const;
+		virtual ptr<expr> d(char x, gen_type i) const;
 		virtual gen_set   match()   const;
 		virtual gen_set   back()    const;
 	
@@ -214,69 +190,13 @@ namespace derivs {
 		mutable memo_ptr<expr> memo_d; ///< Stored derivative
 		mutable gen_set memo_match;    ///< Stored match set
 		mutable gen_set memo_back;     ///< Stored backtracking set
-		/// Character stored derivative was taken w.r.t. [0x7F for none such]
-		mutable char last_char;
+		/// Index of last stored derivative [no_gen for none such]
+		mutable gen_type last_index;
 		mutable struct {
 			bool match : 1; ///< Is there a match set stored?
 			bool back  : 1; ///< Is there a backtrack set stored?
 		} flags;                     ///< Memoization status flags
 	}; // class memo_expr
-	
-	/// Calculates least fixed point of match sets for compound expressions and stores them in the 
-	/// memo table. Approach based on Kleene's fixed point theorem, as implemented in the 
-	/// derivative parser of Might et al. for CFGs.
-	class fixer : public visitor {
-	public:
-		/// Calculates the least fixed point of x->match() and memoizes it
-		void operator() (ptr<expr> x);
-		
-		// Implements visitor
-		void visit(fail_expr&);
-		void visit(inf_expr&);
-		void visit(eps_expr&);
-		void visit(look_expr&);
-		void visit(char_expr&);
-		void visit(except_expr&);
-		void visit(range_expr&);
-		void visit(except_range_expr&);
-		void visit(any_expr&);
-		void visit(none_expr&);
-		void visit(str_expr&);
-		void visit(rule_expr&);
-		void visit(not_expr&);
-		void visit(map_expr&);
-		void visit(alt_expr&);
-		void visit(or_expr&);
-		void visit(and_expr&);
-		void visit(seq_expr&);
-	
-	private:
-		/// Performs fixed point computation to calculate match set of x
-		/// Based on Kleene's thm, iterates upward from a bottom set of {}
-		gen_set fix_match(ptr<expr> x);
-		
-		/// Recursively calculates next iteration of match set
-		/// @param x        The expression to match
-		/// @param changed  Did some subexpression change its value for match?
-		/// @param visited  Which subexpressions have been visited?
-		/// @return The match set
-		gen_set iter_match(ptr<expr> x, bool& changed, 
-		                   std::unordered_set<ptr<expr>>& visited);
-		
-		/// Wraps visitor pattern for actual calculation of next match set
-		/// @param x        The expression to match
-		/// @param changed  Did some subexpression change its value for match?
-		/// @param visited  Which subexpressions have been visited?
-		/// @return The match set
-		gen_set calc_match(ptr<expr> x, bool& changed, 
-		                   std::unordered_set<ptr<expr>>& visited);
-		
-		std::unordered_set<ptr<expr>>  running;  ///< Set of expressions currently being fixed
-		std::unordered_set<ptr<expr>>  fixed;    ///< Set of expressions already fixed
-		std::unordered_set<ptr<expr>>* visited;  ///< Set of expressions visited in current fix
-		bool*                          changed;  ///< Has anything in the current fix changed?
-		gen_set                        match;    ///< Match returned by current fix
-	}; // class fixer
 	
 	/// A failure parsing expression
 	class fail_expr : public expr {
@@ -293,7 +213,7 @@ namespace derivs {
 		static ptr<expr> make();
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> d(char) const;
+		virtual ptr<expr> d(char, gen_type) const;
 		virtual gen_set   match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return fail_type; }
@@ -314,7 +234,7 @@ namespace derivs {
 		static ptr<expr> make();
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> d(char) const;
+		virtual ptr<expr> d(char, gen_type) const;
 		virtual gen_set   match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return inf_type; }
@@ -322,40 +242,19 @@ namespace derivs {
 	
 	/// An empty success parsing expression
 	class eps_expr : public expr {
-		// implements singleton pattern; access through make()
-		eps_expr() = default;
-		eps_expr(const eps_expr&) = delete;
-		eps_expr(eps_expr&&) = delete;
-		
-		eps_expr& operator = (const eps_expr&) = delete;
-		eps_expr& operator = (eps_expr&&) = delete;
 	public:
-		~eps_expr() = default;
+		look_expr(gen_type g) : g{g} {}
 		
-		static ptr<expr> make();
+		static ptr<expr> make(gen_type g);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> d(char) const;
+		virtual ptr<expr> d(char, gen_type) const;
 		virtual gen_set   match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return eps_type; }
+
+		gen_type g; ///< Input index where this match occured
 	}; // class eps_expr
-	
-	/// An lookahead success parsing expression
-	class look_expr : public expr {
-	public:
-		look_expr(gen_type g = 1) : b{g} {}
-	
-		static ptr<expr> make(gen_type g = 1);
-		void accept(visitor* v) { v->visit(*this); }
-		
-		virtual ptr<expr> d(char) const;
-		virtual gen_set   match() const;
-		virtual gen_set   back()  const;
-		virtual expr_type type()  const { return look_type; }
-		
-		gen_type b;  ///< Generation of this success match
-	}; // class look_expr
 	
 	/// A single-character parsing expression
 	class char_expr : public expr {
@@ -365,7 +264,7 @@ namespace derivs {
 		static ptr<expr> make(char c);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> d(char) const;
+		virtual ptr<expr> d(char, gen_type) const;
 		virtual gen_set   match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return char_type; }
@@ -381,7 +280,7 @@ namespace derivs {
 		static ptr<expr> make(char c);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> d(char) const;
+		virtual ptr<expr> d(char, gen_type) const;
 		virtual gen_set   match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return except_type; }
@@ -397,7 +296,7 @@ namespace derivs {
 		static ptr<expr> make(char b, char e);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> d(char) const;
+		virtual ptr<expr> d(char, gen_type) const;
 		virtual gen_set   match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return range_type; }
@@ -414,7 +313,7 @@ namespace derivs {
 		static ptr<expr> make(char b, char e);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> d(char) const;
+		virtual ptr<expr> d(char, gen_type) const;
 		virtual gen_set   match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return except_range_type; }
@@ -431,7 +330,7 @@ namespace derivs {
 		static ptr<expr> make();
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> d(char) const;
+		virtual ptr<expr> d(char, gen_type) const;
 		virtual gen_set   match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return any_type; }
@@ -445,7 +344,7 @@ namespace derivs {
 		static ptr<expr> make();
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> d(char) const;
+		virtual ptr<expr> d(char, gen_type) const;
 		virtual gen_set   match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return none_type; }
@@ -453,24 +352,24 @@ namespace derivs {
 
 	/// A parsing expression representing a character string
 	class str_expr : public expr {
-		str_expr(ptr<std::string> sp, unsigned long i) : sp(sp), i(i) {}
+		str_expr(ptr<std::string> sp, unsigned long si) : sp(sp), si(si) {}
 	public:
-		str_expr(const std::string& s) : sp{std::make_shared<std::string>(s)}, i{0} {}
-		str_expr(std::string&& s) : sp{std::make_shared<std::string>(s)}, i{0} {}
+		str_expr(const std::string& s) : sp{std::make_shared<std::string>(s)}, si{0} {}
+		str_expr(std::string&& s) : sp{std::make_shared<std::string>(s)}, si{0} {}
 		
 		static ptr<expr> make(const std::string& s);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> d(char) const;
+		virtual ptr<expr> d(char, gen_type) const;
 		virtual gen_set   match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return str_type; }
 		
-		std::string str() const { return std::string{*sp, i}; }
-		unsigned long size() const { return sp->size() - i; }
+		std::string str() const { return std::string{*sp, si}; }
+		unsigned long size() const { return sp->size() - si; }
 	private:
 		ptr<std::string> sp;  ///< Pointer to interred string
-		unsigned long i;      ///< Index into interred string
+		unsigned long si;     ///< Index into interred string
 	}; // class str_expr
 	
 	/// A parsing expression representing a non-terminal
@@ -481,7 +380,7 @@ namespace derivs {
 		static ptr<expr> make(ptr<expr> r = nullptr);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> deriv(char) const;
+		virtual ptr<expr> deriv(char, gen_type) const;
 		virtual gen_set   match_set() const;
 		virtual gen_set   back_set()  const;
 		virtual expr_type type()      const { return rule_type; }
@@ -492,12 +391,12 @@ namespace derivs {
 	/// A parsing expression representing negative lookahead
 	class not_expr : public memo_expr {
 	public:
-		not_expr(ptr<expr> e) : memo_expr(), e(e) { flags.match = flags.back = true; }
+		not_expr(ptr<expr> e, gen_type g) : memo_expr(), e(e), g(g) { flags.match = flags.back = true; }
 		
-		static ptr<expr> make(ptr<expr> e);
+		static ptr<expr> make(ptr<expr> e, gen_type g);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> deriv(char) const;
+		virtual ptr<expr> deriv(char, gen_type) const;
 		virtual gen_set   match_set() const;
 		virtual gen_set   back_set()  const;
 		virtual expr_type type()      const { return not_type; }
@@ -506,59 +405,28 @@ namespace derivs {
 		virtual gen_set back()  const { return not_expr::back_set(); }
 		
 		ptr<expr> e;  ///< Subexpression to negatively match
+		gen_type g;   ///< Index at which expression ceased consuming input
 	}; // class not_expr
-	
-	/// Maintains generation mapping from collapsed alternation expression.
-	class map_expr : public memo_expr {
-	public:
-		map_expr(ptr<expr> e, gen_type gm, gen_map eg) : memo_expr(), e(e), gm(gm), eg(eg) {}
-		
-		static ptr<expr> make(ptr<expr> e, gen_type mg, gen_map eg);
-		void accept(visitor* v) { v->visit(*this); }
-		
-		virtual ptr<expr> deriv(char) const;
-		virtual gen_set   match_set() const;
-		virtual gen_set   back_set()  const;
-		virtual expr_type type()      const { return map_type; }
-		
-		ptr<expr> e;   ///< Subexpression
-		gen_type  gm;  ///< Maximum generation from source expresssion
-		gen_map   eg;  ///< Generation flags for subexpression
-	}; // class map_expr
 	
 	/// A parsing expression representing the alternation of two parsing expressions
 	class alt_expr : public memo_expr {
 	public:
-		struct alt_node {
-			alt_node(ptr<expr> e, gen_map eg) : e(e), eg(eg) {}
-
-			ptr<expr> e;   ///< Subexpression
-			gen_map   eg;  ///< Generation flags for subexpression
-		};  // struct alt_node
-		using alt_list = std::vector<alt_node>;
+		alt_expr(ptr<expr> a, ptr<expr> b) : memo_expr(), es{a, b} {}
 		
-		alt_expr(ptr<expr> a, ptr<expr> b, 
-				gen_map ag = gen_map{0}, gen_map bg = gen_map{0}, gen_type gm = 0)
-			: memo_expr(), es{alt_node{a, ag}, alt_node{b, bg}}, gm(gm) {}
-		
-		alt_expr(const alt_list& es, gen_type gm) : memo_expr(), es(es), gm(gm) {}
+		alt_expr(const expr_list& es) : memo_expr(), es(es) {}
 		
 		/// Make an expression using the default generation rules
 		static ptr<expr> make(ptr<expr> a, ptr<expr> b);
-		/// Make an expression with the given generation maps
-		static ptr<expr> make(ptr<expr> a, ptr<expr> b, 
-		                      gen_map ag, gen_map bg, gen_type gm);
 		/// Make an expression using the default generation rules
 		static ptr<expr> make(const expr_list& es);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> deriv(char) const;
+		virtual ptr<expr> deriv(char, gen_type) const;
 		virtual gen_set   match_set() const;
 		virtual gen_set   back_set()  const;
 		virtual expr_type type()      const { return alt_type; }
 		
-		alt_list  es;  ///< List of subexpressions, ordered by priority
-		gen_type  gm;  ///< Maximum generation
+		expr_list  es;  ///< List of subexpressions, ordered by priority
 	}; // class alt_expr
 
 	/// A parsing expression representing the simultaneous match of any of multiple 
@@ -566,13 +434,13 @@ namespace derivs {
 	/// subexpressions.
 	class or_expr : public memo_expr {
 	public:
-		or_expr(expr_list&& es) : memo_expr(), es(es) {}
+		or_expr(expr_list&& es) : memo_expr(), es(std::move(es)) {}
 		
 		/// Make an expression using the default generation rules
 		static ptr<expr> make(expr_list&& es);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> deriv(char) const;
+		virtual ptr<expr> deriv(char, gen_type) const;
 		virtual gen_set   match_set() const;
 		virtual gen_set   back_set()  const;
 		virtual expr_type type()      const { return or_type; }
@@ -590,7 +458,7 @@ namespace derivs {
 		static ptr<expr> make(expr_list&& es);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> deriv(char) const;
+		virtual ptr<expr> deriv(char, gen_type) const;
 		virtual gen_set   match_set() const;
 		virtual gen_set   back_set()  const;
 		virtual expr_type type()      const { return and_type; }
@@ -602,36 +470,33 @@ namespace derivs {
 	class seq_expr : public memo_expr {
 	public:
 		struct look_node {
-			look_node(gen_type g, gen_map eg, ptr<expr> e, gen_type gl = 0) 
-				: g(g), eg(eg), e(e), gl(gl) {}
+			look_node(gen_type g, ptr<expr> e, gen_type gl = no_gen) 
+				: g(g), e(e), gl(gl) {}
 			
-			gen_type  g;   ///< Backtrack generation this follower corresponds to
-			gen_map   eg;  ///< Map of generations from this node to the containing node
+			gen_type  g;   ///< Backtrack index this follower corresponds to
 			ptr<expr> e;   ///< Follower expression for this lookahead generation
-			gen_type  gl;  ///< Generation of last match
+			gen_type  gl;  ///< Index of last match [no_gen for none such]
 		}; // struct look_node
 		using look_list = std::vector<look_node>;
 		
-		seq_expr(ptr<expr> a, ptr<expr> b)
-			: memo_expr(), a(a), b(b), bs(), c(fail_expr::make()), cg(gen_map{0}), gm(0) {}
+		seq_expr(ptr<expr> a, ast::matcher_ptr b)
+			: memo_expr(), a(a), b(b), bs(), ng(no_gen) {}
 		
-		seq_expr(ptr<expr> a, ptr<expr> b, look_list bs, ptr<expr> c, gen_map cg, gen_type gm)
-			: memo_expr(), a(a), b(b), bs(bs), c(c), cg(cg), gm(gm) {}
+		seq_expr(ptr<expr> a, ast::matcher_ptr b, look_list&& bs, gen_type gl)
+			: memo_expr(), a(a), b(b), bs(std::move(bs)), gl(gl) {}
 	
-		static ptr<expr> make(ptr<expr> a, ptr<expr> b);
+		static ptr<expr> make(ptr<expr> a, ast::matcher_ptr b, gen_type gl = no_gen);
 		void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> deriv(char) const;
+		virtual ptr<expr> deriv(char, gen_type) const;
 		virtual gen_set   match_set() const;
 		virtual gen_set   back_set()  const;
 		virtual expr_type type()      const { return seq_type; }
 		
-		ptr<expr> a;   ///< First subexpression
-		ptr<expr> b;   ///< Gen-zero follower
-		look_list bs;  ///< List of following subexpressions for each backtrack generation
-		ptr<expr> c;   ///< Matching backtrack value
-		gen_map   cg;  ///< Backtrack map for c
-		gen_type  gm;  ///< Maximum backtrack generation
+		ptr<expr> a;         ///< First subexpression
+		ast::matcher_ptr b;  ///< Un-normalized second subexpression
+		look_list bs;        ///< List of following subexpressions for each backtrack index
+		gen_type gl;         ///< Last matching generation [no_gen for none such]
 	}; // class seq_expr
 	
 } // namespace derivs
