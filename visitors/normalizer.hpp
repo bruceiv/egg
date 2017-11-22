@@ -29,6 +29,8 @@ namespace visitor {
 	/** Normalizes an Egg AST */
 	class normalizer : ast::visitor {
 	public:
+		normalizer(bool treeSeq = false) : rVal(), treeSeq(treeSeq) {}
+
 		void visit(ast::char_matcher& m) {
 			rVal = ast::as_ptr<ast::matcher>(
 					ast::make_ptr<ast::char_matcher>(m));
@@ -82,9 +84,14 @@ namespace visitor {
 
 		void visit(ast::some_matcher& m) {
 			m.m->accept(this);
-			m.m = rVal;
-			rVal = ast::as_ptr<ast::matcher>(
-					ast::make_ptr<ast::some_matcher>(m));
+			if ( treeSeq ) {
+				rVal = ast::make_ptr<ast::seq_matcher>(
+					rVal, ast::make_ptr<ast::many_matcher>(rVal) );
+			} else {
+				m.m = rVal;
+				rVal = ast::as_ptr<ast::matcher>(
+						ast::make_ptr<ast::some_matcher>(m));
+			}
 		}
 
 		void visit(ast::seq_matcher& m) {
@@ -97,12 +104,23 @@ namespace visitor {
 				// rVal = rVal;
 				break;
 			default:
-				ast::seq_matcher_ptr p = ast::make_ptr<ast::seq_matcher>();
-				for (auto it = m.ms.begin(); it != m.ms.end(); ++it) {
+				if ( treeSeq ) {
+					auto it = m.ms.rbegin();
 					(*it)->accept(this);
-					*p += rVal;
+					ast::matcher_ptr lastVal = rVal;
+					while ( ++it != m.ms.rend() ) {
+						(*it)->accept(this);
+						lastVal = ast::make_ptr<ast::seq_matcher>( rVal, lastVal );
+					}
+					rVal = lastVal;
+				} else {
+					ast::seq_matcher_ptr p = ast::make_ptr<ast::seq_matcher>();
+					for (auto it = m.ms.begin(); it != m.ms.end(); ++it) {
+						(*it)->accept(this);
+						*p += rVal;
+					}
+					rVal = ast::as_ptr<ast::matcher>(p);
 				}
-				rVal = ast::as_ptr<ast::matcher>(p);
 				break;
 			}
 		}
@@ -191,6 +209,8 @@ namespace visitor {
 	private:
 		/** The matcher to return for the current visit */
 		ast::matcher_ptr rVal;
+		/** Whether sequence expressions should be treed */
+		const bool treeSeq;
 	}; /* class visitor */
 	
 } /* namespace visitor */

@@ -36,8 +36,7 @@
 #include <vector>
 
 #include "ast.hpp"
-
-#include "utils/uint_pfn.hpp"
+#include "fixer.hpp"
 
 /**
  * Implements derivative parsing for parsing expression grammars, according to the algorithm 
@@ -51,7 +50,7 @@
 namespace derivs {
 	template <typename T> using ptr = std::shared_ptr<T>;
 	template <typename T> using memo_ptr = std::weak_ptr<T>;
-	
+
 	/// single backtrack generation
 	using gen_type = unsigned long;
 	/// set of backtrack generations
@@ -61,10 +60,18 @@ namespace derivs {
 	static constexpr gen_type no_gen = std::numeric_limits<gen_type>::max();
 
 	/// Gets first index in a generation set; undefined for empty set
-	static inline first( const gen_set& gs ) { return *gs.begin(); }
+	static inline gen_type first( const gen_set& gs ) { return *gs.begin(); }
 
 	/// Gets last index in a generation set; undefined for empty set
-	static inline last( const gen_set& gs ) { return *gs.rbegin(); }
+	static inline gen_type last( const gen_set& gs ) { return *gs.rbegin(); }
+
+	/// Inserts a value into a generation set
+	static inline void set_add( gen_set& a, gen_type g ) { a.insert( g ); }
+
+	/// Takes set union of two generation sets
+	static inline void set_union( gen_set& a, const gen_set& b ) {
+		a.insert( b.begin(), b.end() );
+	}
 	
 	// Forward declarations of expression node types
 	class fail_expr;
@@ -77,7 +84,7 @@ namespace derivs {
 	class any_expr;
 	class none_expr;
 	class str_expr;
-	class rule_expr;
+	// class rule_expr;
 	class not_expr;
 	class alt_expr;
 	class or_expr;
@@ -96,7 +103,7 @@ namespace derivs {
 		any_type,
 		none_type,
 		str_type,
-		rule_type,
+		// rule_type,
 		not_type,
 		alt_type,
 		or_type,
@@ -119,7 +126,7 @@ namespace derivs {
 		virtual void visit(any_expr&)   = 0;
 		virtual void visit(none_expr&)  = 0;
 		virtual void visit(str_expr&)   = 0;
-		virtual void visit(rule_expr&)  = 0;
+		// virtual void visit(rule_expr&)  = 0;
 		virtual void visit(not_expr&)   = 0;
 		virtual void visit(alt_expr&)   = 0;
 		virtual void visit(or_expr&)  = 0;
@@ -243,7 +250,7 @@ namespace derivs {
 	/// An empty success parsing expression
 	class eps_expr : public expr {
 	public:
-		look_expr(gen_type g) : g{g} {}
+		eps_expr(gen_type g) : g{g} {}
 		
 		static ptr<expr> make(gen_type g);
 		void accept(visitor* v) { v->visit(*this); }
@@ -372,21 +379,21 @@ namespace derivs {
 		unsigned long si;     ///< Index into interred string
 	}; // class str_expr
 	
-	/// A parsing expression representing a non-terminal
-	class rule_expr : public memo_expr {
-	public:
-		rule_expr(ptr<expr> r = nullptr) : memo_expr(), r(r) {}
+	// /// A parsing expression representing a non-terminal
+	// class rule_expr : public memo_expr {
+	// public:
+	// 	rule_expr(ptr<expr> r = nullptr) : memo_expr(), r(r) {}
 		
-		static ptr<expr> make(ptr<expr> r = nullptr);
-		void accept(visitor* v) { v->visit(*this); }
+	// 	static ptr<expr> make(ptr<expr> r = nullptr);
+	// 	void accept(visitor* v) { v->visit(*this); }
 		
-		virtual ptr<expr> deriv(char, gen_type) const;
-		virtual gen_set   match_set() const;
-		virtual gen_set   back_set()  const;
-		virtual expr_type type()      const { return rule_type; }
+	// 	virtual ptr<expr> deriv(char, gen_type) const;
+	// 	virtual gen_set   match_set() const;
+	// 	virtual gen_set   back_set()  const;
+	// 	virtual expr_type type()      const { return rule_type; }
 		
-		ptr<expr> r;  ///< Expression corresponding to this rule
-	}; // class rule_expr
+	// 	ptr<expr> r;  ///< Expression corresponding to this rule
+	// }; // class rule_expr
 	
 	/// A parsing expression representing negative lookahead
 	class not_expr : public memo_expr {
@@ -480,12 +487,12 @@ namespace derivs {
 		using look_list = std::vector<look_node>;
 		
 		seq_expr(ptr<expr> a, ast::matcher_ptr b)
-			: memo_expr(), a(a), b(b), bs(), ng(no_gen) {}
+			: memo_expr(), a(a), b(b), bs(), gl(no_gen) {}
 		
 		seq_expr(ptr<expr> a, ast::matcher_ptr b, look_list&& bs, gen_type gl)
 			: memo_expr(), a(a), b(b), bs(std::move(bs)), gl(gl) {}
 	
-		static ptr<expr> make(ptr<expr> a, ast::matcher_ptr b, gen_type gl = no_gen);
+		static ptr<expr> make(ptr<expr> a, ast::matcher_ptr b,  gen_type gl = no_gen);
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char, gen_type) const;

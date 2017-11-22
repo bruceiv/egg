@@ -65,7 +65,6 @@ namespace derivs {
 		void visit(fail_expr& e)   { base_expr(); }
 		void visit(inf_expr& e)    { base_expr(); }
 		void visit(eps_expr& e)    { base_expr(); }
-		void visit(look_expr& e)   { base_expr(); }
 		void visit(char_expr& e)   { base_expr(); }
 		void visit(except_expr& e) { base_expr(); }
 		void visit(range_expr& e)  { base_expr(); }
@@ -73,7 +72,7 @@ namespace derivs {
 		void visit(any_expr& e)   { base_expr(); }
 		void visit(none_expr& e)  { base_expr(); }
 		void visit(str_expr& e)   { base_expr(); }
-		void visit(rule_expr& e)  { base_expr(); }
+		// void visit(rule_expr& e)  { base_expr(); }
 		
 		void visit(not_expr& e)   {
 			++crnt_depth;
@@ -81,15 +80,9 @@ namespace derivs {
 			--crnt_depth;
 		}
 
-		void visit(map_expr& e)   {
-			++crnt_depth;
-			e.e->accept( this );
-			--crnt_depth;
-		}
-
 		void visit(alt_expr& e)   {
 			++crnt_depth;
-			for( auto& x : e.es ) x.e->accept( this );
+			for( auto& x : e.es ) x->accept( this );
 			--crnt_depth;
 		}
 
@@ -108,8 +101,9 @@ namespace derivs {
 		void visit(seq_expr& e)   {
 			++crnt_depth;
 			e.a->accept( this );
+			// NOTE: doesn't instrument un-normalized expressions.
+			// This is (likely?) fine.
 			for( auto& b : e.bs ) b.e->accept( this );
-			if ( e.c->type() != fail_type ) e.c->accept( this );
 			--crnt_depth;
 		}
 	

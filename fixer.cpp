@@ -5,6 +5,8 @@
 #include "fixer.hpp"
 
 namespace derivs {
+	using ast::matcher_mode;
+
 	matcher_mode fixer::operator() (const ast::matcher_ptr& e) {
 		if ( ! e ) return {};
 
@@ -121,19 +123,19 @@ namespace derivs {
 		// check for existing fixed point
 		auto it = by_name.find( m.rule );
 		if ( it != by_name.end() ) {
-			mode = it->second;
+			m.mm = mode = it->second;
 			return;
 		}
 
 		// return bottom if not iterating
 		if ( ! iter ) {
-			mode = matcher_mode{};
+			mode = m.mm;
 			return;
 		}
 
 		// otherwise turn off iteration and do one iteration
 		iter = false;
-		mode = iter_match( g->names[ m.rule ]->m, *visited, *changed );
+		m.mm = mode = iter_match( g->names[ m.rule ]->m, *visited, *changed );
 		iter = true;
 	}
 
@@ -170,7 +172,7 @@ namespace derivs {
 	void fixer::visit(ast::seq_matcher& m) {
 		// empty matcher if empty sequence
 		if ( m.ms.empty() ) {
-			mode = { true };
+			m.mm = mode = { true };
 			return;
 		}
 
@@ -186,13 +188,13 @@ namespace derivs {
 			iter_or_visit( *it, visited, changed );
 			seq_mode &= mode;
 		}
-		mode = seq_mode;
+		m.mm = mode = seq_mode;
 	}
 
 	void fixer::visit(ast::alt_matcher& m) {
 		// empty matcher if empty sequence
 		if ( m.ms.empty() ) {
-			mode = { true };
+			m.mm = mode = { true };
 			return;
 		}
 
@@ -208,7 +210,7 @@ namespace derivs {
 			iter_or_visit( *it, visited, changed );
 			alt_mode |= mode;
 		}
-		mode = alt_mode;
+		m.mm = mode = alt_mode;
 	}
 
 	void fixer::visit(ast::until_matcher& m) {
@@ -255,5 +257,13 @@ namespace derivs {
 
 	void fixer::visit(ast::fail_matcher&) {
 		mode = matcher_mode{};
+	}
+
+	void fixer::fix_all() {
+		for (const auto& rule : g->rs) {
+			if ( by_name.count( rule->name ) ) continue;
+			matcher_mode rm = (*this)( rule->m );
+			by_name.emplace( rule->name, rm );
+		}
 	}
 }

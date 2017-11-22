@@ -49,11 +49,11 @@ namespace derivs {
 			return rVal;
 		}
 		
-		/// Conversion specialized for rule expressions
-		ptr<rule_expr> normalize(ptr<rule_expr> r) {
-			r->accept(this);
-			return std::static_pointer_cast<rule_expr>(rVal);
-		}
+		// /// Conversion specialized for rule expressions
+		// ptr<rule_expr> normalize(ptr<rule_expr> r) {
+		// 	r->accept(this);
+		// 	return std::static_pointer_cast<rule_expr>(rVal);
+		// }
 		
 		void visit(fail_expr& e)  { rVal = fail_expr::make(); }
 		void visit(inf_expr& e)   { rVal = inf_expr::make(); }
@@ -67,20 +67,20 @@ namespace derivs {
 		void visit(none_expr& e)  { rVal = none_expr::make(); }
 		void visit(str_expr& e)   { rVal = str_expr::make(e.str()); }
 		
-		void visit(rule_expr& e) {
-			auto it = rs.find(&e);
-			if ( it == rs.end() ) {
-				// no stored rule; store one, then update its pointed to rule
-				ptr<rule_expr> r = std::make_shared<rule_expr>(inf_expr::make());
-				rs.emplace(&e, r)/*insert(std::make_pair(&e, r))*/;
-				e.r->accept(this);
-				r->r = rVal;
-				r->reset_memo();
-				rVal = std::static_pointer_cast<expr>(r);
-			} else {
-				rVal = std::static_pointer_cast<expr>(it->second);
-			}
-		}
+		// void visit(rule_expr& e) {
+		// 	auto it = rs.find(&e);
+		// 	if ( it == rs.end() ) {
+		// 		// no stored rule; store one, then update its pointed to rule
+		// 		ptr<rule_expr> r = std::make_shared<rule_expr>(inf_expr::make());
+		// 		rs.emplace(&e, r)/*insert(std::make_pair(&e, r))*/;
+		// 		e.r->accept(this);
+		// 		r->r = rVal;
+		// 		r->reset_memo();
+		// 		rVal = std::static_pointer_cast<expr>(r);
+		// 	} else {
+		// 		rVal = std::static_pointer_cast<expr>(it->second);
+		// 	}
+		// }
 		
 		void visit(not_expr& e) {
 			e.e->accept(this);
@@ -129,22 +129,22 @@ namespace derivs {
 	
 	private:
 		ptr<expr>                            rVal;  ///< result of last read
-		std::map<rule_expr*, ptr<rule_expr>> rs;    ///< Unique transformation of rule expressions
+		// std::map<rule_expr*, ptr<rule_expr>> rs;    ///< Unique transformation of rule expressions
 	};  // class normalizer
 	
 	/// Loads a set of derivatives from the grammar AST
 	class loader : ast::visitor {
 		
-		/// Gets the unique rule expression correspoinding to the given name
-		ptr<rule_expr> get_rule(const std::string& s) {
-			if ( rs.count(s) == 0 ) {
-				ptr<rule_expr> r = std::make_shared<rule_expr>(fail_expr::make());
-				rs.emplace(s, r)/*insert(std::make_pair(s, r))*/;
-				return r;
-			} else {
-				return rs.at(s);
-			}
-		}
+		// /// Gets the unique rule expression corresponding to the given name
+		// ptr<rule_expr> get_rule(const std::string& s) {
+		// 	if ( rs.count(s) == 0 ) {
+		// 		ptr<rule_expr> r = std::make_shared<rule_expr>(fail_expr::make());
+		// 		rs.emplace(s, r)/*insert(std::make_pair(s, r))*/;
+		// 		return r;
+		// 	} else {
+		// 		return rs.at(s);
+		// 	}
+		// }
 		
 		/// Converts an AST char range into a derivative expr char_range
 		ptr<expr> make_char_range(const ast::char_range& r, bool neg) const {
@@ -344,6 +344,8 @@ namespace derivs {
 		std::map<expr*, std::string>           names;  ///< Names of rule expressions
 		ptr<expr>                              rVal;   ///< Return value of node visits
 	};  // class loader
+
+	
 	
 	/// Recognizes the input
 	/// @param l		Loaded derivatives

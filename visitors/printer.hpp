@@ -171,6 +171,8 @@ namespace visitor {
 			out << "~`" << strings::unescape_error(m.error) << "`";
 		}
 
+		void operator() (ast::matcher_ptr& p) { p->accept(this); }
+
 		void print(ast::grammar_rule& r) {
 			out << r.name;
 			if ( ! r.type.empty() ) {

@@ -30,6 +30,7 @@
 
 #include "../derivs.hpp"
 #include "../utils/strings.hpp"
+#include "../visitors/printer.hpp"
 
 namespace derivs {
 	
@@ -44,7 +45,6 @@ namespace derivs {
 		void visit(fail_expr& e)  { compound = false; }
 		void visit(inf_expr& e)   { compound = false; }
 		void visit(eps_expr& e)   { compound = false; }
-		void visit(look_expr& e)  { compound = false; }
 		void visit(char_expr& e)  { compound = false; }
 		void visit(except_expr& e) { compound = false; }
 		void visit(range_expr& e) { compound = false; }
@@ -52,9 +52,8 @@ namespace derivs {
 		void visit(any_expr& e)   { compound = false; }
 		void visit(none_expr& e)  { compound = false; }
 		void visit(str_expr& e)   { compound = false; }
-		void visit(rule_expr& e)  { compound = false; }
+		// void visit(rule_expr& e)  { compound = false; }
 		void visit(not_expr& e)   { compound = false; }
-		void visit(map_expr& e)   { compound = false; }
 		void visit(alt_expr& e)   { compound = true; }
 		void visit(or_expr& e)  { compound = true; }
 		void visit(and_expr& e) { compound = true; }
@@ -80,7 +79,8 @@ namespace derivs {
 			e->accept(this);
 		}
 		
-		void print_uint_set(const utils::uint_set& s) {
+		template<typename T>
+		void print_set(const T& s) {
 			out << "[";
 			auto st = s.begin();
 			if ( st != s.end() ) {
@@ -94,7 +94,8 @@ namespace derivs {
 			out << "]";
 		}
 		
-		void print_uint_map(const utils::uint_pfn& f) {
+		template<typename T>
+		void print_map(const T& f) {
 			out << "[";
 			auto ft = f.begin();
 			if ( ft != f.end() ) {
@@ -110,9 +111,9 @@ namespace derivs {
 		
 		void print_fns(expr* e) {
 			out << "b";
-			print_uint_set(e->back());
+			print_set(e->back());
 			out << "m";
-			print_uint_set(e->match());
+			print_set(e->match());
 		}
 	public:
 		/// Default printer
@@ -122,37 +123,37 @@ namespace derivs {
 		printer(std::ostream& out, std::map<expr*, std::string>& rs) 
 			: out(out), rs(rs), nc(rs.size()) {}
 		
-		void print_rule(rule_expr& e) {
-			auto it = rs.find(e.r.get());
-			if ( it == rs.end() ) {
-				out << "{RULE :??} ";
-			} else {
-				out << "{RULE :" << it->second << "} ";
-			}
-			print_fns(&e); out << " ";
-			print_unbraced(e.r);
-			out << std::endl;
-		}
+		// void print_rule(rule_expr& e) {
+		// 	auto it = rs.find(e.r.get());
+		// 	if ( it == rs.end() ) {
+		// 		out << "{RULE :??} ";
+		// 	} else {
+		// 		out << "{RULE :" << it->second << "} ";
+		// 	}
+		// 	print_fns(&e); out << " ";
+		// 	print_unbraced(e.r);
+		// 	out << std::endl;
+		// }
 		
 		/// Prints the expression
 		void print(ptr<expr> e) {
-			if ( e->type() == rule_type ) {
-				rule_expr* r = static_cast<rule_expr*>(e.get());
-				if ( rs.count(r->r.get()) == 0 ) {
-					rs.insert(std::make_pair(r->r.get(), std::to_string(rs.size() - nc)));
-				}
-				pl.push_back(r);
-			} else {
+			// if ( e->type() == rule_type ) {
+			// 	rule_expr* r = static_cast<rule_expr*>(e.get());
+			// 	if ( rs.count(r->r.get()) == 0 ) {
+			// 		rs.insert(std::make_pair(r->r.get(), std::to_string(rs.size() - nc)));
+			// 	}
+			// 	pl.push_back(r);
+			// } else {
 				e->accept(this);
 				out << std::endl;
-			}
+			// }
 			
-			auto it = pl.begin();
-			while ( it != pl.end() ) {
-				print_rule(**it);
-				++it;
-			}
-			pl.clear();
+			// auto it = pl.begin();
+			// while ( it != pl.end() ) {
+			// 	print_rule(**it);
+			// 	++it;
+			// }
+			// pl.clear();
 		}
 		
 		/// Prints the derivative of the expression to the given output stream 
@@ -172,9 +173,7 @@ namespace derivs {
 		
 		void visit(inf_expr& e)   { out << "{INF}"; }
 		
-		void visit(eps_expr& e)   { out << "{EPS}"; }
-		
-		void visit(look_expr& e)  { out << "{LOOK:" << e.b << "}"; }
+		void visit(eps_expr& e)   { out << "{EPS:" << e.g << "}"; }
 		
 		void visit(char_expr& e)  { out << "\'" << strings::escape(e.c) << "\'"; }
 
@@ -194,54 +193,38 @@ namespace derivs {
 		
 		void visit(str_expr& e)   { out << "\"" << strings::escape(e.str()) << "\""; }
 		
-		void visit(rule_expr& e)  {
-			auto it = rs.find(e.r.get());
-			if ( it == rs.end() ) {  // not printed this rule before
-				unsigned int i = rs.size() - nc;
-				rs.insert(std::make_pair(e.r.get(), std::to_string(i)));
-				pl.push_back(&e);
+		// void visit(rule_expr& e)  {
+		// 	auto it = rs.find(e.r.get());
+		// 	if ( it == rs.end() ) {  // not printed this rule before
+		// 		unsigned int i = rs.size() - nc;
+		// 		rs.insert(std::make_pair(e.r.get(), std::to_string(i)));
+		// 		pl.push_back(&e);
 				
-				out << "{RULE ";
-				print_fns(&e);
-				out << " @" << i << "}";
-			} else {  // printed this rule before
-				out << "{RULE ";
-				print_fns(&e);
-				out << " @" << it->second << "}";
-			}
-		}
+		// 		out << "{RULE ";
+		// 		print_fns(&e);
+		// 		out << " @" << i << "}";
+		// 	} else {  // printed this rule before
+		// 		out << "{RULE ";
+		// 		print_fns(&e);
+		// 		out << " @" << it->second << "}";
+		// 	}
+		// }
 		
-		void visit(not_expr& e)   { out << "!"; print_unbraced(e.e); }
-		
-		void visit(map_expr& e)   {
-			out << "(map:";
-			print_fns(&e);
-			out << "g" << (unsigned int)e.gm;
-			out << " ";
-			print_uint_map(e.eg);
-			out << " ";
-			print_unbraced(e.e);
-			out << ")";
-		}
+		void visit(not_expr& e)   { out << "!"; print_braced(e.e); }
 		
 		void visit(alt_expr& e)  {
 			out << "(alt:";
 			print_fns(&e);
-			out << "g" << (unsigned int)e.gm;
 			
 			auto et = e.es.begin();
 			if ( et != e.es.end() ) {
 				out << " ";
-				print_uint_map(et->eg);
-				out << " ";
-				print_unbraced(et->e);
+				print_unbraced(*et);
 			}
 
 			while ( ++et != e.es.end() ) {
 				out << " / ";
-				print_uint_map(et->eg);
-				out << " ";
-				print_unbraced(et->e);
+				print_unbraced(*et);
 			}
 
 			out << ")";
@@ -284,39 +267,28 @@ namespace derivs {
 		void visit(seq_expr& e) {
 			out << "(seq:";
 			print_fns(&e);
-			out << "g" << (unsigned int)e.gm;
 			out << " ";
 			print_unbraced(e.a);
 			out << " ++ ";
-			print_unbraced(e.b);
+			// print_unbraced(e.b);
+			::visitor::printer{ out }( e.b );
 			if ( ! e.bs.empty() ) {
 				out << " <";
 				auto it = e.bs.begin();
 				out << " {" << (unsigned int)it->g;
-				if ( it->gl > 0 ) { out << "." << (unsigned int)it->gl; }
+				if ( e.gl == it->g ) { out << "*"; }
+				if ( it->gl != no_gen ) { out << "." << (unsigned int)it->gl; }
 				out << "} ";
-				print_uint_map(it->eg);
-				out << " ";
-				if ( it->e != e.b ) print_unbraced(it->e);
-				else out << "''''";
+				print_unbraced(it->e);
 				
 				while (++it != e.bs.end()) {
 					out << " | {" << (unsigned int)it->g;
-					if ( it->gl > 0 ) { out << "." << (unsigned int)it->gl; }
+					if ( e.gl == it->g ) { out << "*"; }
+					if ( it->gl != no_gen ) { out << "." << (unsigned int)it->gl; }
 					out << "} ";
-					print_uint_map(it->eg);
-					out << " ";
-					if ( it->e != e.b ) print_unbraced(it->e);
-					else out << "''''";
+					print_unbraced(it->e);
 				}
 				out << ">";
-			}
-			if ( e.c->type() != fail_type ) {
-				out << " \\\\ ";
-				print_uint_map(e.cg);
-				out << " ";
-				if ( e.c != e.b ) print_unbraced(e.c);
-				else out << "''''";
 			}
 			out << ")";
 		}
@@ -325,7 +297,7 @@ namespace derivs {
 		std::ostream&                out;  ///< output stream
 		std::map<expr*, std::string> rs;   ///< Rule identifiers
 		unsigned int                 nc;   ///< Count of named rules
-		std::list<rule_expr*>        pl;   ///< List of rules to print
+		// std::list<rule_expr*>        pl;   ///< List of rules to print
 	}; // class printer
 }
 

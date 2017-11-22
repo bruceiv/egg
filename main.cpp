@@ -29,15 +29,11 @@
 
 #include "egg.hpp"
 #include "parser.hpp"
+#include "matcher.hpp"
 #include "visitors/compiler.hpp"
 #include "visitors/instrumenter.hpp"
 #include "visitors/normalizer.hpp"
 #include "visitors/printer.hpp"
-#ifdef EGG_MUT
-#include "visitors/interpreter-mut.hpp"
-#else
-#include "visitors/interpreter.hpp"
-#endif
 
 /** Egg version */
 static const char* VERSION = "0.3.1";
@@ -331,8 +327,14 @@ int main(int argc, char** argv) {
 	
 	if ( egg::grammar(ps, g) ) {
 		if ( a.dbg() ) { std::cout << "DONE PARSING" << std::endl; }
-		if ( a.norm() ) {
-			visitor::normalizer n;
+		bool is_deriv = a.mode() == MATCH_MODE || a.mode() == LINES_MODE;
+		if ( is_deriv ) {
+			visitor::normalizer n( true );
+			n.normalize(*g);
+			derivs::fixer f(g);
+			f.fix_all();
+		} else if ( a.norm() ) {
+			visitor::normalizer n( false );
 			n.normalize(*g);
 		}
 
@@ -373,11 +375,10 @@ int main(int argc, char** argv) {
 			derivs::instrumenter stats;
 			
 			std::string line;
-			derivs::loader l(*g, a.dbg());
 			while ( std::getline(a.source(), line) ) {
 				stats.reset();
 				std::stringstream ss(line);
-				bool b = derivs::match(l, ss, a.rule(), a.dbg(), 
+				bool b = derivs::match(*g, ss, a.rule(), a.dbg(), 
 				                       a.inst() ? &stats : nullptr);
 				a.output() << "Rule `" << a.rule() << "` " 
 			               << ( b ? "matched" : "DID NOT match" ) 
