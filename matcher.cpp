@@ -26,7 +26,8 @@
 #include "matcher.hpp"
 #include "norm.hpp"
 
-//#include "visitors/deriv_printer.hpp"
+#include "visitors/deriv_printer.hpp"
+#include "visitors/instrumenter.hpp"
 
 namespace derivs {
 	norm nrm = {};
@@ -34,7 +35,7 @@ namespace derivs {
 	bool match( const ast::grammar& gram, std::istream& in, const std::string& rule, 
 			bool dbg, instrumenter* stats ) {
 		/// Set global grammar state
-		nrm.gram = &gram;
+		nrm.reset( gram );
 
 		/// Get start rule
 		ptr<expr> e = nrm( rule );
@@ -43,7 +44,8 @@ namespace derivs {
 		// Take derivatives until failure, match, or end-of-input
 		while ( true ) {
 			// if ( dbg ) { derivs::printer{}.print( e ); }
-			// if ( stats ) { (*stats)(*e); }
+			if ( dbg ) dbgprt( e );
+			if ( stats ) { (*stats)(*e); }
 
 			switch ( e->type() ) {
 			case fail_type: return false;
@@ -68,8 +70,8 @@ namespace derivs {
 
 			if ( x == '\0' ) break;
 		}
-		// if ( dbg ) { derivs::printer{}.print( e ); }
-		// if ( stats ) { (*stats)(*e); }
+		if ( dbg ) { derivs::printer{}.print( e ); }
+		if ( stats ) { (*stats)(*e); }
 
 		// Match if final expression matched on terminator char
 		return ! e->match().empty();

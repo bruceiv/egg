@@ -57,6 +57,8 @@ namespace derivs {
 	// memo_expr ///////////////////////////////////////////////////////////////////
 	
 	void memo_expr::reset_memo() {
+		// memo_d.reset();
+		// last_index = no_gen;
 		memo_match = gen_set{};
 		memo_back = gen_set{};
 		flags = {false,false};
@@ -109,7 +111,7 @@ namespace derivs {
 		
 	gen_set fail_expr::match() const { return gen_set{}; }
 	
-	gen_set fail_expr::back()  const { return gen_set{0}; }
+	gen_set fail_expr::back()  const { return gen_set{}; }
 	
 	// inf_expr ////////////////////////////////////////////////////////////////////
 	
@@ -125,7 +127,7 @@ namespace derivs {
 	
 	gen_set inf_expr::match() const { return gen_set{}; }
 	
-	gen_set inf_expr::back()  const { return gen_set{0}; }
+	gen_set inf_expr::back()  const { return gen_set{}; }
 	
 	// eps_expr ////////////////////////////////////////////////////////////////////
 	
@@ -153,7 +155,7 @@ namespace derivs {
 	
 	gen_set char_expr::match() const { return gen_set{}; }
 	
-	gen_set char_expr::back()  const { return gen_set{0}; }
+	gen_set char_expr::back()  const { return gen_set{}; }
 
 	// except_expr /////////////////////////////////////////////////////////////////
 	
@@ -166,7 +168,7 @@ namespace derivs {
 	
 	gen_set except_expr::match() const { return gen_set{}; }
 	
-	gen_set except_expr::back()  const { return gen_set{0}; }
+	gen_set except_expr::back()  const { return gen_set{}; }
 	
 	// range_expr //////////////////////////////////////////////////////////////////
 	
@@ -179,7 +181,7 @@ namespace derivs {
 	
 	gen_set range_expr::match() const { return gen_set{}; }
 	
-	gen_set range_expr::back()  const { return gen_set{0}; }
+	gen_set range_expr::back()  const { return gen_set{}; }
 
 	// except_range_expr ///////////////////////////////////////////////////////////
 	
@@ -194,7 +196,7 @@ namespace derivs {
 	
 	gen_set except_range_expr::match() const { return gen_set{}; }
 	
-	gen_set except_range_expr::back()  const { return gen_set{0}; }
+	gen_set except_range_expr::back()  const { return gen_set{}; }
 	
 	// any_expr ////////////////////////////////////////////////////////////////////
 	
@@ -207,7 +209,7 @@ namespace derivs {
 	
 	gen_set any_expr::match() const { return gen_set{}; }
 	
-	gen_set any_expr::back()  const { return gen_set{0}; }
+	gen_set any_expr::back()  const { return gen_set{}; }
 
 	// none_expr ///////////////////////////////////////////////////////////////////
 	
@@ -220,7 +222,7 @@ namespace derivs {
 	
 	gen_set none_expr::match() const { return gen_set{}; }
 	
-	gen_set none_expr::back()  const { return gen_set{0}; }
+	gen_set none_expr::back()  const { return gen_set{}; }
 	
 	// str_expr ////////////////////////////////////////////////////////////////////
 	
@@ -244,7 +246,7 @@ namespace derivs {
 	
 	gen_set str_expr::match() const { return gen_set{}; }
 	
-	gen_set str_expr::back()  const { return gen_set{0}; }
+	gen_set str_expr::back()  const { return gen_set{}; }
 	
 	// rule_expr ///////////////////////////////////////////////////////////////////
 	
@@ -270,7 +272,7 @@ namespace derivs {
 	// gen_set rule_expr::back_set() const {
 	// 	// Stop this from infinitely recursing
 	// 	flags.back = true;
-	// 	memo_back = gen_set{0};
+	// 	memo_back = gen_set{};
 		
 	// 	// Calculate backtrack set
 	// 	return r->back();
@@ -398,7 +400,7 @@ namespace derivs {
 	
 	gen_set or_expr::match_set() const { return gen_set{}; }
 	
-	gen_set or_expr::back_set() const { return gen_set{0}; }
+	gen_set or_expr::back_set() const { return gen_set{}; }
 
 	// and_expr ////////////////////////////////////////////////////////////////////
 	
@@ -420,7 +422,7 @@ namespace derivs {
 	
 	gen_set and_expr::match_set() const { return gen_set{}; }
 	
-	gen_set and_expr::back_set() const { return gen_set{0}; }
+	gen_set and_expr::back_set() const { return gen_set{}; }
 	
 	// seq_expr ////////////////////////////////////////////////////////////////////
 	
@@ -499,7 +501,7 @@ namespace derivs {
 		switch ( da->type() ) {
 		case eps_type: {
 			// generation of match
-			auto dag = std::static_pointer_cast<not_expr>(da)->g;
+			auto dag = std::static_pointer_cast<eps_expr>(da)->g;
 
 			// current-gen match
 			if ( dag == i ) {

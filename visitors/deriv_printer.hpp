@@ -110,18 +110,23 @@ namespace derivs {
 		}
 		
 		void print_fns(expr* e) {
+			gen_set eb = e->back();
+			if ( eb.empty() ) return;
 			out << "b";
-			print_set(e->back());
+			print_set(eb);
+
+			gen_set em = e->match();
+			if ( em.empty() ) return;
 			out << "m";
-			print_set(e->match());
+			print_set(em);
 		}
 	public:
 		/// Default printer
-		printer(std::ostream& out = std::cout) : out(out), nc(0) {}
+		printer(std::ostream& out = std::cout) : out(out)/*, nc(0)*/ {}
 		
-		/// Rule name loading printer
-		printer(std::ostream& out, std::map<expr*, std::string>& rs) 
-			: out(out), rs(rs), nc(rs.size()) {}
+		// /// Rule name loading printer
+		// printer(std::ostream& out, std::map<expr*, std::string>& rs) 
+		// 	: out(out), rs(rs), nc(rs.size()) {}
 		
 		// void print_rule(rule_expr& e) {
 		// 	auto it = rs.find(e.r.get());
@@ -156,17 +161,19 @@ namespace derivs {
 			// pl.clear();
 		}
 		
-		/// Prints the derivative of the expression to the given output stream 
-		//  (with the given named rules)
-		static void print(std::ostream& out, ptr<expr> e, std::map<expr*, std::string>& rs) {
-			printer p(out, rs);
-			p.print(e);
-		}
+		// /// Prints the derivative of the expression to the given output stream 
+		// //  (with the given named rules)
+		// static void print(std::ostream& out, ptr<expr> e, std::map<expr*, std::string>& rs) {
+		// 	printer p(out, rs);
+		// 	p.print(e);
+		// }
 		
 		/// Prints the derivative expression to the given output stream
 		static void print(std::ostream& out, ptr<expr> e) {
-			std::map<expr*, std::string> rs;
-			print(out, e, rs);
+			// std::map<expr*, std::string> rs;
+			// print(out, e, rs);
+			printer p(out);
+			p.print(e);
 		}
 		
 		void visit(fail_expr& e)  { out << "{FAIL}"; }
@@ -271,11 +278,11 @@ namespace derivs {
 			print_unbraced(e.a);
 			out << " ++ ";
 			// print_unbraced(e.b);
-			::visitor::printer{ out }( e.b );
+			::visitor::printer{ out, ::visitor::printer::single_line }( e.b );
 			if ( ! e.bs.empty() ) {
 				out << " <";
 				auto it = e.bs.begin();
-				out << " {" << (unsigned int)it->g;
+				out << "{" << (unsigned int)it->g;
 				if ( e.gl == it->g ) { out << "*"; }
 				if ( it->gl != no_gen ) { out << "." << (unsigned int)it->gl; }
 				out << "} ";
@@ -295,9 +302,12 @@ namespace derivs {
 		
 	private:
 		std::ostream&                out;  ///< output stream
-		std::map<expr*, std::string> rs;   ///< Rule identifiers
-		unsigned int                 nc;   ///< Count of named rules
-		// std::list<rule_expr*>        pl;   ///< List of rules to print
+		// std::map<expr*, std::string> rs;   ///< Rule identifiers
+		// unsigned int                 nc;   ///< Count of named rules
 	}; // class printer
+}
+
+static inline void __attribute__((used)) dbgprt( derivs::ptr<derivs::expr> e ) {
+	derivs::printer{ std::cerr }.print( e );
 }
 

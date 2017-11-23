@@ -33,6 +33,34 @@ namespace visitor {
 	/** Pretty-printer for Egg matcher ASTs. */
 	class printer : ast::visitor {
 	public:
+		/// tabs code for "do not print newlines"
+		static const int single_line = -1;
+
+	private:
+		/// Keeps indentation status
+		struct indent {
+			int& tabs;
+			std::string s;
+
+			indent(int& tabs) : tabs(tabs), s() {
+				if ( tabs >= 0 ) {
+					++tabs;
+					s.reserve(4 * tabs + 2);
+					s.push_back('\n');
+					s.append(4 * tabs, ' ');
+				} else {
+					s = " ";
+				}
+			}
+
+			~indent() { if ( tabs > 0 ) --tabs; }
+		};
+
+		// std::ostream& operator<< (std::ostream& o, const indent& i) {
+		// 	return o << i.s;
+		// }
+
+	public:
 		printer(std::ostream& out = std::cout, int tabs = 0) 
 			: out(out), tabs(tabs) {}
 
@@ -109,16 +137,14 @@ namespace visitor {
 		void visit(ast::seq_matcher& m) {
 			if ( m.ms.size() != 1 ) { out << "( "; }
 			if ( ! m.ms.empty() ) {
-				std::string indent((4 * ++tabs), ' ');
-				
+				indent ind{tabs};
+								
 				auto iter = m.ms.begin();
 				(*iter)->accept(this);
 				while ( ++iter != m.ms.end() ) {
-					out << std::endl << indent;
+					out << ind.s;
 					(*iter)->accept(this);
 				}
-				
-				--tabs;
 			}
 			if ( m.ms.size() != 1 ) { out << " )"; }
 		}
@@ -126,16 +152,14 @@ namespace visitor {
 		void visit(ast::alt_matcher& m) {
 			if ( m.ms.size() != 1 ) { out << "( "; }
 			if ( ! m.ms.empty() ) {
-				std::string indent((4 * ++tabs), ' ');
-
+				indent ind{tabs};
+				
 				auto iter = m.ms.begin();
 				(*iter)->accept(this);
 				while ( ++iter != m.ms.end() ) {
-					out << "\n" << indent << "| ";
+					out << ind.s << "| ";
 					(*iter)->accept(this);
 				}
-				
-				--tabs;
 			}
 			if ( m.ms.size() != 1 ) { out << " )"; }
 		}

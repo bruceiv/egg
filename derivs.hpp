@@ -492,7 +492,7 @@ namespace derivs {
 		seq_expr(ptr<expr> a, ast::matcher_ptr b, look_list&& bs, gen_type gl)
 			: memo_expr(), a(a), b(b), bs(std::move(bs)), gl(gl) {}
 	
-		static ptr<expr> make(ptr<expr> a, ast::matcher_ptr b,  gen_type gl = no_gen);
+		static ptr<expr> make(ptr<expr> a, ast::matcher_ptr b, gen_type gl = 0);
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char, gen_type) const;

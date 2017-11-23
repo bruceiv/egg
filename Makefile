@@ -40,5 +40,5 @@ egg:  main.cpp $(OBJS) egg.hpp parser.hpp \
 	$(CXX) $(CXXFLAGS) -o egg main.cpp $(OBJS) $(LDFLAGS)
 
 clean:  
-	-rm derivs.o
+	-rm $(OBJS)
 	-rm egg

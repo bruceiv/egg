@@ -33,9 +33,6 @@
 
 namespace derivs {
 	class norm : public ast::visitor {
-	friend bool match( const ast::grammar&, std::istream&, const std::string&, 
-			bool dbg, instrumenter* );
-
 		/// Original grammar
 		const ast::grammar* gram;
 		/// List of rules in current normalization
@@ -44,7 +41,7 @@ namespace derivs {
 		const ast::matcher_ptr* pPtr;
 		/// The derivative expression to return for the current visit
 		ptr<expr> rVal;
-		///  The current generation
+		/// The current generation
 		gen_type g;
 
 		/// Normalizes a matcher
@@ -183,23 +180,22 @@ namespace derivs {
 				return;
 			case 1:
 				// singleton expression drawn out
-				m.ms.front()->accept(this);
+				process(m.ms.front());
 				return;
 			case 2:
 				// draw singleton expression out and sequence
-				m.ms.front()->accept(this);
-				rVal = expr::make_ptr<seq_expr>(rVal, m.ms.back());
+				process(m.ms.front());
+				rVal = seq_expr::make(rVal, m.ms.back(), g);
 				return;
 			default:
 				// draw initial expression out and sequence rest
 				auto it = m.ms.begin();
-				(*it)->accept(this);
+				process(*it);
 				ast::seq_matcher_ptr p = ast::make_ptr<ast::seq_matcher>();
 				while ( ++it != m.ms.end() ) {
 					*p += *it;
 				}
-				rVal = expr::make_ptr<seq_expr>(rVal, 
-					ast::as_ptr<ast::matcher>(p));
+				rVal = seq_expr::make(rVal, ast::as_ptr<ast::matcher>(p), g);
 				return;
 			}
 		}
@@ -214,7 +210,7 @@ namespace derivs {
 			// Transform options to expression list
 			expr_list es;
 			for (auto& mi : m.ms) {
-				mi->accept(this);
+				process(mi);
 				es.emplace_back(rVal);
 			}
 			rVal = alt_expr::make(es);
@@ -263,6 +259,14 @@ namespace derivs {
 		ptr<expr> operator() (const std::string& r, gen_type g = 0) {
 			reset( g );
 			return get_rule(r);
-		} 
+		}
+
+		/// Resets the normalizer for a new parse
+		void reset( const ast::grammar& gram ) {
+			norm::gram = &gram;
+			rVal.reset();
+			g = 0;
+			rs.clear();
+		}
 	};
 }
