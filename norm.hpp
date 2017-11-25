@@ -129,7 +129,7 @@ namespace derivs {
 		}
 
 		void visit(ast::rule_matcher& m) {
-			get_rule(m.rule);
+			rVal = get_rule(m.rule);
 		}
 
 		void visit(ast::any_matcher& m) {
