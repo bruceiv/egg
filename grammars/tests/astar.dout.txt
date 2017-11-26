@@ -1,0 +1,5 @@
+Rule `S` matched "a"
+Rule `S` matched "aa"
+Rule `S` matched "aaa"
+Rule `S` matched ""
+Rule `S` DID NOT match "b"

@@ -224,6 +224,8 @@ test-nomemo: abc-nomemo anbncn-nomemo calc-nomemo nested-nomemo xml-nomemo json-
 
 test-interpret: egg
 	@echo
+	../egg match-lines astar.egg S tests/astar.in.txt > tests/astar.test.txt
+	diff tests/astar.dout.txt tests/astar.test.txt
 	../egg match-lines abc.egg g1 tests/abc.in.txt > tests/abc.test.txt
 	diff tests/abc.dout.txt tests/abc.test.txt
 	../egg match-lines anbncn.egg G tests/anbncn.in.txt > tests/anbncn.test.txt
@@ -232,7 +234,7 @@ test-interpret: egg
 	diff tests/calc.dout.txt tests/calc.test.txt
 	../egg match-lines nested.egg String tests/nested.in.txt > tests/nested.test.txt
 	diff tests/nested.dout.txt tests/nested.test.txt
-	../egg match-lines eggr.egg grammar tests/egg.in.txt > tests/egg.test.txt
+	../egg match-lines miniegg.egg gram tests/egg.in.txt > tests/egg.test.txt
 	diff tests/egg.dout.txt tests/egg.test.txt
 	../egg match eggr.egg grammar eggr.egg > tests/eggr.test.txt
 	diff tests/eggr.dout.txt tests/eggr.test.txt

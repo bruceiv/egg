@@ -217,7 +217,11 @@ namespace derivs {
 		// 	}
 		// }
 		
-		void visit(not_expr& e)   { out << "!"; print_braced(e.e); }
+		void visit(not_expr& e)   {
+			out << "(not:" << e.g << " ";
+			print_unbraced(e.e);
+			out << ")";
+		}
 		
 		void visit(alt_expr& e)  {
 			out << "(alt:";
@@ -273,29 +277,30 @@ namespace derivs {
 		
 		void visit(seq_expr& e) {
 			out << "(seq:";
+			if ( e.gl != no_gen ) { out << e.gl; }
 			print_fns(&e);
 			out << " ";
 			print_unbraced(e.a);
-			out << " ++ ";
-			// print_unbraced(e.b);
+			out << " ++ <";
 			::visitor::printer{ out, ::visitor::printer::single_line }( e.b );
+			out << ">";
 			if ( ! e.bs.empty() ) {
-				out << " <";
+				out << " {";
 				auto it = e.bs.begin();
-				out << "{" << (unsigned int)it->g;
+				out << "(" << (unsigned int)it->g;
 				if ( e.gl == it->g ) { out << "*"; }
 				if ( it->gl != no_gen ) { out << "." << (unsigned int)it->gl; }
-				out << "} ";
+				out << ") ";
 				print_unbraced(it->e);
 				
 				while (++it != e.bs.end()) {
-					out << " | {" << (unsigned int)it->g;
+					out << " | (" << (unsigned int)it->g;
 					if ( e.gl == it->g ) { out << "*"; }
 					if ( it->gl != no_gen ) { out << "." << (unsigned int)it->gl; }
-					out << "} ";
+					out << ") ";
 					print_unbraced(it->e);
 				}
-				out << ">";
+				out << "}";
 			}
 			out << ")";
 		}

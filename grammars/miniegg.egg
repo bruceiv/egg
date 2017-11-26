@@ -1,0 +1,5 @@
+gram = _ rule+ $
+rule = id '=' _ expr+
+id   = [A-Z] _
+expr = id !'='
+_    = ' '?

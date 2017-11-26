@@ -137,7 +137,7 @@ namespace derivs {
 		
 	// Only succeeds if string is empty
 	ptr<expr> eps_expr::d(char x, gen_type i) const {
-		return ( x == '\0' ) ? eps_expr::make(g) : fail_expr::make();
+		return eps_expr::make(g);
 	}
 	
 	gen_set eps_expr::match() const { return gen_set{g}; }
@@ -247,36 +247,6 @@ namespace derivs {
 	gen_set str_expr::match() const { return gen_set{}; }
 	
 	gen_set str_expr::back()  const { return gen_set{}; }
-	
-	// rule_expr ///////////////////////////////////////////////////////////////////
-	
-	// ptr<expr> rule_expr::make(ptr<expr> r) { return expr::make_ptr<rule_expr>(r); }
-	
-	// ptr<expr> rule_expr::deriv(char x, gen_type i) const {
-	// 	// signal infinite loop if we try to take this derivative again
-	// 	memo_d = inf_expr::make();
-	// 	last_index = i;
-	// 	// calculate derivative
-	// 	return r->d(x, i);
-	// }
-	
-	// gen_set rule_expr::match_set() const {
-	// 	// Stop this from infinitely recursing
-	// 	flags.match = true;
-	// 	memo_match = gen_set{};
-		
-	// 	// Calculate match set
-	// 	return r->match();
-	// }
-	
-	// gen_set rule_expr::back_set() const {
-	// 	// Stop this from infinitely recursing
-	// 	flags.back = true;
-	// 	memo_back = gen_set{};
-		
-	// 	// Calculate backtrack set
-	// 	return r->back();
-	// }
 	
 	// not_expr ////////////////////////////////////////////////////////////////////
 	
@@ -494,7 +464,6 @@ namespace derivs {
 	}
 	
 	ptr<expr> seq_expr::deriv(char x, gen_type i) const {
-		bool did_inc = false;
 		ptr<expr> da = a->d(x, i);
 		
 		// Handle empty or failure results from predecessor derivative
@@ -515,11 +484,8 @@ namespace derivs {
 			ptr<expr> dbi = d_from(bs, dag, x, i);
 			if ( dbi ) return dbi;
 			
-			// end-of-string is only case where we can get a success for an unseen gen
-			if ( x == '\0' ) {
-				return nrm(b, i)->d('\0', i);
-			}
-			return fail_expr::make(); // if lookahead follower not found, fail
+			// if lookahead follower not found, fail
+			return fail_expr::make();
 		} case fail_type: {
 			// Return match-fail follower
 			if ( gl == no_gen ) return fail_expr::make();
@@ -547,29 +513,47 @@ namespace derivs {
 		look_list dbs;
 		while ( dabt != dab.end() && bit != bs.end() ) {
 			const look_node& bi = *bit;
-			if ( bi.g < *dabt ) { ++bit; continue; }  // skip generations not in backtrack list
-			assert(bi.g == *dabt && "no generations missing from backtrack list");
+			// skip generations not in backtrack list or without successful followers
+			if ( bi.g < *dabt ) { ++bit; continue; }
+			if ( bi.g > *dabt ) { ++dabt; continue; }
 			
 			ptr<expr> dbi = bi.e->d(x, i);
-			gen_type dbgl = bi.gl;
-			gen_set dbim = dbi->match();
-			if ( ! dbim.empty() && last(dbim) == i ) {  // set new match-fail backtrack if needed
-				dbgl = i;
+
+			if ( dbi->type() == fail_type ) {
+				// skip failures with no previous match
+				if ( bi.gl != no_gen ) {
+					dbs.emplace_back(bi.g, dbi, bi.gl);
+				}
+			} else {
+				// set new match-fail backtrack if needed
+				gen_type dbgl = bi.gl;
+				gen_set dbim = dbi->match();
+				if ( ! dbim.empty() && last(dbim) == i ) {
+					dbgl = i;
+				}
+				dbs.emplace_back(bi.g, dbi, dbgl);
 			}
-			dbs.emplace_back(bi.g, dbi, dbgl);
 			
 			++dabt; ++bit;
 		}
 		
 		// Add new lookahead backtrack if needed
-		if ( dabt != dab.end() ) {
-			gen_type dabm = *dabt;
-			assert(dabm == i && "leftover generation is new generation");
-			assert(++dabt == dab.end() && "only one new lookahead backtrack");
+		while ( dabt != dab.end() ) {
+			// skip generations without sucessful followers
+			if ( *dabt < i ) { ++dabt; continue; }
+
+			assert(*dabt == i && "leftover generation is new generation");
+
+			++dabt;
+			assert(dabt == dab.end() && "only one new lookahead backtrack");
 			
+			new_gen = true;
+		}
+
+		if ( new_gen ) {
 			ptr<expr> nb = nrm(b, i);
 			gen_type bgl = b->nbl() ? i : no_gen;
-			dbs.emplace_back(dabm, nb, bgl);
+			dbs.emplace_back(i, nb, bgl);
 		}
 		
 		return expr::make_ptr<seq_expr>(da, b, std::move(dbs), dgl);
