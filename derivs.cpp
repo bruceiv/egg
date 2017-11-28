@@ -362,10 +362,9 @@ namespace derivs {
 	}
 	
 	gen_set alt_expr::match_set() const {
-		gen_set x;
-		if ( gl != no_gen ) { set_add( x, gl ); }
-		for (const ptr<expr>& e : es) { set_union( x, e->match() ); }
-		return x;
+		// invariant: gl is set, or only the last alternative may match
+		if ( gl != no_gen ) { return gen_set{ gl }; }
+		return es.back()->match();
 	}
 	
 	gen_set alt_expr::back_set() const {
