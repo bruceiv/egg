@@ -22,7 +22,7 @@
 CXX = g++
 
 # Development
-CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=5
+#CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=5
 
 # Profiling
 #CXXFLAGS = -O0 -ggdb --std=c++0x -DNDEBUG
@@ -30,9 +30,9 @@ CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=5
 
 # Release
 #CXXFLAGS = -O2 --std=c++0x -DNDEBUG
-#CXXFLAGS = -O3 --std=c++0x -DNDEBUG
+CXXFLAGS = -O3 --std=c++0x -DNDEBUG
 
-OBJS = derivs.o fixer.o matcher.o norm.o
+OBJS = derivs.o fixer.o matcher.o
 
 egg:  main.cpp $(OBJS) egg.hpp parser.hpp \
       visitors/printer.hpp visitors/compiler.hpp visitors/interpreter.hpp visitors/normalizer.hpp \

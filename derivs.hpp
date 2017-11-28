@@ -399,9 +399,11 @@ namespace derivs {
 	/// A parsing expression representing the alternation of two parsing expressions
 	class alt_expr : public memo_expr {
 	public:
-		alt_expr(ptr<expr> a, ptr<expr> b) : memo_expr(), es{a, b} {}
+		alt_expr(ptr<expr> a, gen_type gl) : memo_expr(), es{a}, gl(gl) {}
+
+		alt_expr(ptr<expr> a, ptr<expr> b) : memo_expr(), es{a, b}, gl(no_gen) {}
 		
-		alt_expr(const expr_list& es) : memo_expr(), es(es) {}
+		alt_expr(const expr_list& es, gen_type gl) : memo_expr(), es(es), gl(gl) {}
 		
 		/// Make an expression using the default generation rules
 		static ptr<expr> make(ptr<expr> a, ptr<expr> b);
@@ -415,6 +417,7 @@ namespace derivs {
 		virtual expr_type type()      const { return alt_type; }
 		
 		expr_list  es;  ///< List of subexpressions, ordered by priority
+		gen_type   gl;  ///< Index of last epsilon match [no_gen for none such]
 	}; // class alt_expr
 
 	/// A parsing expression representing the simultaneous match of any of multiple 

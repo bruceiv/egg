@@ -283,8 +283,15 @@ namespace derivs {
 		default:        break; // do nothing
 		}
 		
-		// if first alternative matches or second alternative fails, use first
-		if ( b->type() == fail_type || ! a->match().empty() ) return a;
+		auto bt = b->type();
+		// if second alternative fails or first alternative matches, use first
+		if ( bt == fail_type || ! a->match().empty() ) return a;
+		
+		// if second alternative is empty, mark without node
+		if ( bt == eps_type ) {
+			gen_type g = std::static_pointer_cast<eps_expr>(b)->g;
+			return expr::make_ptr<alt_expr>(a, g);
+		}
 		
 		return expr::make_ptr<alt_expr>(a, b);
 	}
@@ -294,10 +301,17 @@ namespace derivs {
 		if ( es.empty() ) return eps_expr::make(0);
 
 		expr_list nes;
+		gen_type ngl = no_gen;
 		for (const ptr<expr>& e : es) {
 			expr_type ety = e->type();
 			// skip failing nodes
 			if ( ety == fail_type ) continue;
+
+			// mark and terminate on epsilon nodes
+			if ( ety == eps_type ) {
+				ngl = std::static_pointer_cast<eps_expr>(e)->g;
+				break;
+			}
 
 			nes.push_back(e);
 			
@@ -307,14 +321,15 @@ namespace derivs {
 
 		// Eliminate alternation node if not enough nodes left
 		switch ( nes.size() ) {
-		case 0: return fail_expr::make();
-		case 1: return nes[0];
-		default: return expr::make_ptr<alt_expr>(nes);
+		case 0: return ngl == no_gen ? fail_expr::make() : eps_expr::make(ngl);
+		case 1: return ngl == no_gen ? nes[0] : expr::make_ptr<alt_expr>(nes[0], ngl);
+		default: return expr::make_ptr<alt_expr>(nes, ngl);
 		}
 	}
 	
 	ptr<expr> alt_expr::deriv(char x, gen_type i) const {
 		expr_list des;
+		gen_type dgl = gl;
 		for (const ptr<expr>& e : es) {
 			// Take derivative
 			ptr<expr> de = e->d(x, i);
@@ -323,28 +338,39 @@ namespace derivs {
 			// skip failing nodes
 			if ( dety == fail_type ) continue;
 			
+			// mark and terminate on epsilon nodes
+			if ( dety == eps_type ) {
+				dgl = std::static_pointer_cast<eps_expr>(de)->g;
+				break;
+			}
+			
 			des.push_back(de);
 
 			// infinite loops and matching nodes end the alternation
-			if ( dety == inf_type || ! de->match().empty() ) break;
+			if ( dety == inf_type || ! de->match().empty() ) {
+				dgl = no_gen;
+				break;
+			}
 		}
 		
 		// Eliminate alternation node if not enough nodes left
 		switch ( des.size() ) {
-		case 0: return fail_expr::make();
-		case 1: return des[0];
-		default: return expr::make_ptr<alt_expr>(des);
+		case 0: return dgl == no_gen ? fail_expr::make() : eps_expr::make(dgl);
+		case 1: return dgl == no_gen ? des[0] : expr::make_ptr<alt_expr>(des[0], dgl);
+		default: return expr::make_ptr<alt_expr>(des, dgl);
 		}
 	}
 	
 	gen_set alt_expr::match_set() const {
 		gen_set x;
+		if ( gl != no_gen ) { set_add( x, gl ); }
 		for (const ptr<expr>& e : es) { set_union( x, e->match() ); }
 		return x;
 	}
 	
 	gen_set alt_expr::back_set() const {
 		gen_set x;
+		if ( gl != no_gen ) { set_add( x, gl ); }
 		for (const ptr<expr>& e : es) { set_union( x, e->back() ); }
 		return x;
 	}
@@ -430,11 +456,11 @@ namespace derivs {
 		return expr::make_ptr<seq_expr>(a, b, std::move(bs), gl);
 	}
 
-	/// Take derivative for lookahead gen g from list bs, null for none-such
+	/// Take derivative for lookahead gen g from list bs, fail for none-such
 	ptr<expr> d_from( const seq_expr::look_list& bs, gen_type g, char x, gen_type i ) {
 		for (const seq_expr::look_node& bi : bs) {
 			if ( bi.g < g ) continue;
-			if ( bi.g > g ) return {};  // generation list is sorted
+			if ( bi.g > g ) return fail_expr::make();  // generation list is sorted
 			
 			ptr<expr> dbi = bi.e->d(x, i);  // found element, take derivative
 			
@@ -456,10 +482,10 @@ namespace derivs {
 			// backtrack
 
 			// Otherwise return alt-expr of this lookahead and its failure backtrack
-			return alt_expr::make(dbi, eps_expr::make(bi.gl));
+			return expr::make_ptr<alt_expr>(dbi, bi.gl);
 		}
 
-		return {};
+		return fail_expr::make();
 	}
 	
 	ptr<expr> seq_expr::deriv(char x, gen_type i) const {
@@ -480,20 +506,15 @@ namespace derivs {
 			}
 		
 			// old lookahead expression
-			ptr<expr> dbi = d_from(bs, dag, x, i);
-			if ( dbi ) return dbi;
-			
-			// if lookahead follower not found, fail
-			return fail_expr::make();
+			return d_from(bs, dag, x, i);
 		} case fail_type: {
 			// Return match-fail follower
 			if ( gl == no_gen ) return fail_expr::make();
-			ptr<expr> dc = d_from(bs, gl, x, i);
-			return dc ? dc : fail_expr::make();
+			return d_from(bs, gl, x, i);
 		} case inf_type: {
 			// Propegate infinite loop
 			return da;
-		} default: {}  // do nothing
+		} default: break;  // do nothing
 		}
 		
 		// check for new failure backtrack

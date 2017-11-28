@@ -209,6 +209,7 @@ namespace derivs {
 			
 			// Transform options to expression list
 			expr_list es;
+			gen_type gl = no_gen;
 			for (auto& mi : m.ms) {
 				process(mi);
 				es.emplace_back(rVal);
