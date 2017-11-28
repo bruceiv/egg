@@ -44,7 +44,6 @@ namespace derivs {
 		case any_type:   out << "ANY";   break;
 		case none_type:  out << "NONE";  break;
 		case str_type:   out << "STR";   break;
-		// case rule_type:  out << "RULE";  break;
 		case not_type:   out << "NOT";   break;
 		case alt_type:   out << "ALT";   break;
 		case or_type:  out << "OR";  break;

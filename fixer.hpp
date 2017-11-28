@@ -49,21 +49,22 @@ namespace derivs {
 		ast::matcher_mode fix_match(const ast::matcher_ptr& m);
 
 		/// Recursively calculates next iteration of match set
-		ast::matcher_mode iter_match(const ast::matcher_ptr& m, emap& visited, 
-				bool& changed);
+		ast::matcher_mode iter_match(const ast::matcher_ptr& m, 
+				rmap& rules_visited, emap& visited, bool& changed);
 
 		/// Wraps visitor pattern for actual calculation of next 
 		/// match set
-		ast::matcher_mode calc_match(const ast::matcher_ptr& m, emap& visited,
-				bool& changed);
+		ast::matcher_mode calc_match(const ast::matcher_ptr& m, 
+				rmap& rules_visited, emap& visited, bool& changed);
 		
 		/// Iterates the fixed point or just visits the matcher, depending on 
 		/// the internal iter flag
-		void iter_or_visit( ast::matcher_ptr& m );
+		ast::matcher_mode iter( ast::matcher_ptr& m );
 
 		/// Iterates the fixed point or just visits the matcher, depending on 
 		/// the internal iter flag
-		void iter_or_visit( ast::matcher_ptr& m, emap* visited, bool* changed );
+		ast::matcher_mode iter( ast::matcher_ptr& m, 
+				rmap* rules_visited, emap* visited, bool* changed );
 		
 		/// Cache for rules
 		rmap by_name;
@@ -71,21 +72,21 @@ namespace derivs {
 		emap cache;
 		/// Set of expressions currently being fixed
 		eset running;
+		/// Set of rules visited in the current iteration
+		rmap* rules_visited;
 		/// Set of expressions visited in the current iteration
 		emap* visited;
 		/// Has anything in the current iteration changed?
 		bool* changed;
 		/// Match returned by the current iteration
 		ast::matcher_mode mode;
-		/// Should the current match iterate the fixed-point?
-		bool iter;
 		/// Grammar being fixed
 		ast::grammar_ptr g;
 	
 	public:
 		fixer(ast::grammar_ptr g) 
-			: by_name(), cache(), running(), visited(), changed(nullptr),
-			  mode(), iter(false), g(g) {}
+			: by_name(), cache(), running(), rules_visited(), visited(), 
+			  changed(nullptr), mode(), g(g) {}
 		
 		/// Runs fixed point on all rules in the grammar
 		void fix_all();

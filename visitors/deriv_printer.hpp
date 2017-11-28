@@ -52,7 +52,6 @@ namespace derivs {
 		void visit(any_expr& e)   { compound = false; }
 		void visit(none_expr& e)  { compound = false; }
 		void visit(str_expr& e)   { compound = false; }
-		// void visit(rule_expr& e)  { compound = false; }
 		void visit(not_expr& e)   { compound = false; }
 		void visit(alt_expr& e)   { compound = true; }
 		void visit(or_expr& e)  { compound = true; }
@@ -122,52 +121,14 @@ namespace derivs {
 		}
 	public:
 		/// Default printer
-		printer(std::ostream& out = std::cout) : out(out)/*, nc(0)*/ {}
-		
-		// /// Rule name loading printer
-		// printer(std::ostream& out, std::map<expr*, std::string>& rs) 
-		// 	: out(out), rs(rs), nc(rs.size()) {}
-		
-		// void print_rule(rule_expr& e) {
-		// 	auto it = rs.find(e.r.get());
-		// 	if ( it == rs.end() ) {
-		// 		out << "{RULE :??} ";
-		// 	} else {
-		// 		out << "{RULE :" << it->second << "} ";
-		// 	}
-		// 	print_fns(&e); out << " ";
-		// 	print_unbraced(e.r);
-		// 	out << std::endl;
-		// }
+		printer(std::ostream& out = std::cout) : out(out) {}
 		
 		/// Prints the expression
 		void print(ptr<expr> e) {
-			// if ( e->type() == rule_type ) {
-			// 	rule_expr* r = static_cast<rule_expr*>(e.get());
-			// 	if ( rs.count(r->r.get()) == 0 ) {
-			// 		rs.insert(std::make_pair(r->r.get(), std::to_string(rs.size() - nc)));
-			// 	}
-			// 	pl.push_back(r);
-			// } else {
-				e->accept(this);
-				out << std::endl;
-			// }
-			
-			// auto it = pl.begin();
-			// while ( it != pl.end() ) {
-			// 	print_rule(**it);
-			// 	++it;
-			// }
-			// pl.clear();
+			e->accept(this);
+			out << std::endl;
 		}
-		
-		// /// Prints the derivative of the expression to the given output stream 
-		// //  (with the given named rules)
-		// static void print(std::ostream& out, ptr<expr> e, std::map<expr*, std::string>& rs) {
-		// 	printer p(out, rs);
-		// 	p.print(e);
-		// }
-		
+				
 		/// Prints the derivative expression to the given output stream
 		static void print(std::ostream& out, ptr<expr> e) {
 			// std::map<expr*, std::string> rs;
@@ -199,23 +160,6 @@ namespace derivs {
 		void visit(none_expr& e)   { out << "$"; }
 		
 		void visit(str_expr& e)   { out << "\"" << strings::escape(e.str()) << "\""; }
-		
-		// void visit(rule_expr& e)  {
-		// 	auto it = rs.find(e.r.get());
-		// 	if ( it == rs.end() ) {  // not printed this rule before
-		// 		unsigned int i = rs.size() - nc;
-		// 		rs.insert(std::make_pair(e.r.get(), std::to_string(i)));
-		// 		pl.push_back(&e);
-				
-		// 		out << "{RULE ";
-		// 		print_fns(&e);
-		// 		out << " @" << i << "}";
-		// 	} else {  // printed this rule before
-		// 		out << "{RULE ";
-		// 		print_fns(&e);
-		// 		out << " @" << it->second << "}";
-		// 	}
-		// }
 		
 		void visit(not_expr& e)   {
 			out << "(not:" << e.g << " ";
@@ -307,8 +251,6 @@ namespace derivs {
 		
 	private:
 		std::ostream&                out;  ///< output stream
-		// std::map<expr*, std::string> rs;   ///< Rule identifiers
-		// unsigned int                 nc;   ///< Count of named rules
 	}; // class printer
 }
 

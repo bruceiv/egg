@@ -3,6 +3,7 @@
 #include <unordered_set>
 
 #include "fixer.hpp"
+#include "utils/scope_sub.hpp"
 
 namespace derivs {
 	using ast::matcher_mode;
@@ -17,35 +18,39 @@ namespace derivs {
 	}
 	
 	matcher_mode fixer::fix_match(const ast::matcher_ptr& e) {
-		// fast path for expressions that have fundamental match set
-		switch ( e->type() ) {
+		auto et = e->type();
+		// fast path for expressions that can't have recursive match set
+		switch ( et ) {
 		case ast::char_type: case ast::str_type: case ast::range_type: 
 		case ast::any_type: case ast::empty_type: case ast::none_type: 
 		case ast::action_type: case ast::look_type: case ast::not_type: 
 		case ast::fail_type:
-			e->accept( this );
-			return cache.emplace( e.get(), mode ).second;
+			mode = matcher_mode{ e->nbl(), e->look() };
+			cache.emplace( e.get(), mode );
+			return mode;
 		default: break;
 		}
 
 		// fixed point calculation for recursive expressions
 		bool changed = false;
 		fixer::emap visited;
+		fixer::rmap rules_visited;
 		running.insert(e.get());
 
 		// recalculate expressions until they don't change; 
 		// by Kleene's thm, a fixed point
 		matcher_mode mode{};
 		while (true) {
-			mode = iter_match(e, visited, changed);
+			mode = iter_match(e, rules_visited, visited, changed);
 			if ( ! changed ) break;
 			changed = false;
+			rules_visited.clear();
 			visited.clear();
 		}
 
 		running.clear();
 		cache.emplace( e.get(), mode );
-		if ( e->type() == ast::rule_type ) {
+		if ( et == ast::rule_type ) {
 			by_name.emplace(
 				std::static_pointer_cast<ast::rule_matcher>(e)->rule, mode );
 		}
@@ -54,7 +59,7 @@ namespace derivs {
 	}
 	
 	matcher_mode fixer::iter_match(const ast::matcher_ptr& e, 
-			fixer::emap& visited, bool& changed) {
+			fixer::rmap& rules_visited, fixer::emap& visited, bool& changed) {
 		// check cache
 		auto cit = cache.find( e.get() );
 		if ( cit != cache.end() ) return cit->second;
@@ -62,53 +67,51 @@ namespace derivs {
 		// run this expression, if not in progress
 		if ( ! running.count( e.get() ) ) return fix_match( e );
 		
-		// return already calculated value if visited this iteration
-		auto vit = visited.find( e.get() );
-		if ( vit != visited.end() ) return vit->second;
-
+		// return already calculated value if visited this iteration, 
 		// otherwise store current value
-		bool iter = this->iter;
-		this->iter = false;
-		e->accept( this );
-		visited.emplace( e.get(), mode );
-		this->iter = iter;
+		matcher_mode old_mode{ e->nbl(), e->look() };
+		if ( e->type() == ast::rule_type ) {
+			const std::string& key = 
+				std::static_pointer_cast<ast::rule_matcher>(e)->rule;
+			
+			auto vit = rules_visited.find( key );
+			if ( vit != rules_visited.end() ) return vit->second;
 
+			rules_visited.emplace( key, old_mode );
+		} else {
+			auto vit = visited.find( e.get() );
+
+			if ( vit != visited.end() ) return vit->second;
+
+			visited.emplace( e.get(), old_mode );
+		}
+		
 		// iterate fixed point for this expression
-		matcher_mode old_mode = mode;
-		matcher_mode new_mode = calc_match( e, visited, changed );
+		matcher_mode new_mode = 
+			calc_match( e, rules_visited, visited, changed );
 		if ( new_mode != old_mode ) { changed = true; }
 
 		return new_mode;
 	}
 	
 	matcher_mode fixer::calc_match(const ast::matcher_ptr& e, 
-			fixer::emap& visited, bool& changed) {
-		this->visited = &visited;
-		this->changed = &changed;
+			fixer::rmap& rules_visited, fixer::emap& visited, bool& changed) {
+		auto s0 = sub_in_scope(this->rules_visited, &rules_visited);
+		auto s1 = sub_in_scope(this->visited, &visited);
+		auto s2 = sub_in_scope(this->changed, &changed);
 		
-		bool iter = this->iter;
-		this->iter = true;
 		e->accept( this );
-		this->iter = iter;
-
+		
 		return mode;
 	}
 
-	void fixer::iter_or_visit( ast::matcher_ptr& m ) {
-		if ( iter ) {
-			mode = iter_match( m, *visited, *changed );
-		} else {
-			m->accept( this );
-		}
+	ast::matcher_mode fixer::iter( ast::matcher_ptr& m ) {
+		mode = iter_match( m, *rules_visited, *visited, *changed );
 	}
 	
-	void fixer::iter_or_visit( ast::matcher_ptr& m, 
-			fixer::emap* visited, bool* changed ) {
-		if ( iter ) {
-			mode = iter_match( m, *visited, *changed );
-		} else {
-			m->accept( this );
-		}
+	ast::matcher_mode fixer::iter( ast::matcher_ptr& m, 
+			fixer::rmap* rules_visited, fixer::emap* visited, bool* changed ) {
+		mode = iter_match( m, *rules_visited, *visited, *changed );
 	}
 
 	void fixer::visit(ast::char_matcher&) { mode = matcher_mode{}; }
@@ -127,16 +130,17 @@ namespace derivs {
 			return;
 		}
 
-		// return bottom if not iterating
-		if ( ! iter ) {
-			mode = m.mm;
+		// return current setting if already running this rule
+		auto rit = rules_visited->find( m.rule );
+		if ( rit != rules_visited->end() ) {
+			mode = rit->second;
 			return;
 		}
-
-		// otherwise turn off iteration and do one iteration
-		iter = false;
-		m.mm = mode = iter_match( g->names[ m.rule ]->m, *visited, *changed );
-		iter = true;
+		
+		// otherwise mark rule as visited and do one iteration
+		rmap* rv = rules_visited;
+		rv->emplace( m.rule, matcher_mode{} );
+		(*rv)[ m.rule ] = m.mm = mode = iter( g->names[ m.rule ]->m );
 	}
 
 	void fixer::visit(ast::any_matcher&) {
@@ -156,17 +160,17 @@ namespace derivs {
 	}
 
 	void fixer::visit(ast::opt_matcher& m) {
-		iter_or_visit( m.m );
+		iter( m.m );
 		mode.nbl = true;
 	}
 
 	void fixer::visit(ast::many_matcher& m) {
-		iter_or_visit( m.m );
+		iter( m.m );
 		mode.nbl = true;
 	}
 
 	void fixer::visit(ast::some_matcher& m) {
-		iter_or_visit( m.m );
+		iter( m.m );
 	}
 
 	void fixer::visit(ast::seq_matcher& m) {
@@ -177,16 +181,15 @@ namespace derivs {
 		}
 
 		// backup visited, changed in case changed by subexpressions
+		rmap* rules_visited = this->rules_visited;
 		emap* visited = this->visited;
 		bool* changed = this->changed;
 
 		// calculate mode for matcher
 		auto it = m.ms.begin();
-		(*it)->accept( this );
-		matcher_mode seq_mode = mode;
+		matcher_mode seq_mode = iter( *it );;
 		while ( ++it != m.ms.end() ) {
-			iter_or_visit( *it, visited, changed );
-			seq_mode &= mode;
+			seq_mode &= iter( *it, rules_visited, visited, changed );
 		}
 		m.mm = mode = seq_mode;
 	}
@@ -199,60 +202,52 @@ namespace derivs {
 		}
 
 		// backup visited, changed in case changed by subexpressions
+		rmap* rules_visited = this->rules_visited;
 		emap* visited = this->visited;
 		bool* changed = this->changed;
 
 		// calculate mode for matcher
 		auto it = m.ms.begin();
-		(*it)->accept( this );
-		matcher_mode alt_mode = mode;
+		matcher_mode alt_mode = iter( *it );;
 		while ( ++it != m.ms.end() ) {
-			iter_or_visit( *it, visited, changed );
-			alt_mode |= mode;
+			alt_mode |= iter( *it, rules_visited, visited, changed );
 		}
 		m.mm = mode = alt_mode;
 	}
 
 	void fixer::visit(ast::until_matcher& m) {
-		if ( iter ) {
-			// backup visited, changed in case changed by subexpressions
-			emap* visited = this->visited;
-			bool* changed = this->changed;
+		// backup visited, changed in case changed by subexpressions
+		rmap* rules_visited = this->rules_visited;
+		emap* visited = this->visited;
+		bool* changed = this->changed;
 
-			// ensure repeated subexpression fixed
-			iter_match( m.r, *visited, *changed );
+		// ensure repeated subexpression fixed
+		iter( m.r );
 
-			mode = iter_match( m.t, *visited, *changed );
-		} else {
-			// until matcher has equivalent mode to terminator
-			m.t->accept( this );
-		}
+		// take mode of terminator
+		mode = iter( m.t, rules_visited, visited, changed );
 	}
 
 	void fixer::visit(ast::look_matcher& m) {
 		// ensure subexpression fixed
-		if ( iter ) {
-			iter_match( m.m, *visited, *changed );
-		}
-
+		iter( m.m );
+		
 		mode = matcher_mode{ false, true };
 	}
 
 	void fixer::visit(ast::not_matcher& m) {
 		// ensure subexpression fixed
-		if ( iter ) {
-			iter_match( m.m, *visited, *changed );
-		}
-
+		iter( m.m );
+		
 		mode = matcher_mode{ false, true };
 	}
 
 	void fixer::visit(ast::capt_matcher& m) {
-		iter_or_visit( m.m );
+		iter( m.m );
 	}
 
 	void fixer::visit(ast::named_matcher& m) {
-		iter_or_visit( m.m );
+		iter( m.m );
 	}
 
 	void fixer::visit(ast::fail_matcher&) {
