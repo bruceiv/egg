@@ -86,6 +86,12 @@ namespace derivs {
 			--crnt_depth;
 		}
 
+		void visit(opt_expr& e)   {
+			++crnt_depth;
+			e.e->accept( this );
+			--crnt_depth;
+		}
+
 		void visit(or_expr& e)  {
 			++crnt_depth;
 			for( auto& x : e.es ) x->accept( this );

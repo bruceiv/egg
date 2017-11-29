@@ -102,6 +102,11 @@ namespace derivs {
 			rVal = alt_expr::make(es);
 		}
 
+		void visit(opt_expr& e) {
+			e.e->accept(this);
+			rVal = opt_expr::make(rVal, e.gl);
+		}
+
 		void visit(or_expr& e) {
 			expr_list es;
 			for (auto& x : e.es) {

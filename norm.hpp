@@ -151,18 +151,15 @@ namespace derivs {
 		
 		void visit(ast::opt_matcher& m) {
 			// match subexpression or epsilon
-			rVal = expr::make_ptr<alt_expr>(
-				process(m.m), 
-				expr::make_ptr<eps_expr>(g) );
+			rVal = expr::make_ptr<opt_expr>( process(m.m), g );
 		}
 
 		void visit(ast::many_matcher& m) {
 			// save current matcher pointer
 			const ast::matcher_ptr& om = *pPtr;
 			// split out one repetition
-			rVal = expr::make_ptr<alt_expr>(
-				expr::make_ptr<seq_expr>( process(m.m), om ),
-				expr::make_ptr<eps_expr>(g) );
+			rVal = expr::make_ptr<opt_expr>(
+				expr::make_ptr<seq_expr>( process(m.m), om ), g );
 		}
 
 		void visit(ast::some_matcher& m) {
@@ -209,7 +206,6 @@ namespace derivs {
 			
 			// Transform options to expression list
 			expr_list es;
-			gen_type gl = no_gen;
 			for (auto& mi : m.ms) {
 				process(mi);
 				es.emplace_back(rVal);

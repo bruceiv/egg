@@ -69,12 +69,13 @@ public:
 			else if ( i != x ){
 				for (auto it = ++(xs.rbegin()); it != xs.rend(); ++it) {
 					i = *it;
-					if ( i == x ) break;
+					if ( i == x ) return *this;
 					if ( i < x ) {
 						xs.insert(it.base(), x);
-						break;
+						return *this;
 					}
 				}
+				xs.insert(xs.begin(), x);
 			}
 		}
 		return *this;

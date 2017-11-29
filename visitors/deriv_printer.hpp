@@ -54,6 +54,7 @@ namespace derivs {
 		void visit(str_expr& e)   { compound = false; }
 		void visit(not_expr& e)   { compound = false; }
 		void visit(alt_expr& e)   { compound = true; }
+		void visit(opt_expr& e)   { compound = false; }
 		void visit(or_expr& e)  { compound = true; }
 		void visit(and_expr& e) { compound = true; }
 		void visit(seq_expr& e)   { compound = true; }
@@ -169,6 +170,7 @@ namespace derivs {
 		
 		void visit(alt_expr& e)  {
 			out << "(alt:";
+			if ( e.gl != no_gen ) { out << e.gl; }
 			print_fns(&e);
 			
 			auto et = e.es.begin();
@@ -182,6 +184,12 @@ namespace derivs {
 				print_unbraced(*et);
 			}
 
+			out << ")";
+		}
+
+		void visit(opt_expr& e)   {
+			out << "(opt:" << e.gl << " ";
+			print_unbraced(e.e);
 			out << ")";
 		}
 

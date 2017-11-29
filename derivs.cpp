@@ -46,6 +46,7 @@ namespace derivs {
 		case str_type:   out << "STR";   break;
 		case not_type:   out << "NOT";   break;
 		case alt_type:   out << "ALT";   break;
+		case opt_type:   out << "OPT";   break;
 		case or_type:  out << "OR";  break;
 		case and_type: out << "AND"; break;
 		case seq_type:   out << "SEQ";   break;
@@ -290,7 +291,7 @@ namespace derivs {
 		// if second alternative is empty, mark without node
 		if ( bt == eps_type ) {
 			gen_type g = std::static_pointer_cast<eps_expr>(b)->g;
-			return expr::make_ptr<alt_expr>(a, g);
+			return expr::make_ptr<opt_expr>(a, g);
 		}
 		
 		return expr::make_ptr<alt_expr>(a, b);
@@ -322,7 +323,7 @@ namespace derivs {
 		// Eliminate alternation node if not enough nodes left
 		switch ( nes.size() ) {
 		case 0: return ngl == no_gen ? fail_expr::make() : eps_expr::make(ngl);
-		case 1: return ngl == no_gen ? nes[0] : expr::make_ptr<alt_expr>(nes[0], ngl);
+		case 1: return ngl == no_gen ? nes[0] : expr::make_ptr<opt_expr>(nes[0], ngl);
 		default: return expr::make_ptr<alt_expr>(nes, ngl);
 		}
 	}
@@ -356,7 +357,7 @@ namespace derivs {
 		// Eliminate alternation node if not enough nodes left
 		switch ( des.size() ) {
 		case 0: return dgl == no_gen ? fail_expr::make() : eps_expr::make(dgl);
-		case 1: return dgl == no_gen ? des[0] : expr::make_ptr<alt_expr>(des[0], dgl);
+		case 1: return dgl == no_gen ? des[0] : expr::make_ptr<opt_expr>(des[0], dgl);
 		default: return expr::make_ptr<alt_expr>(des, dgl);
 		}
 	}
@@ -372,6 +373,34 @@ namespace derivs {
 		if ( gl != no_gen ) { set_add( x, gl ); }
 		for (const ptr<expr>& e : es) { set_union( x, e->back() ); }
 		return x;
+	}
+
+	// opt_expr ////////////////////////////////////////////////////////////////////
+
+	ptr<expr> opt_expr::make(ptr<expr> e, gen_type gl) {
+		switch ( e->type() ) {
+		case fail_type: return eps_expr::make(gl);  // return epsilon match on subexpression failure
+		case eps_type: case inf_type:  return e;    // propegate epsilon, infinite loop
+		default: break;
+		}
+		
+		// return subexpression on match
+		if ( ! e->match().empty() ) return e;
+		
+		return expr::make_ptr<opt_expr>(e, gl);
+	}
+	
+	// Take subexpression derivative
+	ptr<expr> opt_expr::deriv(char x, gen_type i) const {
+		return opt_expr::make( e->d(x, i), gl );
+	}
+	
+	gen_set opt_expr::match_set() const { return gen_set{gl}; }
+	
+	gen_set opt_expr::back_set() const {
+		gen_set eb = e->back();
+		set_add( eb, gl );
+		return eb;
 	}
 
 	// or_expr /////////////////////////////////////////////////////////////////////
@@ -473,15 +502,16 @@ namespace derivs {
 
 			// if there is no failure backtrack, or it is replaced by a new 
 			// backtrack, just return the expression
-			if ( bi.gl == no_gen ) return dbi;
-			gen_set dbim = dbi->match();
-			if ( ! dbim.empty() && last(dbim) == i ) return dbi;
+			if ( bi.gl == no_gen || ! dbi->match().empty() ) return dbi;
+			// if ( bi.gl == no_gen ) return dbi;
+			// gen_set dbim = dbi->match();
+			// if ( ! dbim.empty() && last(dbim) == i ) return dbi;
 
 			// otherwise return alt-expr of this lookahead and its failure 
 			// backtrack
 
 			// Otherwise return alt-expr of this lookahead and its failure backtrack
-			return expr::make_ptr<alt_expr>(dbi, bi.gl);
+			return expr::make_ptr<opt_expr>(dbi, bi.gl);
 		}
 
 		return fail_expr::make();

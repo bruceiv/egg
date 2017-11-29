@@ -108,6 +108,7 @@ namespace derivs {
 	class str_expr;
 	class not_expr;
 	class alt_expr;
+	class opt_expr;
 	class or_expr;
 	class and_expr;
 	class seq_expr;
@@ -126,6 +127,7 @@ namespace derivs {
 		str_type,
 		not_type,
 		alt_type,
+		opt_type,
 		or_type,
 		and_type,
 		seq_type
@@ -148,7 +150,8 @@ namespace derivs {
 		virtual void visit(str_expr&)   = 0;
 		virtual void visit(not_expr&)   = 0;
 		virtual void visit(alt_expr&)   = 0;
-		virtual void visit(or_expr&)  = 0;
+		virtual void visit(opt_expr&)   = 0;
+		virtual void visit(or_expr&)    = 0;
 		virtual void visit(and_expr&)   = 0;
 		virtual void visit(seq_expr&)   = 0;
 	}; // class visitor
@@ -401,7 +404,7 @@ namespace derivs {
 	/// A parsing expression representing negative lookahead
 	class not_expr : public memo_expr {
 	public:
-		not_expr(ptr<expr> e, gen_type g) : memo_expr(), e(e), g(g) { flags.match = flags.back = true; }
+		not_expr(ptr<expr> e, gen_type g) : memo_expr(), e(e), g(g) {}
 		
 		static ptr<expr> make(ptr<expr> e, gen_type g);
 		void accept(visitor* v) { v->visit(*this); }
@@ -418,11 +421,9 @@ namespace derivs {
 		gen_type g;   ///< Index at which expression ceased consuming input
 	}; // class not_expr
 	
-	/// A parsing expression representing the alternation of two parsing expressions
+	/// A parsing expression representing the alternation of two or more parsing expressions
 	class alt_expr : public memo_expr {
 	public:
-		alt_expr(ptr<expr> a, gen_type gl) : memo_expr(), es{a}, gl(gl) {}
-
 		alt_expr(ptr<expr> a, ptr<expr> b) : memo_expr(), es{a, b}, gl(no_gen) {}
 		
 		alt_expr(const expr_list& es, gen_type gl) : memo_expr(), es(es), gl(gl) {}
@@ -441,6 +442,26 @@ namespace derivs {
 		expr_list  es;  ///< List of subexpressions, ordered by priority
 		gen_type   gl;  ///< Index of last epsilon match [no_gen for none such]
 	}; // class alt_expr
+
+	/// A parsing expression representing the alternation of a non-matching parsing 
+	/// expression and an epsilon expression
+	class opt_expr : public memo_expr {
+	public:
+		opt_expr(ptr<expr> e, gen_type gl) : memo_expr(), e(e), gl(gl) {}
+
+		static ptr<expr> make(ptr<expr> e, gen_type gl);
+		void accept(visitor* v) { v->visit(*this); }
+
+		virtual ptr<expr> deriv(char, gen_type) const;
+		virtual gen_set   match_set() const;
+		virtual gen_set   back_set()  const;
+		virtual expr_type type()      const { return opt_type; }
+
+		virtual gen_set match() const { return opt_expr::match_set(); }
+
+		ptr<expr> e;  ///< Subexpression to match
+		gen_type gl;  ///< Failure match index for e
+	}; // class opt_expr
 
 	/// A parsing expression representing the simultaneous match of any of multiple 
 	/// expressions at the same position. Only guaranteed to work for single-character 
