@@ -466,9 +466,6 @@ namespace derivs {
 		default: break;  // do nothing
 		}
 		
-		// Set up match-fail follower
-		gen_type gl = a->match().empty() ? no_gen : i;
-		
 		// set up lookahead follower
 		look_list bs;
 		if ( ! a->back().empty() ) {
@@ -476,7 +473,7 @@ namespace derivs {
 		}
 		
 		// return constructed expression
-		return expr::make_ptr<seq_expr>(a, b, std::move(bs), gl);
+		return expr::make_ptr<seq_expr>(a, b, std::move(bs));
 	}
 
 	/// Take derivative for lookahead gen g from list bs, fail for none-such
@@ -510,23 +507,10 @@ namespace derivs {
 		
 			// old lookahead expression
 			return d_from(bs, dag, x, i);
-		} case fail_type: {
-			// Return match-fail follower
-			if ( gl == no_gen ) return fail_expr::make();
-			return d_from(bs, gl, x, i);
-		} case inf_type: {
-			// Propegate infinite loop
-			return da;
-		} default: break;  // do nothing
-		}
-		
-		// check for new failure backtrack
-		bool new_gen = false;
-		gen_type dgl = gl;
-		gen_set dam = da->match();
-		if ( ! dam.empty() && last(dam) == i ) {
-			dgl = i;
-			new_gen = true;
+		} 
+		// propegate fail, infinite loop
+		case fail_type: case inf_type: return da;
+		default: break;  // do nothing
 		}
 		
 		gen_set dab = da->back();
@@ -561,15 +545,11 @@ namespace derivs {
 			++dabt;
 			assert(dabt == dab.end() && "only one new lookahead backtrack");
 			
-			new_gen = true;
-		}
-
-		if ( new_gen ) {
 			ptr<expr> nb = nrm(b, i);
 			dbs.emplace_back(i, nb);
 		}
 		
-		return expr::make_ptr<seq_expr>(da, b, std::move(dbs), dgl);
+		return expr::make_ptr<seq_expr>(da, b, std::move(dbs));
 	}
 	
 	gen_set seq_expr::match_set() const {

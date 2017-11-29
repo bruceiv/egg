@@ -229,7 +229,6 @@ namespace derivs {
 		
 		void visit(seq_expr& e) {
 			out << "(seq:";
-			if ( e.gl != no_gen ) { out << e.gl; }
 			print_fns(&e);
 			out << " ";
 			print_unbraced(e.a);
@@ -240,13 +239,11 @@ namespace derivs {
 				out << " {";
 				auto it = e.bs.begin();
 				out << "(" << (unsigned int)it->g;
-				if ( e.gl == it->g ) { out << "*"; }
 				out << ") ";
 				print_unbraced(it->e);
 				
 				while (++it != e.bs.end()) {
 					out << " | (" << (unsigned int)it->g;
-					if ( e.gl == it->g ) { out << "*"; }
 					out << ") ";
 					print_unbraced(it->e);
 				}
