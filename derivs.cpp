@@ -460,24 +460,19 @@ namespace derivs {
 		
 		switch ( a->type() ) {
 		// empty first element just leaves follower
-		case eps_type:
-			return nrm(b, i);
+		case eps_type: return nrm(b, i);
 		// failure or infinite loop propagates
-		case fail_type:
-		case inf_type:
-			return a;
+		case fail_type: case inf_type: return a;
 		default: break;  // do nothing
 		}
 		
 		// Set up match-fail follower
-		gen_set am = a->match();
-		gen_type gl = ( ! am.empty() && last(am) == i ) ? i : no_gen;
+		gen_type gl = a->match().empty() ? no_gen : i;
 		
 		// set up lookahead follower
 		look_list bs;
 		if ( ! a->back().empty() ) {
-			gen_type bgl = b->nbl() ? i : no_gen;
-			bs.emplace_back(i, nrm(b, i), bgl);
+			bs.emplace_back(i, nrm(b, i));
 		}
 		
 		// return constructed expression
@@ -490,31 +485,10 @@ namespace derivs {
 			if ( bi.g < g ) continue;
 			if ( bi.g > g ) return fail_expr::make();  // generation list is sorted
 			
-			ptr<expr> dbi = bi.e->d(x, i);  // found element, take derivative
-			
-			if ( dbi->type() == fail_type ) {  // straight path fails ...
-				if ( bi.gl != no_gen ) {          // ... but matched in the past
-					return eps_expr::make(bi.gl);   // return appropriate lookahead
-				} else {                          // ... and no previous match
-					return dbi;                      // return a failure expression
-				}
-			}
-
-			// if there is no failure backtrack, or it is replaced by a new 
-			// backtrack, just return the expression
-			if ( bi.gl == no_gen || ! dbi->match().empty() ) return dbi;
-			// if ( bi.gl == no_gen ) return dbi;
-			// gen_set dbim = dbi->match();
-			// if ( ! dbim.empty() && last(dbim) == i ) return dbi;
-
-			// otherwise return alt-expr of this lookahead and its failure 
-			// backtrack
-
-			// Otherwise return alt-expr of this lookahead and its failure backtrack
-			return expr::make_ptr<opt_expr>(dbi, bi.gl);
+			return bi.e->d(x, i);  // found element, take derivative
 		}
 
-		return fail_expr::make();
+		return fail_expr::make();  // no element, fail
 	}
 	
 	ptr<expr> seq_expr::deriv(char x, gen_type i) const {
@@ -568,22 +542,13 @@ namespace derivs {
 			
 			ptr<expr> dbi = bi.e->d(x, i);
 
-			if ( dbi->type() == fail_type ) {
-				// skip failures with no previous match
-				if ( bi.gl != no_gen ) {
-					dbs.emplace_back(bi.g, dbi, bi.gl);
-				}
-			} else {
-				// set new match-fail backtrack if needed
-				gen_type dbgl = bi.gl;
-				gen_set dbim = dbi->match();
-				if ( ! dbim.empty() && last(dbim) == i ) {
-					dbgl = i;
-				}
-				dbs.emplace_back(bi.g, dbi, dbgl);
-			}
-			
 			++dabt; ++bit;
+
+			// skip failures
+			if ( dbi->type() == fail_type ) continue;
+
+			// set new backtrack
+			dbs.emplace_back(bi.g, dbi);
 		}
 		
 		// Add new lookahead backtrack if needed
@@ -601,8 +566,7 @@ namespace derivs {
 
 		if ( new_gen ) {
 			ptr<expr> nb = nrm(b, i);
-			gen_type bgl = b->nbl() ? i : no_gen;
-			dbs.emplace_back(i, nb, bgl);
+			dbs.emplace_back(i, nb);
 		}
 		
 		return expr::make_ptr<seq_expr>(da, b, std::move(dbs), dgl);
@@ -626,7 +590,6 @@ namespace derivs {
 			
 			// Add followers to match set as well as follower match-fail
 			set_union( x, bi.e->match() );
-			if ( bi.gl != no_gen ) set_add( x, bi.gl );
 			
 			++at; ++bit;
 		}
@@ -640,7 +603,6 @@ namespace derivs {
 		// Include lookahead follower backtracks
 		for (const look_node& bi : bs) {
 			set_union( x, bi.e->back() );
-			if ( bi.gl != no_gen ) set_add( x, bi.gl );
 		}
 		
 		return x;

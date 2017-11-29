@@ -504,12 +504,10 @@ namespace derivs {
 	class seq_expr : public memo_expr {
 	public:
 		struct look_node {
-			look_node(gen_type g, ptr<expr> e, gen_type gl = no_gen) 
-				: g(g), e(e), gl(gl) {}
+			look_node(gen_type g, ptr<expr> e) : g(g), e(e) {}
 			
 			gen_type  g;   ///< Backtrack index this follower corresponds to
 			ptr<expr> e;   ///< Follower expression for this lookahead generation
-			gen_type  gl;  ///< Index of last match [no_gen for none such]
 		}; // struct look_node
 		using look_list = std::vector<look_node>;
 		
@@ -530,7 +528,7 @@ namespace derivs {
 		ptr<expr> a;         ///< First subexpression
 		ast::matcher_ptr b;  ///< Un-normalized second subexpression
 		look_list bs;        ///< List of following subexpressions for each backtrack index
-		gen_type gl;         ///< Last matching generation [no_gen for none such]
+		gen_type gl;         ///< Last matching generation of a [no_gen for none such]
 	}; // class seq_expr
 	
 } // namespace derivs

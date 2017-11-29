@@ -241,14 +241,12 @@ namespace derivs {
 				auto it = e.bs.begin();
 				out << "(" << (unsigned int)it->g;
 				if ( e.gl == it->g ) { out << "*"; }
-				if ( it->gl != no_gen ) { out << "." << (unsigned int)it->gl; }
 				out << ") ";
 				print_unbraced(it->e);
 				
 				while (++it != e.bs.end()) {
 					out << " | (" << (unsigned int)it->g;
 					if ( e.gl == it->g ) { out << "*"; }
-					if ( it->gl != no_gen ) { out << "." << (unsigned int)it->gl; }
 					out << ") ";
 					print_unbraced(it->e);
 				}

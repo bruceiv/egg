@@ -22,7 +22,7 @@
 CXX = g++
 
 # Development
-CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=5
+#CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=5
 
 # Profiling
 #CXXFLAGS = -O0 -ggdb --std=c++0x -DNDEBUG
@@ -30,7 +30,7 @@ CXXFLAGS = -O0 -ggdb --std=c++0x -fmax-errors=5
 
 # Release
 #CXXFLAGS = -O2 --std=c++0x -DNDEBUG
-#CXXFLAGS = -O3 --std=c++0x -DNDEBUG
+CXXFLAGS = -O3 --std=c++0x -DNDEBUG
 
 OBJS = derivs.o fixer.o matcher.o
 
