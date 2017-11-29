@@ -28,7 +28,7 @@
 
 #include <limits>
 #include <memory>
-#include <set>
+// #include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -37,6 +37,8 @@
 
 #include "ast.hpp"
 #include "fixer.hpp"
+
+#include "utils/uint_set.hpp"
 
 /**
  * Implements derivative parsing for parsing expression grammars, according to the algorithm 
@@ -51,27 +53,47 @@ namespace derivs {
 	template <typename T> using ptr = std::shared_ptr<T>;
 	template <typename T> using memo_ptr = std::weak_ptr<T>;
 
+	// /// single backtrack generation
+	// using gen_type = unsigned long;
+	// /// set of backtrack generations
+	// using gen_set = std::set<gen_type>;
+
+	// /// sentinel generation indicating none-such
+	// static constexpr gen_type no_gen = std::numeric_limits<gen_type>::max();
+
+	// /// Gets first index in a generation set; undefined for empty set
+	// static inline gen_type first( const gen_set& gs ) { return *gs.begin(); }
+
+	// /// Gets last index in a generation set; undefined for empty set
+	// static inline gen_type last( const gen_set& gs ) { return *gs.rbegin(); }
+
+	// /// Inserts a value into a generation set
+	// static inline void set_add( gen_set& a, gen_type g ) { a.insert( g ); }
+
+	// /// Takes set union of two generation sets
+	// static inline void set_union( gen_set& a, const gen_set& b ) {
+	// 	a.insert( b.begin(), b.end() );
+	// }
+
 	/// single backtrack generation
-	using gen_type = unsigned long;
+	using gen_type = utils::uint_set::value_type;
 	/// set of backtrack generations
-	using gen_set = std::set<gen_type>;
+	using gen_set = utils::uint_set;
 
 	/// sentinel generation indicating none-such
 	static constexpr gen_type no_gen = std::numeric_limits<gen_type>::max();
 
 	/// Gets first index in a generation set; undefined for empty set
-	static inline gen_type first( const gen_set& gs ) { return *gs.begin(); }
+	static inline gen_type first( const gen_set& gs ) { return gs.min(); }
 
 	/// Gets last index in a generation set; undefined for empty set
-	static inline gen_type last( const gen_set& gs ) { return *gs.rbegin(); }
+	static inline gen_type last( const gen_set& gs ) { return gs.max(); }
 
 	/// Inserts a value into a generation set
-	static inline void set_add( gen_set& a, gen_type g ) { a.insert( g ); }
+	static inline void set_add( gen_set& a, gen_type g ) { a |= g; }
 
 	/// Takes set union of two generation sets
-	static inline void set_union( gen_set& a, const gen_set& b ) {
-		a.insert( b.begin(), b.end() );
-	}
+	static inline void set_union( gen_set& a, const gen_set& b ) { a |= b; }
 	
 	// Forward declarations of expression node types
 	class fail_expr;
