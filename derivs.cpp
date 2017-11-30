@@ -466,14 +466,8 @@ namespace derivs {
 		default: break;  // do nothing
 		}
 		
-		// set up lookahead follower
-		look_list bs;
-		if ( ! a->back().empty() ) {
-			bs.emplace_back(i, nrm(b, i));
-		}
-		
 		// return constructed expression
-		return expr::make_ptr<seq_expr>(a, b, std::move(bs));
+		return expr::make_ptr<seq_expr>(a, b, i);
 	}
 
 	/// Take derivative for lookahead gen g from list bs, fail for none-such
@@ -497,11 +491,11 @@ namespace derivs {
 			// generation of match
 			auto dag = std::static_pointer_cast<eps_expr>(da)->g;
 
-			// current-gen match
-			if ( dag == i ) {
-				// Take follower (or follower's end-of-string derivative on end-of-string)
-				ptr<expr> bn = nrm(b, i);
-				if ( x == '\0' ) { bn = bn->d('\0', i); }
+			// current- or last-gen match
+			if ( dag == i || dag == i-1 ) {
+				// Take follower (or follower's derivative on end-of-string or last-gen)
+				ptr<expr> bn = nrm(b, dag);
+				if ( x == '\0' || dag == i-1 ) { bn = bn->d(x, i); }
 				return bn;
 			}
 		
@@ -538,18 +532,23 @@ namespace derivs {
 		// Add new lookahead backtrack if needed
 		while ( dabt != dab.end() ) {
 			// skip generations without sucessful followers
-			if ( *dabt < i ) { ++dabt; continue; }
+			if ( *dabt < i-1 ) { ++dabt; continue; }
 
-			assert(*dabt == i && "leftover generation is new generation");
+			// lazily generate current generation follower
+			if ( *dabt == i ) break;
 
-			++dabt;
-			assert(dabt == dab.end() && "only one new lookahead backtrack");
-			
-			ptr<expr> nb = nrm(b, i);
-			dbs.emplace_back(i, nb);
+			// take derivative of previous-generation follower
+			ptr<expr> nb = nrm(b, i-1)->d(x, i);
+
+			// skip failures
+			if ( nb->type() == fail_type ) break;
+
+			// set new backtrack
+			dbs.emplace_back(i-1, nb);
+			break;
 		}
 		
-		return expr::make_ptr<seq_expr>(da, b, std::move(dbs));
+		return expr::make_ptr<seq_expr>(da, b, std::move(dbs), i);
 	}
 	
 	gen_set seq_expr::match_set() const {
@@ -557,6 +556,7 @@ namespace derivs {
 
 		// Include matches from matching lookahead successors
 		gen_set am = a->match();
+		if ( am.empty() ) return x;
 
 		auto at = am.begin();
 		auto bit = bs.begin();
@@ -573,6 +573,9 @@ namespace derivs {
 			
 			++at; ++bit;
 		}
+
+		// account for lazy generation of current-gen lookahead
+		if ( last( am ) == g && b->nbl() ) { set_add( x, g ); }
 		
 		return x;
 	}
@@ -584,6 +587,10 @@ namespace derivs {
 		for (const look_node& bi : bs) {
 			set_union( x, bi.e->back() );
 		}
+
+		// account for lazy generation of current-gen lookahead
+		gen_set ab = a->back();
+		if ( ! ab.empty() && last( ab ) == g && b->look() ) { set_add( x, g ); }
 		
 		return x;
 	}

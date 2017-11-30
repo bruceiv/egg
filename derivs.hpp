@@ -511,10 +511,11 @@ namespace derivs {
 		}; // struct look_node
 		using look_list = std::vector<look_node>;
 		
-		seq_expr(ptr<expr> a, ast::matcher_ptr b) : memo_expr(), a(a), b(b), bs() {}
+		seq_expr(ptr<expr> a, ast::matcher_ptr b, gen_type g)
+			: memo_expr(), a(a), b(b), bs(), g(g) {}
 		
-		seq_expr(ptr<expr> a, ast::matcher_ptr b, look_list&& bs)
-			: memo_expr(), a(a), b(b), bs(std::move(bs)) {}
+		seq_expr(ptr<expr> a, ast::matcher_ptr b, look_list&& bs, gen_type g)
+			: memo_expr(), a(a), b(b), bs(std::move(bs)), g(g) {}
 	
 		static ptr<expr> make(ptr<expr> a, ast::matcher_ptr b, gen_type i);
 		void accept(visitor* v) { v->visit(*this); }
@@ -527,6 +528,7 @@ namespace derivs {
 		ptr<expr> a;         ///< First subexpression
 		ast::matcher_ptr b;  ///< Un-normalized second subexpression
 		look_list bs;        ///< List of following subexpressions for each backtrack index
+		gen_type g;          ///< Generation seq_expr was created at
 	}; // class seq_expr
 	
 } // namespace derivs

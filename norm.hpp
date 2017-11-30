@@ -159,14 +159,13 @@ namespace derivs {
 			const ast::matcher_ptr& om = *pPtr;
 			// split out one repetition
 			rVal = expr::make_ptr<opt_expr>(
-				expr::make_ptr<seq_expr>( process(m.m), om ), g );
+				expr::make_ptr<seq_expr>( process(m.m), om, g ), g );
 		}
 
 		void visit(ast::some_matcher& m) {
 			// transmute into m.m m.m*
 			rVal = expr::make_ptr<seq_expr>(
-				process(m.m),
-				ast::make_ptr<ast::many_matcher>(m.m) );
+				process(m.m), ast::make_ptr<ast::many_matcher>(m.m), g );
 		}
 
 		void visit(ast::seq_matcher& m) {
@@ -219,7 +218,7 @@ namespace derivs {
 			// split out one repetition
 			rVal = expr::make_ptr<alt_expr>(
 				process(m.t),
-				expr::make_ptr<seq_expr>( process(m.r), om ) );
+				expr::make_ptr<seq_expr>( process(m.r), om, g ) );
 		}
 
 		void visit(ast::look_matcher& m) {
