@@ -32,11 +32,124 @@
 #include "visitors/instrumenter.hpp"
 
 namespace derivs {
+
+	/// Normalizes AST matchers into derivative expressions
 	class norm : public ast::visitor {
+
+		/// Substitutes derivative expressions into current generation.
+		/// Only works on output of norm (i.e. has only single generation)
+		class gen_sub : public derivs::visitor {
+			ptr<expr> rVal;
+			gen_type g;
+
+			ptr<expr> process( ptr<expr> e ) {
+				rVal = e;
+				rVal->accept( this );
+				return rVal;
+			}
+
+		public:
+			/// returns e at generation i; does not rebuild if no substitution
+			ptr<expr> operator() ( ptr<expr> e, gen_type i ) {
+				g = i;				
+				return process( e );
+			}
+
+			virtual void visit(fail_expr&) {}
+			
+			virtual void visit(inf_expr&) {}
+			
+			virtual void visit(eps_expr&) { rVal = expr::make_ptr<eps_expr>(g); }
+			
+			virtual void visit(char_expr&) {}
+			
+			virtual void visit(except_expr&) {}
+			
+			virtual void visit(range_expr&) {}
+			
+			virtual void visit(except_range_expr&) {}
+			
+			virtual void visit(any_expr&) {}
+			
+			virtual void visit(none_expr&) {}
+			
+			virtual void visit(str_expr&) {}
+			
+			virtual void visit(not_expr& e) {
+				rVal = expr::make_ptr<not_expr>( process( e.e ), g );
+			}
+			
+			virtual void visit(alt_expr& e) {
+				ptr<expr> bak = rVal;
+				
+				// investigate how far no change
+				unsigned i = 0;
+				ptr<expr> last;
+				for ( ; i < e.es.size(); ++i ) {
+					last = process( e.es[i] );
+					if ( last != e.es[i] ) break;
+				}
+
+				// quit early if no change
+				if ( i == e.es.size() ) {
+					if ( e.gl == no_gen ) {
+						rVal = bak;
+					} else {
+						rVal = expr::make_ptr<alt_expr>( e.es, g );
+					}
+					return;
+				}
+
+				// build unchanged prefix of list
+				expr_list es;
+				es.reserve( e.es.size() );
+				es.insert( es.end(), e.es.begin(), e.es.begin() + i );
+				es.push_back( last );
+
+				// finish list
+				for ( ++i; i < e.es.size(); ++i ) {
+					es.push_back( process( e.es[i] ) );
+				}
+
+				rVal = expr::make_ptr<alt_expr>( 
+					std::move(es), e.gl == no_gen ? no_gen : g );
+			}
+			
+			virtual void visit(opt_expr& e) {
+				rVal = expr::make_ptr<opt_expr>( process( e.e ), g );
+			}
+			
+			virtual void visit(or_expr&) { /* only contains single chars */ }
+			
+			virtual void visit(and_expr&) { /* only contains single chars */ }
+			
+			virtual void visit(seq_expr& e) {
+				rVal = expr::make_ptr<seq_expr>( process(e.a), e.b, g );
+			}
+		};
+
+		/// Cached state of an expression
+		struct state {
+			ptr<expr> e;
+			gen_type g;
+
+			state() = default;
+			state(ptr<expr> e, gen_type g) : e(e), g(g) {}
+
+			/// updates state for a new generation
+			ptr<expr> get( gen_type i ) {
+				if ( i == g ) return e;
+				g = i;
+				return e = gen_sub{}( e, i );
+			}
+		};
+
 		/// Original grammar
 		const ast::grammar* gram;
 		/// List of rules in current normalization
 		std::unordered_map<std::string, ptr<expr>>  rs;
+		/// Cache of pre-normalized rules
+		std::unordered_map<const ast::matcher*, state> cache;
 		/// The AST pointer being processed
 		const ast::matcher_ptr* pPtr;
 		/// The derivative expression to return for the current visit
@@ -49,6 +162,17 @@ namespace derivs {
 			pPtr = &p;
 			p->accept(this);
 			return rVal;
+		}
+
+		/// Gets a matcher, possibly from the current cache
+		ptr<expr> get_cached(const ast::matcher_ptr& p) {
+			auto key = p.get();
+			auto it = cache.find( key );
+			if ( it == cache.end() ) {
+				ptr<expr> e = process( p );
+				cache.emplace_hint( it, key, state{ e, g } );
+				return e;
+			} else return it->second.get( g );
 		}
 
 		/// Converts an AST char range into a derivative expr char_range
@@ -75,7 +199,7 @@ namespace derivs {
 					rVal = fail_expr::make();
 				} else {
 					// normalize expression
-					process( rit->second->m );
+					rVal = get_cached( rit->second->m );
 				}
 				// place in buffer
 				it->second = rVal;
@@ -93,10 +217,10 @@ namespace derivs {
 		}
 
 	public:
-		norm() : gram(nullptr), rs(), pPtr(nullptr), rVal(), g(0) {}
+		norm() : gram(nullptr), rs(), cache(), pPtr(nullptr), rVal(), g(0) {}
 
 		norm(const ast::grammar& gram)
-			: gram(&gram), rs(), pPtr(nullptr), rVal(), g(0) {}
+			: gram(&gram), rs(), cache(), pPtr(nullptr), rVal(), g(0) {}
 
 		void visit(ast::char_matcher& m) {
 			rVal = expr::make_ptr<char_expr>( m.c );
@@ -119,13 +243,13 @@ namespace derivs {
 			if ( m.rs.size() == 1 ) return;
 			
 			// Transform remaining options
-			expr_list rs{ rVal };
-			rs.reserve( m.rs.size() );
+			expr_list ms{ rVal };
+			ms.reserve( m.rs.size() );
 			while ( ++it != m.rs.end() ) {
-				rs.push_back( make_char_range(*it, m.neg) );
+				ms.push_back( make_char_range(*it, m.neg) );
 			}
-			rVal = m.neg ? expr::make_ptr<and_expr>( std::move(rs) ) :
-					expr::make_ptr<or_expr>( std::move(rs) );
+			rVal = m.neg ? expr::make_ptr<and_expr>( std::move(ms) ) :
+					expr::make_ptr<or_expr>( std::move(ms) );
 		}
 
 		void visit(ast::rule_matcher& m) {
@@ -209,7 +333,7 @@ namespace derivs {
 				process(mi);
 				es.emplace_back(rVal);
 			}
-			rVal = alt_expr::make(es);
+			rVal = alt_expr::make(std::move(es));
 		}
 		
 		void visit(ast::until_matcher& m) {
@@ -248,7 +372,7 @@ namespace derivs {
 		/// Normalize an AST node at a specified generation [default 0]
 		ptr<expr> operator() (const ast::matcher_ptr& p, gen_type g = 0) {
 			reset( g );
-			return process(p);
+			return get_cached(p);
 		}
 
 		/// Normalize the rule with the given name at a specified generation [default 0]
@@ -263,6 +387,7 @@ namespace derivs {
 			rVal.reset();
 			g = 0;
 			rs.clear();
+			cache.clear();
 		}
 	};
 }

@@ -324,7 +324,7 @@ namespace derivs {
 		switch ( nes.size() ) {
 		case 0: return ngl == no_gen ? fail_expr::make() : eps_expr::make(ngl);
 		case 1: return ngl == no_gen ? nes[0] : expr::make_ptr<opt_expr>(nes[0], ngl);
-		default: return expr::make_ptr<alt_expr>(nes, ngl);
+		default: return expr::make_ptr<alt_expr>(std::move(nes), ngl);
 		}
 	}
 	
@@ -358,7 +358,7 @@ namespace derivs {
 		switch ( des.size() ) {
 		case 0: return dgl == no_gen ? fail_expr::make() : eps_expr::make(dgl);
 		case 1: return dgl == no_gen ? des[0] : expr::make_ptr<opt_expr>(des[0], dgl);
-		default: return expr::make_ptr<alt_expr>(des, dgl);
+		default: return expr::make_ptr<alt_expr>(std::move(des), dgl);
 		}
 	}
 	

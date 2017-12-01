@@ -228,7 +228,7 @@ namespace derivs {
 		}
 		
 		void visit(seq_expr& e) {
-			out << "(seq:";
+			out << "(seq:" << e.g;
 			print_fns(&e);
 			out << " ";
 			print_unbraced(e.a);
@@ -257,7 +257,7 @@ namespace derivs {
 	}; // class printer
 }
 
-static inline void __attribute__((used)) dbgprt( derivs::ptr<derivs::expr> e ) {
+static inline void dbgprt( derivs::ptr<derivs::expr> e ) {
 	derivs::printer{ std::cerr }.print( e );
 }
 

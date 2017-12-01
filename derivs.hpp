@@ -427,6 +427,8 @@ namespace derivs {
 		alt_expr(ptr<expr> a, ptr<expr> b) : memo_expr(), es{a, b}, gl(no_gen) {}
 		
 		alt_expr(const expr_list& es, gen_type gl) : memo_expr(), es(es), gl(gl) {}
+
+		alt_expr(const expr_list&& es, gen_type gl) : memo_expr(), es(std::move(es)), gl(gl) {}
 		
 		/// Make an expression using the default generation rules
 		static ptr<expr> make(ptr<expr> a, ptr<expr> b);
