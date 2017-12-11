@@ -176,8 +176,8 @@ namespace derivs {
 		/// Accept visitor
 		virtual void accept(visitor*) = 0;
 		
-		/// At what backtracking generations does this expression match?
-		virtual gen_set match() const = 0;
+		/// At what backtracking generation does this expression match? [no_gen if none]
+		virtual gen_type match() const = 0;
 		
 		/// What backtracking generations does this expression expose?
 		virtual gen_set back() const = 0;
@@ -200,7 +200,7 @@ namespace derivs {
 		virtual ptr<expr> deriv(char, gen_type) const = 0;
 		
 		/// Actual computation of match set
-		virtual gen_set match_set() const = 0;
+		virtual gen_type match_set() const = 0;
 		
 		/// Actual computation of backtrack set
 		virtual gen_set back_set() const = 0;
@@ -212,12 +212,12 @@ namespace derivs {
 		virtual void accept(visitor*) = 0;
 		
 		virtual ptr<expr> d(char x, gen_type i) const;
-		virtual gen_set   match()   const;
+		virtual gen_type  match()   const;
 		virtual gen_set   back()    const;
 	
 	protected:
 		mutable memo_ptr<expr> memo_d; ///< Stored derivative
-		mutable gen_set memo_match;    ///< Stored match set
+		mutable gen_type memo_match;   ///< Stored match value
 		mutable gen_set memo_back;     ///< Stored backtracking set
 		/// Index of last stored derivative [no_gen for none such]
 		mutable gen_type last_index;
@@ -243,7 +243,7 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> d(char, gen_type) const;
-		virtual gen_set   match() const;
+		virtual gen_type  match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return fail_type; }
 	}; // class fail_expr
@@ -264,7 +264,7 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> d(char, gen_type) const;
-		virtual gen_set   match() const;
+		virtual gen_type  match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return inf_type; }
 	}; // class inf_expr
@@ -278,7 +278,7 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> d(char, gen_type) const;
-		virtual gen_set   match() const;
+		virtual gen_type  match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return eps_type; }
 
@@ -294,7 +294,7 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> d(char, gen_type) const;
-		virtual gen_set   match() const;
+		virtual gen_type  match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return char_type; }
 		
@@ -310,7 +310,7 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> d(char, gen_type) const;
-		virtual gen_set   match() const;
+		virtual gen_type  match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return except_type; }
 		
@@ -326,7 +326,7 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> d(char, gen_type) const;
-		virtual gen_set   match() const;
+		virtual gen_type  match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return range_type; }
 		
@@ -343,7 +343,7 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> d(char, gen_type) const;
-		virtual gen_set   match() const;
+		virtual gen_type  match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return except_range_type; }
 		
@@ -360,7 +360,7 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> d(char, gen_type) const;
-		virtual gen_set   match() const;
+		virtual gen_type  match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return any_type; }
 	}; // class any_expr
@@ -374,7 +374,7 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> d(char, gen_type) const;
-		virtual gen_set   match() const;
+		virtual gen_type  match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return none_type; }
 	}; // class none_expr
@@ -390,7 +390,7 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> d(char, gen_type) const;
-		virtual gen_set   match() const;
+		virtual gen_type  match() const;
 		virtual gen_set   back()  const;
 		virtual expr_type type()  const { return str_type; }
 		
@@ -410,11 +410,11 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char, gen_type) const;
-		virtual gen_set   match_set() const;
+		virtual gen_type  match_set() const;
 		virtual gen_set   back_set()  const;
 		virtual expr_type type()      const { return not_type; }
 		
-		virtual gen_set match() const { return not_expr::match_set(); }
+		virtual gen_type match() const { return not_expr::match_set(); }
 		virtual gen_set back()  const { return not_expr::back_set(); }
 		
 		ptr<expr> e;  ///< Subexpression to negatively match
@@ -437,7 +437,7 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char, gen_type) const;
-		virtual gen_set   match_set() const;
+		virtual gen_type  match_set() const;
 		virtual gen_set   back_set()  const;
 		virtual expr_type type()      const { return alt_type; }
 		
@@ -455,11 +455,11 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 
 		virtual ptr<expr> deriv(char, gen_type) const;
-		virtual gen_set   match_set() const;
+		virtual gen_type  match_set() const;
 		virtual gen_set   back_set()  const;
 		virtual expr_type type()      const { return opt_type; }
 
-		virtual gen_set match() const { return opt_expr::match_set(); }
+		virtual gen_type match() const { return opt_expr::match_set(); }
 
 		ptr<expr> e;  ///< Subexpression to match
 		gen_type gl;  ///< Failure match index for e
@@ -477,7 +477,7 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char, gen_type) const;
-		virtual gen_set   match_set() const;
+		virtual gen_type  match_set() const;
 		virtual gen_set   back_set()  const;
 		virtual expr_type type()      const { return or_type; }
 		
@@ -495,7 +495,7 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char, gen_type) const;
-		virtual gen_set   match_set() const;
+		virtual gen_type  match_set() const;
 		virtual gen_set   back_set()  const;
 		virtual expr_type type()      const { return and_type; }
 		
@@ -523,7 +523,7 @@ namespace derivs {
 		void accept(visitor* v) { v->visit(*this); }
 		
 		virtual ptr<expr> deriv(char, gen_type) const;
-		virtual gen_set   match_set() const;
+		virtual gen_type  match_set() const;
 		virtual gen_set   back_set()  const;
 		virtual expr_type type()      const { return seq_type; }
 		

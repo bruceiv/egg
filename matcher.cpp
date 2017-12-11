@@ -43,8 +43,7 @@ namespace derivs {
 
 		// Take derivatives until failure, match, or end-of-input
 		while ( true ) {
-			// if ( dbg ) { derivs::printer{}.print( e ); }
-			if ( dbg ) dbgprt( e );
+			if ( dbg ) { derivs::printer{}.print( e ); }
 			if ( stats ) { (*stats)(*e); }
 
 			switch ( e->type() ) {
@@ -55,7 +54,7 @@ namespace derivs {
 			}
 
 			// Break on a match
-			if ( ! e->match().empty() ) return true;
+			if ( e->match() != no_gen ) return true;
 
 			// take next character, \0 for EOF
 			char x;
@@ -74,6 +73,6 @@ namespace derivs {
 		if ( stats ) { (*stats)(*e); }
 
 		// Match if final expression matched on terminator char
-		return ! e->match().empty();
+		return e->match() != no_gen;
 	}
 }

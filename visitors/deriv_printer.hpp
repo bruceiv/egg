@@ -115,10 +115,9 @@ namespace derivs {
 			out << "b";
 			print_set(eb);
 
-			gen_set em = e->match();
-			if ( em.empty() ) return;
-			out << "m";
-			print_set(em);
+			gen_type em = e->match();
+			if ( em == no_gen ) return;
+			out << "m[" << em << "]";
 		}
 	public:
 		/// Default printer

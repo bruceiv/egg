@@ -59,7 +59,7 @@ namespace derivs {
 	void memo_expr::reset_memo() {
 		// memo_d.reset();
 		// last_index = no_gen;
-		memo_match = gen_set{};
+		memo_match = no_gen;
 		memo_back = gen_set{};
 		flags = {false,false};
 	}
@@ -78,7 +78,7 @@ namespace derivs {
 		return dx;
 	}
 	
-	gen_set memo_expr::match() const {
+	gen_type memo_expr::match() const {
 		if ( ! flags.match ) {
 			memo_match = match_set();
 			flags.match = true;
@@ -109,7 +109,7 @@ namespace derivs {
 		return fail_expr::make();
 	}
 		
-	gen_set fail_expr::match() const { return gen_set{}; }
+	gen_type fail_expr::match() const { return no_gen; }
 	
 	gen_set fail_expr::back()  const { return gen_set{}; }
 	
@@ -125,7 +125,7 @@ namespace derivs {
 		return inf_expr::make();
 	}
 	
-	gen_set inf_expr::match() const { return gen_set{}; }
+	gen_type inf_expr::match() const { return no_gen; }
 	
 	gen_set inf_expr::back()  const { return gen_set{}; }
 	
@@ -140,7 +140,7 @@ namespace derivs {
 		return eps_expr::make(g);
 	}
 	
-	gen_set eps_expr::match() const { return gen_set{g}; }
+	gen_type eps_expr::match() const { return g; }
 	
 	gen_set eps_expr::back()  const { return gen_set{g}; }
 	
@@ -153,7 +153,7 @@ namespace derivs {
 		return ( c == x ) ? eps_expr::make(i) : fail_expr::make();
 	}
 	
-	gen_set char_expr::match() const { return gen_set{}; }
+	gen_type char_expr::match() const { return no_gen; }
 	
 	gen_set char_expr::back()  const { return gen_set{}; }
 
@@ -166,7 +166,7 @@ namespace derivs {
 		return ( c != x ) ? eps_expr::make(i) : fail_expr::make();
 	}
 	
-	gen_set except_expr::match() const { return gen_set{}; }
+	gen_type except_expr::match() const { return no_gen; }
 	
 	gen_set except_expr::back()  const { return gen_set{}; }
 	
@@ -179,7 +179,7 @@ namespace derivs {
 		return ( b <= x && x <= e ) ? eps_expr::make(i) : fail_expr::make();
 	}
 	
-	gen_set range_expr::match() const { return gen_set{}; }
+	gen_type range_expr::match() const { return no_gen; }
 	
 	gen_set range_expr::back()  const { return gen_set{}; }
 
@@ -194,7 +194,7 @@ namespace derivs {
 		return ( b > x || x > e ) ? eps_expr::make(i) : fail_expr::make();
 	}
 	
-	gen_set except_range_expr::match() const { return gen_set{}; }
+	gen_type except_range_expr::match() const { return no_gen; }
 	
 	gen_set except_range_expr::back()  const { return gen_set{}; }
 	
@@ -207,7 +207,7 @@ namespace derivs {
 		return ( x == '\0' ) ? fail_expr::make() : eps_expr::make(i);
 	}
 	
-	gen_set any_expr::match() const { return gen_set{}; }
+	gen_type any_expr::match() const { return no_gen; }
 	
 	gen_set any_expr::back()  const { return gen_set{}; }
 
@@ -220,7 +220,7 @@ namespace derivs {
 		return ( x == '\0' ) ? eps_expr::make(i) : fail_expr::make();
 	}
 	
-	gen_set none_expr::match() const { return gen_set{}; }
+	gen_type none_expr::match() const { return no_gen; }
 	
 	gen_set none_expr::back()  const { return gen_set{}; }
 	
@@ -244,7 +244,7 @@ namespace derivs {
 		return ptr<expr>{new str_expr(sp, si+1)};
 	}
 	
-	gen_set str_expr::match() const { return gen_set{}; }
+	gen_type str_expr::match() const { return no_gen; }
 	
 	gen_set str_expr::back()  const { return gen_set{}; }
 	
@@ -259,7 +259,7 @@ namespace derivs {
 		}
 		
 		// return failure on subexpression success
-		if ( ! e->match().empty() ) return fail_expr::make();
+		if ( e->match() != no_gen ) return fail_expr::make();
 		
 		return expr::make_ptr<not_expr>(e, g);
 	}
@@ -269,7 +269,7 @@ namespace derivs {
 		return not_expr::make(e->d(x, i), g);
 	}
 	
-	gen_set not_expr::match_set() const { return gen_set{}; }
+	gen_type not_expr::match_set() const { return no_gen; }
 	
 	gen_set not_expr::back_set() const { return gen_set{g}; }
 	
@@ -286,7 +286,7 @@ namespace derivs {
 		
 		auto bt = b->type();
 		// if second alternative fails or first alternative matches, use first
-		if ( bt == fail_type || ! a->match().empty() ) return a;
+		if ( bt == fail_type || a->match() != no_gen ) return a;
 		
 		// if second alternative is empty, mark without node
 		if ( bt == eps_type ) {
@@ -317,7 +317,7 @@ namespace derivs {
 			nes.push_back(e);
 			
 			// infinite loops and matching nodes end the alternation
-			if ( ety == inf_type || ! e->match().empty() ) break;
+			if ( ety == inf_type || e->match() != no_gen ) break;
 		}
 
 		// Eliminate alternation node if not enough nodes left
@@ -348,7 +348,7 @@ namespace derivs {
 			des.push_back(de);
 
 			// infinite loops and matching nodes end the alternation
-			if ( dety == inf_type || ! de->match().empty() ) {
+			if ( dety == inf_type || de->match() != no_gen ) {
 				dgl = no_gen;
 				break;
 			}
@@ -362,9 +362,9 @@ namespace derivs {
 		}
 	}
 	
-	gen_set alt_expr::match_set() const {
+	gen_type alt_expr::match_set() const {
 		// invariant: gl is set, or only the last alternative may match
-		if ( gl != no_gen ) { return gen_set{ gl }; }
+		if ( gl != no_gen ) { return gl; }
 		return es.back()->match();
 	}
 	
@@ -385,7 +385,7 @@ namespace derivs {
 		}
 		
 		// return subexpression on match
-		if ( ! e->match().empty() ) return e;
+		if ( e->match() != no_gen ) return e;
 		
 		return expr::make_ptr<opt_expr>(e, gl);
 	}
@@ -395,7 +395,7 @@ namespace derivs {
 		return opt_expr::make( e->d(x, i), gl );
 	}
 	
-	gen_set opt_expr::match_set() const { return gen_set{gl}; }
+	gen_type opt_expr::match_set() const { return gl; }
 	
 	gen_set opt_expr::back_set() const {
 		gen_set eb = e->back();
@@ -421,7 +421,7 @@ namespace derivs {
 		return fail_expr::make();
 	}
 	
-	gen_set or_expr::match_set() const { return gen_set{}; }
+	gen_type or_expr::match_set() const { return no_gen; }
 	
 	gen_set or_expr::back_set() const { return gen_set{}; }
 
@@ -443,7 +443,7 @@ namespace derivs {
 		return eps_expr::make(i);
 	}
 	
-	gen_set and_expr::match_set() const { return gen_set{}; }
+	gen_type and_expr::match_set() const { return no_gen; }
 	
 	gen_set and_expr::back_set() const { return gen_set{}; }
 	
@@ -551,33 +551,27 @@ namespace derivs {
 		return expr::make_ptr<seq_expr>(da, b, std::move(dbs), i);
 	}
 	
-	gen_set seq_expr::match_set() const {
-		gen_set x;
+	gen_type seq_expr::match_set() const {
+		// No match if a does not match
+		gen_type am = a->match();
+		if ( am == no_gen ) return no_gen;
 
-		// Include matches from matching lookahead successors
-		gen_set am = a->match();
-		if ( am.empty() ) return x;
+		// check current-gen lookahead
+		if ( am == g && b->nbl() ) return g;
 
-		auto at = am.begin();
-		auto bit = bs.begin();
-		while ( at != am.end() && bit != bs.end() ) {
-			auto& bi = *bit;
-			auto  ai = *at;
-			
-			// Find matching generations
-			if ( bi.g < ai ) { ++bit; continue; }
-			else if ( bi.g > ai ) { ++at; continue; }
-			
-			// Add followers to match set as well as follower match-fail
-			set_union( x, bi.e->match() );
-			
-			++at; ++bit;
+		// find match in lookahead followers if appropriate
+		for ( const auto& bi : bs ) {
+			// skip earlier generations
+			if ( bi.g < am ) continue;
+			// generations are sorted; can't find one here
+			if ( bi.g > am ) return no_gen;
+
+			// return match of matching generation
+			return bi.e->match();
 		}
 
-		// account for lazy generation of current-gen lookahead
-		if ( last( am ) == g && b->nbl() ) { set_add( x, g ); }
-		
-		return x;
+		// no match if can't find lookahead follower
+		return no_gen;
 	}
 	
 	gen_set seq_expr::back_set() const {
