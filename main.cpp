@@ -34,12 +34,12 @@
 #include "visitors/printer.hpp"
 
 /** Egg version */
-static const char* VERSION = "0.3.1";
+static const char* VERSION = "0.3.2";
 
 /** Egg usage string */
 static const char* USAGE = 
 "[-c print|compile] [-i input_file] [-o output_file]\n\
- [--dbg] [--no-norm] [--no-memo] [--help] [--version] [--usage]";
+ [--dbg] [--no-norm] [--no-memo] [--quiet] [--help] [--version] [--usage]";
 
 /** Full Egg help string */
 static const char* HELP = 
@@ -53,6 +53,7 @@ Supported flags are\n\
  -n --name     grammar name - if none given, takes the longest prefix of\n\
                the input or output file name (output preferred) which is a\n\
                valid Egg identifier (default empty)\n\
+ -q --quiet    suppress warning output\n\
  --dbg         turn on debugging\n\
  --no-norm     turns off grammar normalization\n\
  --no-memo     turns of grammar memoization\n\
@@ -171,7 +172,7 @@ public:
 	args(int argc, char** argv) 
 		: in(nullptr), out(nullptr), 
 		  inName(), outName(), outType(STREAM_TYPE), pName(), 
-		  dbgFlag(false), nameFlag(false), normFlag(true), memoFlag(true), 
+		  dbgFlag(false), nameFlag(false), normFlag(true), memoFlag(true), quietFlag(false),
 		  eMode(COMPILE_MODE) {
 		
 		i = 1;
@@ -200,6 +201,8 @@ public:
 				normFlag = false;
 			} else if ( eq("--no-memo", argv[i]) ) {
 				memoFlag = false;
+			} else if ( match("-i", "--quiet", argv[i]) ) {
+				quietFlag = true;
 			} else if ( eq("--usage", argv[i]) ) {
 				eMode = USAGE_MODE;
 			} else if ( eq("--help", argv[i]) ) {
@@ -228,6 +231,7 @@ public:
 	bool dbg()  { return dbgFlag; }
 	bool norm() { return normFlag; }
 	bool memo() { return memoFlag; }
+	bool quiet() { return quietFlag; }
 	egg_mode mode() { return eMode; }
 
 private:
@@ -242,21 +246,12 @@ private:
 	bool nameFlag;		  ///< has the parser name been explicitly set?
 	bool normFlag;        ///< should egg do grammar normalization?
 	bool memoFlag;        ///< should the generated grammar do memoization?
+	bool quietFlag;       ///< should warnings be suppressed?
 	egg_mode eMode;		  ///< compiler mode to use
 };
 
 /** Command line interface
  *  egg [command] [flags] [input-file [output-file]]
- *  
- *  Supported flags are
- *  -i --input    input file (default stdin)
- *  -o --output   output file (default stdout)
- *  -c --command  command - either compile, print, help, usage, or version
- *                (default compile)
- *  --no-norm     turns off grammar normalization
- *  --usage       print usage message
- *  --help        print full help message
- *  --version     print version string
  */
 int main(int argc, char** argv) {
 
@@ -293,8 +288,10 @@ int main(int argc, char** argv) {
 		} case COMPILE_MODE: {  // Compile grammar
 			visitor::compiler c(a.name(), a.output(), (a.outputType() != CPP_SOURCE));
 			c.memo(a.memo());
-			c.compile(*g);
-			break;
+			auto warnings = c.compile(*g);
+			if ( ! a.quiet() ) for ( auto&& warning : warnings ) {
+				std::cerr << "WARNING: " << warning << std::endl;
+			}
 			break;
 		} default: break;
 		}
